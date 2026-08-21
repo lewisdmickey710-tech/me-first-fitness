@@ -108,10 +108,12 @@ function ClientLogin() {
 }
 
 function CoachLogin() {
+  const [mode, setMode] = useState<"signin" | "forgot">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -128,6 +130,66 @@ function CoachLogin() {
     } else {
       window.location.href = "/";
     }
+  }
+
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset-password`,
+    });
+    setLoading(false);
+    if (error) {
+      setError(error.message);
+    } else {
+      setResetSent(true);
+    }
+  }
+
+  if (mode === "forgot") {
+    if (resetSent) {
+      return (
+        <div className="py-4 text-center">
+          <Heart className="mb-2 inline-block text-lg" />
+          <p className="font-medium text-ink">Check your email</p>
+          <p className="mt-1 text-sm text-gray">
+            We sent a password reset link to {email}. Open it on this device.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <form onSubmit={handleForgotPassword} className="space-y-3">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ink">
+            Email
+          </label>
+          <Input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="coach@mefirstfitness.com"
+          />
+        </div>
+        {error ? <p className="text-sm text-pink">{error}</p> : null}
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? "Sending…" : "Send reset link"}
+        </Button>
+        <button
+          type="button"
+          onClick={() => {
+            setMode("signin");
+            setError(null);
+          }}
+          className="block w-full text-center text-xs text-gray hover:text-ink"
+        >
+          Back to sign in
+        </button>
+      </form>
+    );
   }
 
   return (
@@ -159,6 +221,16 @@ function CoachLogin() {
       <Button type="submit" className="w-full" disabled={loading}>
         {loading ? "Signing in…" : "Sign in"}
       </Button>
+      <button
+        type="button"
+        onClick={() => {
+          setMode("forgot");
+          setError(null);
+        }}
+        className="block w-full text-center text-xs text-gray hover:text-ink"
+      >
+        Forgot password?
+      </button>
     </form>
   );
 }
