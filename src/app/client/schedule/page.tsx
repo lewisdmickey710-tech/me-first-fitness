@@ -282,15 +282,27 @@ export default async function ClientSchedulePage({
             </p>
           ))}
 
-          {selectedCell.status === "scheduled" && selectedSchedules.length > 0 ? (
+          {selectedCell.status === "scheduled" ? (
             (() => {
-              const hours = hoursUntilOccurrence(
-                selectedCell.date,
-                selectedSchedules[0].time_of_day
+              // One-off confirmed requests have no recurring schedule --
+              // the time they asked for (if any) is stashed in notes as
+              // "Confirmed request — HH:MM" when setRequestStatus created
+              // this row, so pull it back out for the late-cancel check.
+              const oneOffTimeMatch = selectedOccurrence?.notes?.match(
+                /Confirmed request — (\d{2}:\d{2})/
               );
-              const wouldBeLate = hours < LATE_CANCEL_NOTICE_HOURS;
-              const isPast = hours < -24;
+              const timeOfDay =
+                selectedSchedules[0]?.time_of_day ?? oneOffTimeMatch?.[1] ?? null;
+              const scheduleId = selectedSchedules[0]?.id ?? null;
+
+              const hours = timeOfDay
+                ? hoursUntilOccurrence(selectedCell.date, timeOfDay)
+                : null;
+              const wouldBeLate = hours !== null && hours < LATE_CANCEL_NOTICE_HOURS;
+              const isPast =
+                hours !== null ? hours < -24 : selectedCell.date < todayStr;
               if (isPast) return null;
+
               return (
                 <div className="flex flex-wrap items-center gap-2 border-t border-grayLt pt-3">
                   {wouldBeLate ? (
@@ -298,15 +310,16 @@ export default async function ClientSchedulePage({
                       Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours
                       notice — this will count as a late cancellation.
                     </p>
+                  ) : timeOfDay === null ? (
+                    <p className="w-full text-xs text-gray">
+                      No exact time on file for this one — cancelling won&apos;t
+                      be checked against the 12-hour notice window.
+                    </p>
                   ) : null}
                   <form
                     action={async () => {
                       "use server";
-                      await cancelMySession(
-                        selectedSchedules[0].id,
-                        selectedCell.date,
-                        selectedSchedules[0].time_of_day
-                      );
+                      await cancelMySession(scheduleId, selectedCell.date, timeOfDay);
                     }}
                   >
                     <Button type="submit" variant="danger">

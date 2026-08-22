@@ -133,16 +133,19 @@ export async function submitRequest(formData: FormData) {
 }
 
 export async function cancelMySession(
-  clientScheduleId: string,
+  clientScheduleId: string | null,
   occurrenceDate: string,
-  timeOfDay: string
+  timeOfDay: string | null
 ) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
 
   const supabase = await createClient();
 
-  const late = isLateCancellation(occurrenceDate, timeOfDay);
+  // A one-off confirmed request has no recurring schedule (and often no
+  // stored time), so lateness can only be judged when we actually have a
+  // time to check against -- otherwise it's just a plain cancel.
+  const late = timeOfDay ? isLateCancellation(occurrenceDate, timeOfDay) : false;
   const status = late ? "late_cancelled" : "cancelled";
 
   const { data: occurrence, error } = await supabase
@@ -150,7 +153,7 @@ export async function cancelMySession(
     .upsert(
       {
         client_id: me.id,
-        client_schedule_id: clientScheduleId,
+        ...(clientScheduleId ? { client_schedule_id: clientScheduleId } : {}),
         occurrence_date: occurrenceDate,
         status,
       },
