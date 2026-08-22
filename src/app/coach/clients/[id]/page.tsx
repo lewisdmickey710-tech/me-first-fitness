@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -1400,6 +1401,12 @@ function CheckinsTab({
   );
 }
 
+const WELLNESS_LEVEL_CLASS: Record<number, string> = {
+  1: "border-teal bg-teal",
+  2: "border-gold bg-gold",
+  3: "border-pink bg-pink",
+};
+
 function WellnessTab({
   habits,
   habitLogs,
@@ -1411,31 +1418,61 @@ function WellnessTab({
   symptomLogs: ClientSymptomLog[];
   nutritionLogs: ClientNutritionLog[];
 }) {
-  const loggedCountByHabit = new Map<string, number>();
-  for (const l of habitLogs) {
-    loggedCountByHabit.set(l.habit_id, (loggedCountByHabit.get(l.habit_id) ?? 0) + 1);
+  const now = nowInBusinessTz();
+  const last7Days: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    last7Days.push(toDateString(d));
   }
+
+  const levelByHabitAndDate = new Map(
+    habitLogs.map((l) => [`${l.habit_id}:${l.log_date}`, l.level])
+  );
 
   return (
     <div className="space-y-6">
       <div>
         <p className="text-sm font-medium text-gray">Habits (last 7 days)</p>
+        <p className="mt-1 text-xs text-gray">
+          Client-set colors — <span className="text-teal">teal</span>,{" "}
+          <span className="text-gold">gold</span>,{" "}
+          <span className="text-pink">pink</span> — whatever level they
+          assigned that day for that habit.
+        </p>
         {habits.length === 0 ? (
           <EmptyState
             title="No habits tracked"
             body="This client hasn't set up any personal habit tracking yet — entirely optional on their end."
           />
         ) : (
-          <div className="mt-2 space-y-2">
-            {habits.map((h) => (
-              <Card key={h.id} className="flex items-center justify-between">
-                <span className="text-sm text-ink">{h.name}</span>
-                <Badge tone="teal">
-                  {loggedCountByHabit.get(h.id) ?? 0}/7 days
-                </Badge>
-              </Card>
-            ))}
-          </div>
+          <Card className="mt-2 space-y-3">
+            <div className="grid grid-cols-[1fr_repeat(7,1.75rem)] items-center gap-x-1 gap-y-2 text-xs text-gray">
+              <div />
+              {last7Days.map((d) => (
+                <div key={d} className="text-center">
+                  {d.slice(5)}
+                </div>
+              ))}
+              {habits.map((h) => (
+                <Fragment key={h.id}>
+                  <span className="truncate text-sm text-ink">{h.name}</span>
+                  {last7Days.map((d) => {
+                    const level = levelByHabitAndDate.get(`${h.id}:${d}`);
+                    return (
+                      <div key={`${h.id}-${d}`} className="flex justify-center">
+                        <span
+                          className={`inline-block h-4 w-4 rounded-full border ${
+                            level ? WELLNESS_LEVEL_CLASS[level] : "border-grayLt bg-white"
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </Fragment>
+              ))}
+            </div>
+          </Card>
         )}
       </div>
 

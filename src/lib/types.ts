@@ -202,6 +202,7 @@ export interface ClientHabitLog {
   habit_id: string;
   client_id: string;
   log_date: string;
+  level: number;
   created_at: string;
 }
 

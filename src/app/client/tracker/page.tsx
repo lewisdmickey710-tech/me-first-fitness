@@ -6,10 +6,10 @@ import {
   addHabit,
   addNutritionLog,
   addSymptomLog,
+  cycleHabitLog,
   deleteHabit,
   deleteNutritionLog,
   deleteSymptomLog,
-  toggleHabitLog,
 } from "@/app/client/actions";
 import {
   Badge,
@@ -31,6 +31,12 @@ import type {
 } from "@/lib/types";
 
 const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
+
+const LEVEL_CLASS: Record<number, string> = {
+  1: "border-teal bg-teal",
+  2: "border-gold bg-gold",
+  3: "border-pink bg-pink",
+};
 
 export default async function ClientTrackerPage() {
   const me = await getMyClient();
@@ -88,8 +94,8 @@ export default async function ClientTrackerPage() {
       .limit(20) as unknown as Promise<{ data: ClientNutritionLog[] | null }>,
   ]);
 
-  const loggedByHabitAndDate = new Set(
-    (habitLogs ?? []).map((l) => `${l.habit_id}:${l.log_date}`)
+  const levelByHabitAndDate = new Map(
+    (habitLogs ?? []).map((l) => [`${l.habit_id}:${l.log_date}`, l.level])
   );
 
   return (
@@ -112,6 +118,14 @@ export default async function ClientTrackerPage() {
       {/* Habits */}
       <div className="space-y-3">
         <h2 className="text-lg font-semibold text-rose">Habits</h2>
+        <p className="text-sm text-gray">
+          Tap a day to cycle it through a level —{" "}
+          <span className="font-medium text-teal">teal</span> →{" "}
+          <span className="font-medium text-gold">gold</span> →{" "}
+          <span className="font-medium text-pink">pink</span> → clear. Use it
+          however makes sense to you — done/not done, or how mild to severe
+          something was.
+        </p>
 
         {(habits ?? []).length === 0 ? (
           <EmptyState
@@ -153,26 +167,27 @@ export default async function ClientTrackerPage() {
                     </form>
                   </div>
                   {last7Days.map((d) => {
-                    const done = loggedByHabitAndDate.has(`${habit.id}:${d}`);
+                    const level = levelByHabitAndDate.get(`${habit.id}:${d}`);
                     return (
                       <form
                         key={`${habit.id}-${d}`}
                         action={async () => {
                           "use server";
-                          await toggleHabitLog(habit.id, d);
+                          await cycleHabitLog(habit.id, d);
                         }}
                         className="flex justify-center"
                       >
                         <button
                           type="submit"
-                          className={`h-6 w-6 rounded-full border text-xs transition ${
-                            done
-                              ? "border-rose bg-rose text-white"
-                              : "border-grayLt bg-white text-transparent hover:border-rose/40"
+                          className={`h-6 w-6 rounded-full border transition ${
+                            level
+                              ? LEVEL_CLASS[level]
+                              : "border-grayLt bg-white hover:border-rose/40"
                           }`}
-                        >
-                          ✓
-                        </button>
+                          aria-label={
+                            level ? `Level ${level} — tap to change` : "Tap to log"
+                          }
+                        />
                       </form>
                     );
                   })}

@@ -645,19 +645,28 @@ export async function deleteHabit(habitId: string) {
   revalidatePath("/client/tracker");
 }
 
-export async function toggleHabitLog(habitId: string, logDate: string) {
+// Cycles a day-box through empty -> level 1 (teal) -> level 2 (gold) ->
+// level 3 (pink) -> empty. A single click target is simpler here than a
+// color-swatch picker given the app has no client-side interactivity to
+// pop one open, and the cycle is short enough to tap through.
+export async function cycleHabitLog(habitId: string, logDate: string) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
 
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from("client_habit_logs")
-    .select("id")
+    .select("id, level")
     .eq("habit_id", habitId)
     .eq("log_date", logDate)
     .maybeSingle();
 
-  if (existing) {
+  if (!existing) {
+    const { error } = await supabase
+      .from("client_habit_logs")
+      .insert({ habit_id: habitId, client_id: me.id, log_date: logDate, level: 1 });
+    if (error) throw new Error(error.message);
+  } else if (existing.level >= 3) {
     const { error } = await supabase
       .from("client_habit_logs")
       .delete()
@@ -666,7 +675,8 @@ export async function toggleHabitLog(habitId: string, logDate: string) {
   } else {
     const { error } = await supabase
       .from("client_habit_logs")
-      .insert({ habit_id: habitId, client_id: me.id, log_date: logDate });
+      .update({ level: existing.level + 1 })
+      .eq("id", existing.id);
     if (error) throw new Error(error.message);
   }
 
