@@ -3,7 +3,12 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/reset-password"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/auth/reset-password",
+  "/request-assessment",
+];
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -50,22 +55,34 @@ export async function updateSession(request: NextRequest) {
       .single();
 
     const role = profile?.role ?? "client";
+    const homeFor = (r: string) =>
+      r === "coach"
+        ? "/coach/roster"
+        : r === "lead"
+          ? "/lead/dashboard"
+          : "/client/dashboard";
 
     if (path === "/login" || path === "/") {
       const url = request.nextUrl.clone();
-      url.pathname = role === "coach" ? "/coach/roster" : "/client/dashboard";
+      url.pathname = homeFor(role);
       return NextResponse.redirect(url);
     }
 
     if (path.startsWith("/coach") && role !== "coach") {
       const url = request.nextUrl.clone();
-      url.pathname = "/client/dashboard";
+      url.pathname = homeFor(role);
       return NextResponse.redirect(url);
     }
 
     if (path.startsWith("/client") && role !== "client") {
       const url = request.nextUrl.clone();
-      url.pathname = "/coach/roster";
+      url.pathname = homeFor(role);
+      return NextResponse.redirect(url);
+    }
+
+    if (path.startsWith("/lead") && role !== "lead") {
+      const url = request.nextUrl.clone();
+      url.pathname = homeFor(role);
       return NextResponse.redirect(url);
     }
   }

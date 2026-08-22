@@ -41,6 +41,18 @@ export default function LoginPage() {
 
         {tab === "client" ? <ClientLogin /> : <CoachLogin />}
       </Card>
+
+      {tab === "client" ? (
+        <p className="mt-4 text-center text-xs text-gray">
+          New here?{" "}
+          <a
+            href="/request-assessment"
+            className="text-rose hover:underline"
+          >
+            Request a free assessment
+          </a>
+        </p>
+      ) : null}
     </div>
   );
 }

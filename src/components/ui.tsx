@@ -196,6 +196,31 @@ export function Select({
   );
 }
 
+export function Checkbox({
+  label,
+  name,
+  value,
+  defaultChecked,
+}: {
+  label: string;
+  name: string;
+  value?: string;
+  defaultChecked?: boolean;
+}) {
+  return (
+    <label className="flex items-center gap-2 text-sm text-ink">
+      <input
+        type="checkbox"
+        name={name}
+        value={value}
+        defaultChecked={defaultChecked}
+        className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
+      />
+      {label}
+    </label>
+  );
+}
+
 export function Badge({
   children,
   tone = "rose",

@@ -1,4 +1,4 @@
-export type Role = "coach" | "client";
+export type Role = "coach" | "client" | "lead";
 
 export interface Profile {
   id: string;
@@ -196,4 +196,101 @@ export interface Measurement {
   notes: string | null;
   logged_by: "coach" | "client";
   created_at: string;
+}
+
+export type LeadStatus = "new" | "converted" | "archived";
+
+export interface Lead {
+  id: string;
+  user_id: string | null;
+  name: string;
+  email: string;
+  phone: string | null;
+  note: string | null;
+  status: LeadStatus;
+  converted_client_id: string | null;
+  created_at: string;
+}
+
+export interface LeadAssessmentRequest {
+  id: string;
+  lead_id: string;
+  preferred_date: string;
+  preferred_time: string | null;
+  note: string | null;
+  status: RequestStatus;
+  created_at: string;
+}
+
+export type MedicalClearance = "have_clearance" | "in_progress" | "not_needed";
+export type NutritionRelationship =
+  | "comfortable"
+  | "complicated"
+  | "actively_working"
+  | "rather_not_say";
+
+export interface LeadIntake {
+  id: string;
+  lead_id: string;
+  date_of_birth: string | null;
+  why_here: string | null;
+  why_worthwhile: string | null;
+  fall_past_year: boolean;
+  near_fall: boolean;
+  fear_of_falling: boolean;
+  balance_notes: string | null;
+  osteoporosis: boolean;
+  joint_replacement: boolean;
+  arthritis: boolean;
+  bones_notes: string | null;
+  medications: string | null;
+  doctor_name: string | null;
+  medical_clearance: MedicalClearance | null;
+  lives_alone: boolean;
+  drives_self: boolean;
+  stairs_daily: boolean;
+  day_to_day_notes: string | null;
+  pain_location: string | null;
+  pain_duration: string | null;
+  pain_better: string | null;
+  pain_worse: string | null;
+  pain_type: string[] | null;
+  energy_scale: number | null;
+  sleep_scale: number | null;
+  stress_scale: number | null;
+  confidence_scale: number | null;
+  nutrition_relationship: NutritionRelationship | null;
+  nutrition_notes: string | null;
+  support_system: string | null;
+  competing_demands: string | null;
+  submitted_at: string | null;
+  created_at: string;
+}
+
+export type MovementName =
+  | "squat"
+  | "deadlift_hinge"
+  | "lunge"
+  | "push_up"
+  | "plank"
+  | "row";
+export type MovementPlan = "regress" | "maintain" | "progress";
+
+export interface LeadMovementScreening {
+  id: string;
+  lead_id: string;
+  date: string;
+  modifications_observations: string | null;
+  coach_notes: string | null;
+  created_at: string;
+}
+
+export interface LeadMovementScreeningResult {
+  id: string;
+  screening_id: string;
+  movement: MovementName;
+  score: number | null;
+  pain: boolean;
+  plan: MovementPlan | null;
+  notes: string | null;
 }
