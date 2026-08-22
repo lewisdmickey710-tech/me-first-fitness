@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { setRequestStatus } from "@/app/coach/actions";
+import { advancePhase, setRequestStatus } from "@/app/coach/actions";
 import {
   Badge,
   Button,
@@ -10,11 +10,14 @@ import {
   Heart,
   PhaseBanner,
 } from "@/components/ui";
-import { trackName } from "@/lib/constants";
+import { phaseInfo } from "@/lib/constants";
+import { weekInPhase } from "@/lib/phase";
 import type {
   Activity,
+  CareProfile,
   Checkin,
   Client,
+  ClientPhaseHistory,
   SessionRequest,
   TrainingSession,
 } from "@/lib/types";
@@ -45,43 +48,58 @@ export default async function ClientDetailPage({
 
   const { data: client } = (await supabase
     .from("clients")
-    .select("*")
+    .select("*, care_profiles(*)")
     .eq("id", id)
-    .single()) as { data: Client | null };
+    .single()) as {
+    data: (Client & { care_profiles: CareProfile | null }) | null;
+  };
 
   if (!client) notFound();
 
-  const [{ data: sessions }, { data: checkins }, { data: activities }, { data: requests }] =
-    await Promise.all([
-      supabase
-        .from("sessions")
-        .select("*")
-        .eq("client_id", id)
-        .order("date", { ascending: false }) as unknown as Promise<{
-        data: TrainingSession[] | null;
-      }>,
-      supabase
-        .from("checkins")
-        .select("*")
-        .eq("client_id", id)
-        .order("date", { ascending: false }) as unknown as Promise<{
-        data: Checkin[] | null;
-      }>,
-      supabase
-        .from("activities")
-        .select("*")
-        .eq("client_id", id)
-        .order("date", { ascending: false }) as unknown as Promise<{
-        data: Activity[] | null;
-      }>,
-      supabase
-        .from("requests")
-        .select("*")
-        .eq("client_id", id)
-        .order("created_at", { ascending: false }) as unknown as Promise<{
-        data: SessionRequest[] | null;
-      }>,
-    ]);
+  const [
+    { data: sessions },
+    { data: checkins },
+    { data: activities },
+    { data: requests },
+    { data: currentPhase },
+  ] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: TrainingSession[] | null;
+    }>,
+    supabase
+      .from("checkins")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: Checkin[] | null;
+    }>,
+    supabase
+      .from("activities")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: Activity[] | null;
+    }>,
+    supabase
+      .from("requests")
+      .select("*")
+      .eq("client_id", id)
+      .order("created_at", { ascending: false }) as unknown as Promise<{
+      data: SessionRequest[] | null;
+    }>,
+    supabase
+      .from("client_phase_history")
+      .select("*")
+      .eq("client_id", id)
+      .is("ended_on", null)
+      .order("started_on", { ascending: false })
+      .limit(1)
+      .maybeSingle() as unknown as Promise<{ data: ClientPhaseHistory | null }>,
+  ]);
 
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
@@ -95,9 +113,9 @@ export default async function ClientDetailPage({
       </Link>
 
       <PhaseBanner
-        phase={client.phase}
+        phase={currentPhase?.phase ?? "n/a"}
         title={client.name}
-        subtitle={trackName(client.track)}
+        subtitle={client.care_profiles?.name ?? "No care profile set"}
       />
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">
@@ -122,6 +140,7 @@ export default async function ClientDetailPage({
       {tab === "overview" && (
         <Overview
           client={client}
+          currentPhase={currentPhase}
           sessionsUsed={sessionsUsed}
           recentSessions={sessions?.slice(0, 3) ?? []}
         />
@@ -142,16 +161,52 @@ export default async function ClientDetailPage({
 
 function Overview({
   client,
+  currentPhase,
   sessionsUsed,
   recentSessions,
 }: {
   client: Client;
+  currentPhase: ClientPhaseHistory | null;
   sessionsUsed: number;
   recentSessions: TrainingSession[];
 }) {
   const allotted = client.sessions_allotted;
   return (
     <div className="space-y-4">
+      {currentPhase ? (
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray">
+                Cycle {currentPhase.cycle_number} · {phaseInfo(currentPhase.phase).name}
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-ink">
+                Week {weekInPhase(currentPhase.started_on)}
+                <span className="text-base font-normal text-gray">
+                  {" "}
+                  (planned {currentPhase.planned_weeks})
+                </span>
+              </p>
+            </div>
+            <form
+              action={async () => {
+                "use server";
+                await advancePhase(client.id);
+              }}
+            >
+              <Button type="submit" variant="secondary">
+                {currentPhase.phase === "4" ? "Start new cycle" : "Advance phase"}
+              </Button>
+            </form>
+          </div>
+        </Card>
+      ) : (
+        <EmptyState
+          title="No active phase"
+          body="This client isn't on a care profile with phase tracking yet."
+        />
+      )}
+
       <Card>
         <p className="text-sm font-medium text-gray">Sessions</p>
         {allotted ? (

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
-import { trackName } from "@/lib/constants";
-import type { SessionRequest, TrainingSession } from "@/lib/types";
+import { getCurrentPhase, weekInPhase } from "@/lib/phase";
+import type { CareProfile, SessionRequest, TrainingSession } from "@/lib/types";
 
 export default async function ClientDashboard() {
   const me = await getMyClient();
@@ -19,21 +19,30 @@ export default async function ClientDashboard() {
 
   const supabase = await createClient();
 
-  const [{ data: sessions }, { data: requests }] = await Promise.all([
-    supabase
-      .from("sessions")
-      .select("*")
-      .eq("client_id", me.id)
-      .order("date", { ascending: false })
-      .limit(5) as unknown as Promise<{ data: TrainingSession[] | null }>,
-    supabase
-      .from("requests")
-      .select("*")
-      .eq("client_id", me.id)
-      .eq("status", "pending") as unknown as Promise<{
-      data: SessionRequest[] | null;
-    }>,
-  ]);
+  const [{ data: sessions }, { data: requests }, { data: careProfile }, currentPhase] =
+    await Promise.all([
+      supabase
+        .from("sessions")
+        .select("*")
+        .eq("client_id", me.id)
+        .order("date", { ascending: false })
+        .limit(5) as unknown as Promise<{ data: TrainingSession[] | null }>,
+      supabase
+        .from("requests")
+        .select("*")
+        .eq("client_id", me.id)
+        .eq("status", "pending") as unknown as Promise<{
+        data: SessionRequest[] | null;
+      }>,
+      me.care_profile_id
+        ? (supabase
+            .from("care_profiles")
+            .select("*")
+            .eq("id", me.care_profile_id)
+            .single() as unknown as Promise<{ data: CareProfile | null }>)
+        : Promise.resolve({ data: null }),
+      getCurrentPhase(supabase, me.id),
+    ]);
 
   const { count: sessionsUsed } = await supabase
     .from("sessions")
@@ -45,10 +54,17 @@ export default async function ClientDashboard() {
   return (
     <div className="space-y-6">
       <PhaseBanner
-        phase={me.phase}
+        phase={currentPhase?.phase ?? "n/a"}
         title={`Hey, ${me.name.split(" ")[0]}`}
-        subtitle={trackName(me.track)}
+        subtitle={careProfile?.name ?? undefined}
       />
+
+      {currentPhase ? (
+        <p className="-mt-3 text-sm text-gray">
+          Week {weekInPhase(currentPhase.started_on)} of this phase · Cycle{" "}
+          {currentPhase.cycle_number}
+        </p>
+      ) : null}
 
       <Card>
         <p className="text-sm font-medium text-gray">Sessions</p>

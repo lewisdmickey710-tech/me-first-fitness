@@ -9,8 +9,8 @@ export interface Profile {
 export interface Client {
   id: string;
   name: string;
-  track: string;
-  phase: string;
+  track: string | null;
+  phase: string | null;
   sessions_allotted: number | null;
   notes: string | null;
   created_at: string;

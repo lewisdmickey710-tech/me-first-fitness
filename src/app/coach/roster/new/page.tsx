@@ -1,37 +1,22 @@
+import { createClient } from "@/lib/supabase/server";
 import { addClient } from "@/app/coach/actions";
 import { Button, Card, Heart, Input, Select, Textarea } from "@/components/ui";
-import { PHASES } from "@/lib/constants";
-import { SORTING_QUESTIONS } from "@/lib/track-criteria";
-import { TrackPicker } from "./TrackPicker";
+import type { CareProfile } from "@/lib/types";
+import { CareProfilePicker } from "./CareProfilePicker";
 
-export default function NewClientPage() {
+export default async function NewClientPage() {
+  const supabase = await createClient();
+  const { data: careProfiles } = (await supabase
+    .from("care_profiles")
+    .select("*")
+    .order("name")) as { data: CareProfile[] | null };
+
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
         Add a client
       </h1>
-
-      <details className="rounded-2xl border border-grayLt bg-white p-4">
-        <summary className="cursor-pointer text-sm font-medium text-ink">
-          <Heart className="mr-1.5" />
-          Not sure which track? Work through these in order
-        </summary>
-        <ol className="mt-3 space-y-2 text-sm text-gray">
-          {SORTING_QUESTIONS.map((q, i) => (
-            <li key={i}>
-              <span className="font-medium text-ink">{i + 1}.</span> {q}
-            </li>
-          ))}
-        </ol>
-        <p className="mt-3 text-xs text-gray">
-          Most clients sort themselves into a track by question 2 or 3 — the
-          rest just confirm the fit. When more than one track could fit, the
-          more specific track (medical or population-based) wins over a
-          general frequency-based one. Pick a track below to see what it&apos;s
-          built for.
-        </p>
-      </details>
 
       <Card>
         <form action={addClient} className="space-y-4">
@@ -42,19 +27,29 @@ export default function NewClientPage() {
             <Input name="name" required placeholder="Client's full name" />
           </div>
 
-          <TrackPicker />
+          <CareProfilePicker careProfiles={careProfiles ?? []} />
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              Phase
-            </label>
-            <Select name="phase" defaultValue="n/a">
-              {PHASES.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </Select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Days per week
+              </label>
+              <Select name="days_per_week" defaultValue="3">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Session mode
+              </label>
+              <Select name="session_mode" defaultValue="in_person">
+                <option value="in_person">In-person</option>
+                <option value="virtual">Virtual</option>
+                <option value="mixed">Mixed</option>
+              </Select>
+            </div>
           </div>
 
           <div>
@@ -83,8 +78,9 @@ export default function NewClientPage() {
       </Card>
 
       <p className="text-sm text-gray">
-        Once they have a login, invite them by adding their email as a
-        Supabase user and linking it to this client — see the README.
+        They start at Phase 1, week 1 of a new cycle automatically. Once
+        they have a login, invite them by adding their email as a Supabase
+        user and linking it to this client — see the README.
       </p>
     </div>
   );

@@ -1,9 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { logSession } from "@/app/coach/actions";
 import { Button, Card, Input, Textarea } from "@/components/ui";
-import type { ProgramDay } from "@/lib/track-programs";
+import { PHASES } from "@/lib/constants";
+
+export interface ProgramDayOption {
+  phase: string;
+  dayNumber: number;
+  label: string;
+  exercises: { exercise: string; sets: string; reps: string }[];
+}
 
 interface Row {
   exercise: string;
@@ -26,20 +33,37 @@ function blankRows(count: number): Row[] {
 export function LogSessionForm({
   clientId,
   today,
-  programDays,
+  programDayOptions,
+  defaultPhase,
 }: {
   clientId: string;
   today: string;
-  programDays: ProgramDay[] | null;
+  programDayOptions: ProgramDayOption[];
+  defaultPhase: string;
 }) {
+  const availablePhases = useMemo(
+    () =>
+      PHASES.filter((p) =>
+        programDayOptions.some((d) => d.phase === p.id)
+      ),
+    [programDayOptions]
+  );
+
+  const [phase, setPhase] = useState(
+    availablePhases.some((p) => p.id === defaultPhase)
+      ? defaultPhase
+      : availablePhases[0]?.id ?? ""
+  );
   const [dayLabel, setDayLabel] = useState("");
   const [rows, setRows] = useState<Row[]>(blankRows(BLANK_ROWS));
-  const [activeDay, setActiveDay] = useState<string | null>(null);
+  const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
 
   const boundLogSession = logSession.bind(null, clientId);
 
-  function applyDay(day: ProgramDay) {
-    setActiveDay(day.label);
+  const daysForPhase = programDayOptions.filter((d) => d.phase === phase);
+
+  function applyDay(day: ProgramDayOption) {
+    setActiveDayKey(`${day.phase}-${day.dayNumber}`);
     setDayLabel(day.label);
     const filled = day.exercises.map((e) => ({
       exercise: e.exercise,
@@ -51,7 +75,7 @@ export function LogSessionForm({
   }
 
   function clearTemplate() {
-    setActiveDay(null);
+    setActiveDayKey(null);
     setDayLabel("");
     setRows(blankRows(BLANK_ROWS));
   }
@@ -64,36 +88,78 @@ export function LogSessionForm({
 
   return (
     <Card>
-      {programDays && programDays.length > 0 ? (
-        <div className="mb-4">
-          <p className="mb-2 text-sm font-medium text-ink">
-            Start from this client&apos;s program
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {programDays.map((day) => (
-              <button
-                key={day.label}
-                type="button"
-                onClick={() => applyDay(day)}
-                className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
-                  activeDay === day.label
-                    ? "bg-rose text-white"
-                    : "border border-grayLt bg-white text-ink hover:border-rose/40"
-                }`}
-              >
-                {day.label}
-              </button>
-            ))}
-            {activeDay ? (
-              <button
-                type="button"
-                onClick={clearTemplate}
-                className="rounded-xl px-3 py-1.5 text-sm text-gray hover:text-ink"
-              >
-                Clear
-              </button>
-            ) : null}
+      {availablePhases.length > 0 ? (
+        <div className="mb-4 space-y-3">
+          <div>
+            <p className="mb-2 text-sm font-medium text-ink">
+              Which phase&apos;s version?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {availablePhases.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => {
+                    setPhase(p.id);
+                    clearTemplate();
+                  }}
+                  className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                    phase === p.id
+                      ? "text-white"
+                      : "border border-grayLt bg-white text-ink hover:border-rose/40"
+                  }`}
+                  style={phase === p.id ? { backgroundColor: p.color } : undefined}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-gray">
+              Mixing phases across sessions this week? Pick whichever phase
+              fits today, day by day.
+            </p>
           </div>
+
+          {daysForPhase.length > 0 ? (
+            <div>
+              <p className="mb-2 text-sm font-medium text-ink">
+                Start from this client&apos;s program
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {daysForPhase.map((day) => {
+                  const key = `${day.phase}-${day.dayNumber}`;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => applyDay(day)}
+                      className={`rounded-xl px-3 py-1.5 text-sm font-medium transition ${
+                        activeDayKey === key
+                          ? "bg-rose text-white"
+                          : "border border-grayLt bg-white text-ink hover:border-rose/40"
+                      }`}
+                    >
+                      {day.label}
+                    </button>
+                  );
+                })}
+                {activeDayKey ? (
+                  <button
+                    type="button"
+                    onClick={clearTemplate}
+                    className="rounded-xl px-3 py-1.5 text-sm text-gray hover:text-ink"
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray">
+              No days built yet for this phase — add them in Programs, or
+              just log freeform below.
+            </p>
+          )}
         </div>
       ) : null}
 
