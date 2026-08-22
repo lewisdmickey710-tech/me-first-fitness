@@ -137,6 +137,17 @@ export interface ClientProgramOverride {
   created_at: string;
 }
 
+export interface CareProfilePhaseNotes {
+  id: string;
+  care_profile_id: string;
+  phase: Phase;
+  headline: string | null;
+  coach_tips: string | null;
+  extra_care: string | null;
+  cardio_guidance: string | null;
+  created_at: string;
+}
+
 export interface ServiceCheckin {
   id: string;
   client_id: string;

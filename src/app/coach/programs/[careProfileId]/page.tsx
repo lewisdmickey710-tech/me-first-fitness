@@ -2,11 +2,55 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { saveProgramDay } from "@/app/coach/programs/actions";
-import { Button, Card, Heart, Input, Select } from "@/components/ui";
+import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui";
 import { PHASES } from "@/lib/constants";
-import type { CareProfile, Exercise, ProgramDayExercise } from "@/lib/types";
+import type {
+  CareProfile,
+  CareProfilePhaseNotes,
+  Exercise,
+  ProgramDayExercise,
+} from "@/lib/types";
 
 const ROWS = 10;
+
+function PhaseNotesCard({ notes }: { notes: CareProfilePhaseNotes }) {
+  return (
+    <Card className="border-rose/30 bg-rose/5">
+      {notes.headline ? (
+        <p className="font-medium text-ink">
+          <Heart className="mr-1.5" />
+          {notes.headline}
+        </p>
+      ) : null}
+
+      <div className="mt-3 space-y-2">
+        {notes.coach_tips ? (
+          <Collapsible label="Coach tips">
+            <p className="whitespace-pre-wrap text-sm text-ink">
+              {notes.coach_tips}
+            </p>
+          </Collapsible>
+        ) : null}
+
+        {notes.extra_care ? (
+          <Collapsible label="Extra care & red flags">
+            <p className="whitespace-pre-wrap text-sm text-ink">
+              {notes.extra_care}
+            </p>
+          </Collapsible>
+        ) : null}
+
+        {notes.cardio_guidance ? (
+          <Collapsible label="Cardio guidance">
+            <p className="whitespace-pre-wrap text-sm text-ink">
+              {notes.cardio_guidance}
+            </p>
+          </Collapsible>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
 
 interface ProgramDayWithExercises {
   id: string;
@@ -30,7 +74,7 @@ export default async function CareProfileProgramPage({
 
   const supabase = await createClient();
 
-  const [{ data: careProfile }, { data: exercises }, { data: days }] =
+  const [{ data: careProfile }, { data: exercises }, { data: days }, { data: phaseNotes }] =
     await Promise.all([
       supabase
         .from("care_profiles")
@@ -48,6 +92,12 @@ export default async function CareProfileProgramPage({
         .order("day_number") as unknown as Promise<{
         data: ProgramDayWithExercises[] | null;
       }>,
+      supabase
+        .from("care_profile_phase_notes")
+        .select("*")
+        .eq("care_profile_id", careProfileId)
+        .eq("phase", phase)
+        .maybeSingle() as unknown as Promise<{ data: CareProfilePhaseNotes | null }>,
     ]);
 
   if (!careProfile) notFound();
@@ -84,6 +134,8 @@ export default async function CareProfileProgramPage({
           </Link>
         ))}
       </div>
+
+      {phaseNotes ? <PhaseNotesCard notes={phaseNotes} /> : null}
 
       <div className="space-y-6">
         {[1, 2, 3].map((dayNumber) => {
