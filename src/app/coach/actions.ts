@@ -148,6 +148,48 @@ export async function logSession(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=sessions`);
 }
 
+const MEASUREMENT_FIELDS = [
+  "weight",
+  "neck",
+  "chest",
+  "waist",
+  "hips",
+  "thigh_l",
+  "thigh_r",
+  "bicep_l",
+  "bicep_r",
+] as const;
+
+export async function logMeasurementAsCoach(
+  clientId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  if (!date) throw new Error("Date is required.");
+
+  const values: Record<string, number | null> = {};
+  for (const field of MEASUREMENT_FIELDS) {
+    const raw = String(formData.get(field) ?? "").trim();
+    values[field] = raw ? Number(raw) : null;
+  }
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  const { error } = await supabase.from("measurements").insert({
+    client_id: clientId,
+    date,
+    ...values,
+    notes: notes || null,
+    logged_by: "coach",
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  redirect(`/coach/clients/${clientId}?tab=measurements`);
+}
+
 export async function logCheckinAsCoach(clientId: string, formData: FormData) {
   const supabase = await createClient();
 

@@ -6,18 +6,23 @@ import {
   Badge,
   Button,
   Card,
+  DeltaField,
   EmptyState,
   Heart,
   PhaseBanner,
+  Sparkline,
 } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
+import { nextWindowLabel } from "@/lib/measurement-window";
 import type {
   Activity,
   CareProfile,
   Checkin,
   Client,
   ClientPhaseHistory,
+  Measurement,
+  ServiceCheckin,
   SessionRequest,
   TrainingSession,
 } from "@/lib/types";
@@ -26,6 +31,7 @@ const TABS = [
   { id: "overview", label: "Overview" },
   { id: "sessions", label: "Sessions" },
   { id: "checkins", label: "Check-ins" },
+  { id: "measurements", label: "Measurements" },
   { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
 ] as const;
@@ -62,6 +68,8 @@ export default async function ClientDetailPage({
     { data: activities },
     { data: requests },
     { data: currentPhase },
+    { data: measurements },
+    { data: serviceCheckins },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -99,6 +107,20 @@ export default async function ClientDetailPage({
       .order("started_on", { ascending: false })
       .limit(1)
       .maybeSingle() as unknown as Promise<{ data: ClientPhaseHistory | null }>,
+    supabase
+      .from("measurements")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: Measurement[] | null;
+    }>,
+    supabase
+      .from("service_checkins")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: ServiceCheckin[] | null;
+    }>,
   ]);
 
   const pendingCount = (requests ?? []).filter(
@@ -142,7 +164,10 @@ export default async function ClientDetailPage({
           client={client}
           currentPhase={currentPhase}
           sessionsUsed={sessionsUsed}
+          allSessions={sessions ?? []}
           recentSessions={sessions?.slice(0, 3) ?? []}
+          measurements={measurements ?? []}
+          latestServiceCheckin={serviceCheckins?.[0] ?? null}
         />
       )}
       {tab === "sessions" && (
@@ -150,6 +175,13 @@ export default async function ClientDetailPage({
       )}
       {tab === "checkins" && (
         <CheckinsTab clientId={id} checkins={checkins ?? []} />
+      )}
+      {tab === "measurements" && (
+        <MeasurementsTab
+          clientId={id}
+          measurements={measurements ?? []}
+          serviceCheckins={serviceCheckins ?? []}
+        />
       )}
       {tab === "activity" && <ActivityTab activities={activities ?? []} />}
       {tab === "requests" && (
@@ -163,14 +195,35 @@ function Overview({
   client,
   currentPhase,
   sessionsUsed,
+  allSessions,
   recentSessions,
+  measurements,
+  latestServiceCheckin,
 }: {
   client: Client;
   currentPhase: ClientPhaseHistory | null;
   sessionsUsed: number;
+  allSessions: TrainingSession[];
   recentSessions: TrainingSession[];
+  measurements: Measurement[];
+  latestServiceCheckin: ServiceCheckin | null;
 }) {
   const allotted = client.sessions_allotted;
+
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  const recentCount = allSessions.filter(
+    (s) => new Date(s.date) >= fourWeeksAgo
+  ).length;
+  const expectedCount = (client.days_per_week ?? 3) * 4;
+  const consistencyPct =
+    expectedCount > 0
+      ? Math.min(100, Math.round((recentCount / expectedCount) * 100))
+      : null;
+
+  const latestMeasurement = measurements[0] ?? null;
+  const previousMeasurement = measurements[1] ?? null;
+
   return (
     <div className="space-y-4">
       {currentPhase ? (
@@ -228,6 +281,79 @@ function Overview({
             {sessionsUsed} logged
           </p>
         )}
+      </Card>
+
+      <Card>
+        <p className="text-sm font-medium text-gray">
+          Consistency (last 4 weeks)
+        </p>
+        {consistencyPct !== null ? (
+          <>
+            <p className="mt-1 text-2xl font-semibold text-ink">
+              {consistencyPct}%
+            </p>
+            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-grayLt">
+              <div
+                className="h-full rounded-full bg-teal"
+                style={{ width: `${consistencyPct}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-gray">
+            Set a weekly schedule to track this.
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <p className="text-sm font-medium text-gray">Latest measurement</p>
+        {latestMeasurement ? (
+          <>
+            <p className="mt-1 text-sm text-gray">{latestMeasurement.date}</p>
+            <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+              <DeltaField
+                label="Weight"
+                value={latestMeasurement.weight}
+                previous={previousMeasurement?.weight ?? null}
+                unit="lb"
+              />
+              <DeltaField
+                label="Waist"
+                value={latestMeasurement.waist}
+                previous={previousMeasurement?.waist ?? null}
+                unit="in"
+              />
+              <DeltaField
+                label="Hips"
+                value={latestMeasurement.hips}
+                previous={previousMeasurement?.hips ?? null}
+                unit="in"
+              />
+            </dl>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-gray">
+            No measurements logged yet.
+          </p>
+        )}
+      </Card>
+
+      <Card>
+        <p className="text-sm font-medium text-gray">Service check-in</p>
+        {latestServiceCheckin ? (
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {latestServiceCheckin.satisfaction ?? "—"}/5{" "}
+            <span className="text-base font-normal text-gray">
+              on {latestServiceCheckin.date}
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-gray">
+            No service check-in yet.
+          </p>
+        )}
+        <p className="mt-2 text-xs text-gray">{nextWindowLabel()}</p>
       </Card>
 
       {client.notes ? (
@@ -361,6 +487,122 @@ function CheckinsTab({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function MeasurementsTab({
+  clientId,
+  measurements,
+  serviceCheckins,
+}: {
+  clientId: string;
+  measurements: Measurement[];
+  serviceCheckins: ServiceCheckin[];
+}) {
+  const weights = measurements
+    .slice()
+    .reverse()
+    .filter((m) => m.weight != null)
+    .map((m) => m.weight as number);
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href={`/coach/clients/${clientId}/log-measurement`}
+        className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+      >
+        + Log measurement
+      </Link>
+
+      {measurements.length === 0 ? (
+        <EmptyState
+          title="No measurements yet"
+          body="Log the first measurement to start tracking trends."
+        />
+      ) : (
+        <>
+          {weights.length >= 2 ? (
+            <Card>
+              <p className="text-sm font-medium text-gray">Weight trend</p>
+              <Sparkline values={weights} />
+            </Card>
+          ) : null}
+
+          <div className="space-y-3">
+            {measurements.map((m, i) => {
+              const previous = measurements[i + 1] ?? null;
+              return (
+                <Card key={m.id}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-ink">{m.date}</p>
+                    <Badge tone={m.logged_by === "coach" ? "rose" : "teal"}>
+                      logged by {m.logged_by}
+                    </Badge>
+                  </div>
+                  <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+                    <DeltaField label="Weight" value={m.weight} previous={previous?.weight ?? null} unit="lb" />
+                    <DeltaField label="Neck" value={m.neck} previous={previous?.neck ?? null} unit="in" />
+                    <DeltaField label="Chest" value={m.chest} previous={previous?.chest ?? null} unit="in" />
+                    <DeltaField label="Waist" value={m.waist} previous={previous?.waist ?? null} unit="in" />
+                    <DeltaField label="Hips" value={m.hips} previous={previous?.hips ?? null} unit="in" />
+                    <DeltaField label="Thigh L" value={m.thigh_l} previous={previous?.thigh_l ?? null} unit="in" />
+                    <DeltaField label="Thigh R" value={m.thigh_r} previous={previous?.thigh_r ?? null} unit="in" />
+                    <DeltaField label="Bicep L" value={m.bicep_l} previous={previous?.bicep_l ?? null} unit="in" />
+                    <DeltaField label="Bicep R" value={m.bicep_r} previous={previous?.bicep_r ?? null} unit="in" />
+                  </dl>
+                  {m.notes ? (
+                    <p className="mt-2 text-sm text-ink">{m.notes}</p>
+                  ) : null}
+                </Card>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-gray">
+          Service check-ins
+        </p>
+        {serviceCheckins.length === 0 ? (
+          <EmptyState
+            title="No service check-ins yet"
+            body="Your client's monthly satisfaction check-ins will show up here."
+          />
+        ) : (
+          <div className="space-y-3">
+            {serviceCheckins.map((sc) => (
+              <Card key={sc.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">{sc.date}</p>
+                  {sc.satisfaction != null ? (
+                    <Badge tone="gold">{sc.satisfaction}/5</Badge>
+                  ) : null}
+                </div>
+                {sc.what_working ? (
+                  <p className="mt-2 text-sm text-ink">
+                    <span className="font-medium">Working well:</span>{" "}
+                    {sc.what_working}
+                  </p>
+                ) : null}
+                {sc.what_would_help ? (
+                  <p className="mt-1 text-sm text-ink">
+                    <span className="font-medium">Would help:</span>{" "}
+                    {sc.what_would_help}
+                  </p>
+                ) : null}
+                {sc.anything_else ? (
+                  <p className="mt-1 text-sm text-ink">
+                    <span className="font-medium">Anything else:</span>{" "}
+                    {sc.anything_else}
+                  </p>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -29,6 +29,72 @@ export function Collapsible({
   );
 }
 
+export function Sparkline({
+  values,
+  color = "#E75480",
+}: {
+  values: number[];
+  color?: string;
+}) {
+  if (values.length < 2) return null;
+  const w = 280;
+  const h = 56;
+  const pad = 6;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = pad + (i * (w - pad * 2)) / (values.length - 1);
+      const y = h - pad - ((v - min) / range) * (h - pad * 2);
+      return `${x},${y}`;
+    })
+    .join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-14 w-full">
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function DeltaField({
+  label,
+  value,
+  previous,
+  unit,
+}: {
+  label: string;
+  value: number | null;
+  previous: number | null;
+  unit: string;
+}) {
+  if (value == null) return null;
+  const delta = previous != null ? value - previous : null;
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-gray/70">
+        {label}
+      </dt>
+      <dd className="text-ink">
+        {value} {unit}
+        {delta != null && delta !== 0 ? (
+          <span className="ml-1 text-xs text-gray">
+            ({delta > 0 ? "+" : ""}
+            {delta})
+          </span>
+        ) : null}
+      </dd>
+    </div>
+  );
+}
+
 export function Card({
   children,
   className = "",

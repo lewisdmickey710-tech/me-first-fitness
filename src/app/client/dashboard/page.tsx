@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
+import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import type { CareProfile, SessionRequest, TrainingSession } from "@/lib/types";
 
 export default async function ClientDashboard() {
@@ -19,30 +20,45 @@ export default async function ClientDashboard() {
 
   const supabase = await createClient();
 
-  const [{ data: sessions }, { data: requests }, { data: careProfile }, currentPhase] =
-    await Promise.all([
-      supabase
-        .from("sessions")
-        .select("*")
-        .eq("client_id", me.id)
-        .order("date", { ascending: false })
-        .limit(5) as unknown as Promise<{ data: TrainingSession[] | null }>,
-      supabase
-        .from("requests")
-        .select("*")
-        .eq("client_id", me.id)
-        .eq("status", "pending") as unknown as Promise<{
-        data: SessionRequest[] | null;
-      }>,
-      me.care_profile_id
-        ? (supabase
-            .from("care_profiles")
-            .select("*")
-            .eq("id", me.care_profile_id)
-            .single() as unknown as Promise<{ data: CareProfile | null }>)
-        : Promise.resolve({ data: null }),
-      getCurrentPhase(supabase, me.id),
-    ]);
+  const [
+    { data: sessions },
+    { data: requests },
+    { data: careProfile },
+    currentPhase,
+    { data: recentServiceCheckins },
+  ] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })
+      .limit(5) as unknown as Promise<{ data: TrainingSession[] | null }>,
+    supabase
+      .from("requests")
+      .select("*")
+      .eq("client_id", me.id)
+      .eq("status", "pending") as unknown as Promise<{
+      data: SessionRequest[] | null;
+    }>,
+    me.care_profile_id
+      ? (supabase
+          .from("care_profiles")
+          .select("*")
+          .eq("id", me.care_profile_id)
+          .single() as unknown as Promise<{ data: CareProfile | null }>)
+      : Promise.resolve({ data: null }),
+    getCurrentPhase(supabase, me.id),
+    supabase
+      .from("service_checkins")
+      .select("date")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })
+      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
+  ]);
+
+  const needsServiceCheckin =
+    isFirstWeekOfMonth() &&
+    !loggedThisMonth((recentServiceCheckins ?? []).map((r) => r.date));
 
   const { count: sessionsUsed } = await supabase
     .from("sessions")
@@ -92,6 +108,24 @@ export default async function ClientDashboard() {
         )}
       </Card>
 
+      {needsServiceCheckin ? (
+        <Card className="border-gold/50 bg-gold/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            Quick monthly check-in
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            It&apos;s that time of the month — how&apos;s it going overall?
+          </p>
+          <Link
+            href="/client/service-checkin"
+            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            Do it now
+          </Link>
+        </Card>
+      ) : null}
+
       {(requests?.length ?? 0) > 0 ? (
         <Card>
           <p className="text-sm font-medium text-gray">
@@ -113,9 +147,11 @@ export default async function ClientDashboard() {
       ) : null}
 
       <div className="grid grid-cols-3 gap-3">
+        <QuickAction href="/client/program" label="My program" />
         <QuickAction href="/client/checkin" label="Log check-in" />
         <QuickAction href="/client/activity" label="Log activity" />
         <QuickAction href="/client/request" label="Request time" />
+        <QuickAction href="/client/service-checkin" label="Service check-in" />
       </div>
 
       <div>

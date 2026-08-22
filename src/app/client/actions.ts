@@ -66,6 +66,35 @@ export async function logActivity(formData: FormData) {
   redirect("/client/dashboard");
 }
 
+export async function submitServiceCheckin(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  const satisfactionRaw = String(formData.get("satisfaction") ?? "");
+  const what_working = String(formData.get("what_working") ?? "").trim();
+  const what_would_help = String(formData.get("what_would_help") ?? "").trim();
+  const anything_else = String(formData.get("anything_else") ?? "").trim();
+
+  if (!date) throw new Error("Date is required.");
+
+  const { error } = await supabase.from("service_checkins").insert({
+    client_id: me.id,
+    date,
+    satisfaction: satisfactionRaw ? Number(satisfactionRaw) : null,
+    what_working: what_working || null,
+    what_would_help: what_would_help || null,
+    anything_else: anything_else || null,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/dashboard");
+  redirect("/client/dashboard");
+}
+
 export async function submitRequest(formData: FormData) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
