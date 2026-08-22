@@ -6,6 +6,7 @@ import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type { ClientSchedule, SessionOccurrence } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
+  scheduled: "Scheduled",
   completed: "Completed",
   cancelled: "Cancelled",
   late_cancelled: "Late cancelled",
@@ -20,6 +21,13 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
 const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 type ScheduleRow = ClientSchedule & { clients: { id: string; name: string } | null };
+
+interface DaySession {
+  clientId: string;
+  clientName: string;
+  timeOfDay: string | null;
+  label: string | null;
+}
 
 export default async function CoachSchedulePage({
   searchParams,
@@ -47,19 +55,25 @@ export default async function CoachSchedulePage({
   const firstDateStr = toDateString(firstOfMonth);
   const lastDateStr = toDateString(new Date(Date.UTC(year, month, daysInMonth)));
 
-  const [{ data: schedules }, { data: monthOccurrences }] = await Promise.all([
-    supabase
-      .from("client_schedules")
-      .select("*, clients(id, name)")
-      .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
-    supabase
-      .from("session_occurrences")
-      .select("*")
-      .gte("occurrence_date", firstDateStr)
-      .lte("occurrence_date", lastDateStr) as unknown as Promise<{
-      data: SessionOccurrence[] | null;
-    }>,
-  ]);
+  const [{ data: schedules }, { data: monthOccurrences }, { data: allClients }] =
+    await Promise.all([
+      supabase
+        .from("client_schedules")
+        .select("*, clients(id, name)")
+        .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
+      supabase
+        .from("session_occurrences")
+        .select("*")
+        .gte("occurrence_date", firstDateStr)
+        .lte("occurrence_date", lastDateStr) as unknown as Promise<{
+        data: SessionOccurrence[] | null;
+      }>,
+      supabase.from("clients").select("id, name") as unknown as Promise<{
+        data: { id: string; name: string }[] | null;
+      }>,
+    ]);
+
+  const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
 
   const activeSchedules = (schedules ?? []).filter((s) => s.clients);
   const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
@@ -69,25 +83,58 @@ export default async function CoachSchedulePage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
+  const occurrencesByDate = new Map<string, SessionOccurrence[]>();
   const occurrenceByClientDate = new Map<string, SessionOccurrence>();
   for (const o of monthOccurrences ?? []) {
+    const list = occurrencesByDate.get(o.occurrence_date) ?? [];
+    list.push(o);
+    occurrencesByDate.set(o.occurrence_date, list);
     occurrenceByClientDate.set(`${o.client_id}:${o.occurrence_date}`, o);
+  }
+
+  // A date's sessions = whoever has a recurring weekly time matching that
+  // weekday, plus anyone with a one-off session_occurrences row for that
+  // exact date (e.g. a confirmed time request) who isn't already covered
+  // by a recurring match.
+  function sessionsForDate(dateStr: string, dayOfWeek: number): DaySession[] {
+    const fromSchedule: DaySession[] = (scheduleByDayOfWeek.get(dayOfWeek) ?? []).map(
+      (s) => ({
+        clientId: s.client_id,
+        clientName: s.clients?.name ?? clientNameById.get(s.client_id) ?? "Client",
+        timeOfDay: s.time_of_day,
+        label: s.label,
+      })
+    );
+    const covered = new Set(fromSchedule.map((s) => s.clientId));
+    const fromOccurrenceOnly: DaySession[] = (occurrencesByDate.get(dateStr) ?? [])
+      .filter((o) => !covered.has(o.client_id) && o.status !== "rescheduled")
+      .map((o) => ({
+        clientId: o.client_id,
+        clientName: clientNameById.get(o.client_id) ?? "Client",
+        timeOfDay: null,
+        label: o.notes,
+      }));
+    return [...fromSchedule, ...fromOccurrenceOnly];
   }
 
   const cells: { day: number; date: string; count: number }[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(Date.UTC(year, month, day));
     const dateStr = toDateString(date);
-    const daySchedules = scheduleByDayOfWeek.get(date.getUTCDay()) ?? [];
-    cells.push({ day, date: dateStr, count: daySchedules.length });
+    cells.push({
+      day,
+      date: dateStr,
+      count: sessionsForDate(dateStr, date.getUTCDay()).length,
+    });
   }
 
   const selectedDate = dateParam ?? (monthKey === todayStr.slice(0, 7) ? todayStr : null);
   const selectedCell = cells.find((c) => c.date === selectedDate) ?? null;
-  const selectedSchedules = selectedCell
-    ? (scheduleByDayOfWeek.get(new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()) ?? [])
-        .slice()
-        .sort((a, b) => a.time_of_day.localeCompare(b.time_of_day))
+  const selectedSessions = selectedCell
+    ? sessionsForDate(
+        selectedCell.date,
+        new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()
+      ).sort((a, b) => (a.timeOfDay ?? "99:99").localeCompare(b.timeOfDay ?? "99:99"))
     : [];
 
   const prevMonthDate = new Date(Date.UTC(year, month - 1, 1));
@@ -102,8 +149,9 @@ export default async function CoachSchedulePage({
         Your schedule
       </h1>
       <p className="text-sm text-gray">
-        Every client&apos;s recurring weekly time, in one place. Manage an
-        individual client&apos;s times from their own Schedule tab.
+        Every client&apos;s recurring weekly time, plus any one-off
+        confirmed requests, in one place. Manage an individual client&apos;s
+        recurring times from their own Schedule tab.
       </p>
 
       <Card>
@@ -170,7 +218,7 @@ export default async function CoachSchedulePage({
         </div>
       </Card>
 
-      {!selectedCell || selectedSchedules.length === 0 ? (
+      {!selectedCell || selectedSessions.length === 0 ? (
         <EmptyState
           title="No sessions that day"
           body="Tap a highlighted date on the calendar to see who's scheduled."
@@ -181,32 +229,28 @@ export default async function CoachSchedulePage({
             {DAY_NAMES[new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()]},{" "}
             {selectedCell.date}
           </p>
-          {selectedSchedules.map((s) => {
+          {selectedSessions.map((s) => {
             const occurrence = occurrenceByClientDate.get(
-              `${s.client_id}:${selectedCell.date}`
+              `${s.clientId}:${selectedCell.date}`
             );
             return (
-              <Card key={s.id}>
+              <Card key={s.clientId}>
                 <div className="flex items-center justify-between">
                   <div>
                     <Link
-                      href={`/coach/clients/${s.client_id}`}
+                      href={`/coach/clients/${s.clientId}`}
                       className="font-medium text-ink hover:text-rose"
                     >
-                      {s.clients?.name}
+                      {s.clientName}
                     </Link>
                     <p className="text-sm text-gray">
-                      {formatTimeOfDay(s.time_of_day)}
-                      {s.label ? ` · ${s.label}` : ""}
+                      {s.timeOfDay ? formatTimeOfDay(s.timeOfDay) : s.label}
+                      {s.timeOfDay && s.label ? ` · ${s.label}` : ""}
                     </p>
                   </div>
-                  {occurrence ? (
-                    <Badge tone={occurrence.status === "completed" ? "green" : "gold"}>
-                      {STATUS_LABEL[occurrence.status]}
-                    </Badge>
-                  ) : (
-                    <Badge tone="teal">Scheduled</Badge>
-                  )}
+                  <Badge tone={occurrence?.status === "completed" ? "green" : "teal"}>
+                    {occurrence ? STATUS_LABEL[occurrence.status] : "Scheduled"}
+                  </Badge>
                 </div>
               </Card>
             );

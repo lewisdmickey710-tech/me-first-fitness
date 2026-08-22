@@ -6,8 +6,10 @@
 // Thresholds are deliberately simple starting points -- adjust the point
 // values or the `isHighRisk` cutoff below if they don't match reality.
 
+import type { OccurrenceStatus } from "@/lib/types";
+
 export interface RiskInput {
-  recentOccurrenceStatuses: ("completed" | "rescheduled" | "cancelled" | "late_cancelled")[]; // most recent first
+  recentOccurrenceStatuses: OccurrenceStatus[]; // most recent first, excluding not-yet-happened "scheduled" rows
   daysSinceLastCheckinOrActivity: number | null; // null = never logged one
   hasOverduePayment: boolean;
   consistencyPct: number | null; // trailing-28-day sessions vs. expected, 0-100

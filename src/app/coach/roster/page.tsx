@@ -120,6 +120,7 @@ export default async function RosterPage() {
 
   const occurrencesByClient = new Map<string, OccurrenceStatus[]>();
   for (const row of occurrenceRows ?? []) {
+    if (row.status === "scheduled") continue;
     occurrencesByClient.set(row.client_id, [
       ...(occurrencesByClient.get(row.client_id) ?? []),
       row.status as OccurrenceStatus,

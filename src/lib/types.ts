@@ -215,6 +215,7 @@ export interface Payment {
 }
 
 export type OccurrenceStatus =
+  | "scheduled"
   | "completed"
   | "rescheduled"
   | "cancelled"

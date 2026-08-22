@@ -100,32 +100,57 @@ export async function setRequestStatus(
     .from("requests")
     .update({ status })
     .eq("id", requestId)
-    .select("preferred_date, reschedule_from_date")
+    .select("preferred_date, preferred_time, reschedule_from_date")
     .single();
 
   if (error) throw new Error(error.message);
 
-  // Confirming a reschedule request (one tied to a specific existing
-  // session, not a freeform new-time request) closes the loop
-  // automatically -- the original date's attendance record is marked
-  // rescheduled instead of being left to drift out of sync.
-  if (status === "confirmed" && request?.reschedule_from_date) {
-    const { error: occurrenceError } = await supabase
+  if (status === "confirmed" && request) {
+    // Confirming a reschedule request (one tied to a specific existing
+    // session, not a freeform new-time request) closes the loop
+    // automatically -- the original date's attendance record is marked
+    // rescheduled instead of being left to drift out of sync.
+    if (request.reschedule_from_date) {
+      const { error: occurrenceError } = await supabase
+        .from("session_occurrences")
+        .upsert(
+          {
+            client_id: clientId,
+            occurrence_date: request.reschedule_from_date,
+            status: "rescheduled",
+            rescheduled_to_date: request.preferred_date,
+          },
+          { onConflict: "client_id,occurrence_date" }
+        );
+      if (occurrenceError) throw new Error(occurrenceError.message);
+    }
+
+    // Confirming used to only flip this status flag with nothing else
+    // reflecting it anywhere -- this is what actually puts the confirmed
+    // date on the calendar (both the coach's aggregate schedule and the
+    // client's own), as a real one-off session rather than a change to
+    // their standing recurring weekly time.
+    const { error: scheduleError } = await supabase
       .from("session_occurrences")
       .upsert(
         {
           client_id: clientId,
-          occurrence_date: request.reschedule_from_date,
-          status: "rescheduled",
-          rescheduled_to_date: request.preferred_date,
+          occurrence_date: request.preferred_date,
+          status: "scheduled",
+          notes: request.preferred_time
+            ? `Confirmed request — ${request.preferred_time}`
+            : "Confirmed request",
         },
         { onConflict: "client_id,occurrence_date" }
       );
-    if (occurrenceError) throw new Error(occurrenceError.message);
+    if (scheduleError) throw new Error(scheduleError.message);
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/schedule");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
 }
 
 export async function logSession(clientId: string, formData: FormData) {

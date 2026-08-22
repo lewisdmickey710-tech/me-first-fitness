@@ -67,6 +67,7 @@ const TABS = [
 ] as const;
 
 const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
+  scheduled: "Scheduled",
   completed: "Completed",
   rescheduled: "Rescheduled",
   cancelled: "Cancelled",
@@ -74,6 +75,7 @@ const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
 };
 
 function occurrenceBadgeTone(status: OccurrenceStatus) {
+  if (status === "scheduled") return "teal" as const;
   if (status === "completed") return "green" as const;
   if (status === "rescheduled") return "gold" as const;
   return "pink" as const; // cancelled, late_cancelled
@@ -370,7 +372,9 @@ function Overview({
     : null;
 
   const risk = computeCancellationRisk({
-    recentOccurrenceStatuses: occurrences.map((o) => o.status),
+    recentOccurrenceStatuses: occurrences
+      .filter((o) => o.status !== "scheduled")
+      .map((o) => o.status),
     daysSinceLastCheckinOrActivity,
     hasOverduePayment: unpaid.some((p) => p.due_date < today),
     consistencyPct,

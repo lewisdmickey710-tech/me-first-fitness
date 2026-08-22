@@ -269,6 +269,12 @@ export default async function ClientSchedulePage({
             </p>
           ) : null}
 
+          {selectedOccurrence?.status === "scheduled" &&
+          selectedSchedules.length === 0 &&
+          selectedOccurrence.notes ? (
+            <p className="text-sm text-gray">{selectedOccurrence.notes}</p>
+          ) : null}
+
           {selectedSchedules.map((s) => (
             <p key={s.id} className="text-sm text-gray">
               {formatTimeOfDay(s.time_of_day)}
