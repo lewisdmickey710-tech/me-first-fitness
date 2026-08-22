@@ -411,6 +411,10 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
     intake.osteoporosis && "osteoporosis/osteopenia",
     intake.joint_replacement && "joint replacement",
     intake.arthritis && "arthritis",
+    intake.hypermobility && "hypermobility",
+    intake.pots_dysautonomia && "POTS/dysautonomia",
+    intake.mcas && "MCAS",
+    intake.autoimmune_condition && "autoimmune condition",
   ].filter(Boolean);
   const dayFlags = [
     intake.lives_alone && "lives alone",
@@ -436,7 +440,10 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
         <SummaryRow label="Balance notes" value={intake.balance_notes} />
       ) : null}
       {boneFlags.length > 0 ? (
-        <SummaryRow label="Bones & joints" value={boneFlags.join(", ")} />
+        <SummaryRow
+          label="Bones, joints & chronic conditions"
+          value={boneFlags.join(", ")}
+        />
       ) : null}
       {intake.bones_notes ? (
         <SummaryRow label="Bones notes" value={intake.bones_notes} />

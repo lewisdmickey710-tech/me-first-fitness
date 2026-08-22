@@ -242,6 +242,10 @@ export interface LeadIntake {
   osteoporosis: boolean;
   joint_replacement: boolean;
   arthritis: boolean;
+  hypermobility: boolean;
+  pots_dysautonomia: boolean;
+  mcas: boolean;
+  autoimmune_condition: boolean;
   bones_notes: string | null;
   medications: string | null;
   doctor_name: string | null;

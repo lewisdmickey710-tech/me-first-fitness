@@ -42,6 +42,10 @@ export async function submitLeadIntake(formData: FormData) {
       osteoporosis: checked(formData, "osteoporosis"),
       joint_replacement: checked(formData, "joint_replacement"),
       arthritis: checked(formData, "arthritis"),
+      hypermobility: checked(formData, "hypermobility"),
+      pots_dysautonomia: checked(formData, "pots_dysautonomia"),
+      mcas: checked(formData, "mcas"),
+      autoimmune_condition: checked(formData, "autoimmune_condition"),
       bones_notes: textOrNull(formData, "bones_notes"),
 
       medications: textOrNull(formData, "medications"),

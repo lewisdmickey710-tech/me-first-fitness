@@ -110,7 +110,7 @@ export default async function LeadIntakePage() {
         </Card>
 
         <Card className="space-y-4">
-          <SectionTitle>Bones &amp; joints</SectionTitle>
+          <SectionTitle>Bones, joints &amp; chronic conditions</SectionTitle>
           <div className="grid grid-cols-2 gap-2">
             <Checkbox
               name="osteoporosis"
@@ -127,8 +127,28 @@ export default async function LeadIntakePage() {
               label="Arthritis"
               defaultChecked={intake?.arthritis}
             />
+            <Checkbox
+              name="hypermobility"
+              label="Hypermobility"
+              defaultChecked={intake?.hypermobility}
+            />
+            <Checkbox
+              name="pots_dysautonomia"
+              label="POTS/dysautonomia"
+              defaultChecked={intake?.pots_dysautonomia}
+            />
+            <Checkbox
+              name="mcas"
+              label="MCAS"
+              defaultChecked={intake?.mcas}
+            />
+            <Checkbox
+              name="autoimmune_condition"
+              label="Autoimmune condition"
+              defaultChecked={intake?.autoimmune_condition}
+            />
           </div>
-          <Field label="Anything you'd add — which joint, when, how it is now">
+          <Field label="Anything you'd add — which condition or joint, and how it is now">
             <Textarea
               name="bones_notes"
               rows={2}
