@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
-import { loggedThisMonth } from "@/lib/measurement-window";
 import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
@@ -38,12 +37,10 @@ export default async function ClientDashboard() {
     { data: requests },
     { data: careProfile },
     currentPhase,
-    { data: recentServiceCheckins },
     { data: schedules },
     { data: payments },
     { data: documents },
     { data: acks },
-    { data: recentMeasurements },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -67,12 +64,6 @@ export default async function ClientDashboard() {
       : Promise.resolve({ data: null }),
     getCurrentPhase(supabase, me.id),
     supabase
-      .from("service_checkins")
-      .select("date")
-      .eq("client_id", me.id)
-      .order("date", { ascending: false })
-      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
-    supabase
       .from("client_schedules")
       .select("*")
       .eq("client_id", me.id)
@@ -94,12 +85,6 @@ export default async function ClientDashboard() {
       .eq("client_id", me.id) as unknown as Promise<{
       data: ClientDocumentAcknowledgment[] | null;
     }>,
-    supabase
-      .from("measurements")
-      .select("date")
-      .eq("client_id", me.id)
-      .order("date", { ascending: false })
-      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
   ]);
 
   const [{ data: clientIntake }, { data: docAssignments }, { data: minorConsent }] =
@@ -121,13 +106,6 @@ export default async function ClientDashboard() {
         .eq("client_id", me.id)
         .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
     ]);
-
-  // Prompted by measurements, not the calendar -- once Mickey has logged
-  // this month's measurements, that's the cue to also do the service
-  // check-in, whenever in the month that actually happens.
-  const needsServiceCheckin =
-    loggedThisMonth((recentMeasurements ?? []).map((m) => m.date)) &&
-    !loggedThisMonth((recentServiceCheckins ?? []).map((r) => r.date));
 
   const nextSession = nextSessionFromSchedules(schedules ?? []);
   const nextDue = payments?.[0] ?? null;
@@ -258,23 +236,6 @@ export default async function ClientDashboard() {
         )}
       </Card>
 
-      {needsServiceCheckin ? (
-        <Card className="border-gold/50 bg-gold/5">
-          <p className="text-sm font-medium text-ink">
-            <Heart className="mr-1" />
-            Quick monthly check-in
-          </p>
-          <p className="mt-1 text-sm text-gray">
-            It&apos;s that time of the month — how&apos;s it going overall?
-          </p>
-          <Link
-            href="/client/service-checkin"
-            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            Do it now
-          </Link>
-        </Card>
-      ) : null}
 
       {!clientIntake?.submitted_at ? (
         <Card className="border-gold/50 bg-gold/5">
