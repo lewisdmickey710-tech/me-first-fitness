@@ -84,10 +84,15 @@ function ClientLogin() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError("Enter your email.");
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithOtp({
-      email,
+      email: trimmedEmail,
       options: {
         emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
       },
@@ -106,7 +111,8 @@ function ClientLogin() {
         <Heart className="mb-2 inline-block text-lg" />
         <p className="font-medium text-ink">Check your email</p>
         <p className="mt-1 text-sm text-gray">
-          We sent a login link to {email}. Tap it on this device to get in.
+          We sent a login link to {email.trim()}. Tap it on this device to
+          get in.
         </p>
       </div>
     );
@@ -119,7 +125,12 @@ function ClientLogin() {
           Your email
         </label>
         <Input
-          type="email"
+          type="text"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -151,7 +162,7 @@ function CoachLogin() {
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim(),
       password,
     });
     setLoading(false);
@@ -167,7 +178,7 @@ function CoachLogin() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: `${window.location.origin}/auth/reset-password`,
     });
     setLoading(false);
@@ -197,7 +208,12 @@ function CoachLogin() {
             Email
           </label>
           <Input
-            type="email"
+            type="text"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -229,7 +245,12 @@ function CoachLogin() {
           Email
         </label>
         <Input
-          type="email"
+          type="text"
+          inputMode="email"
+          autoComplete="email"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}

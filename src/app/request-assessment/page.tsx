@@ -42,7 +42,12 @@ export default function RequestAssessmentPage() {
             </label>
             <Input
               name="email"
-              type="email"
+              type="text"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
               placeholder="you@example.com"
             />
