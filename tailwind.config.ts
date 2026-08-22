@@ -13,7 +13,7 @@ const config: Config = {
         ink: "#3E363A", // primary text
         gray: "#6B5F63", // secondary text
         grayLt: "#E4DADD", // borders, dividers
-        bg: "#FBF9FA", // page background
+        bg: "#E9F4F2", // page background — light teal
       },
       borderRadius: {
         xl: "0.875rem",
