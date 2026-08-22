@@ -614,3 +614,153 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
   revalidatePath("/client/program");
   revalidatePath("/client/dashboard");
 }
+
+export async function addHabit(name: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+  const trimmed = name.trim();
+  if (!trimmed) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_habits")
+    .insert({ client_id: me.id, name: trimmed });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}
+
+export async function deleteHabit(habitId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_habits")
+    .delete()
+    .eq("id", habitId)
+    .eq("client_id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}
+
+export async function toggleHabitLog(habitId: string, logDate: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("client_habit_logs")
+    .select("id")
+    .eq("habit_id", habitId)
+    .eq("log_date", logDate)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("client_habit_logs")
+      .delete()
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("client_habit_logs")
+      .insert({ habit_id: habitId, client_id: me.id, log_date: logDate });
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/client/tracker");
+}
+
+export async function addSymptomLog(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const logDate = String(formData.get("log_date") ?? "");
+  const symptom = String(formData.get("symptom") ?? "").trim();
+  const severityRaw = String(formData.get("severity") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const sharedWithCoach = formData.get("shared_with_coach") === "on";
+
+  if (!logDate || !symptom) throw new Error("Date and symptom are required.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("client_symptom_logs").insert({
+    client_id: me.id,
+    log_date: logDate,
+    symptom,
+    severity: severityRaw ? Number(severityRaw) : null,
+    notes: notes || null,
+    shared_with_coach: sharedWithCoach,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}
+
+export async function deleteSymptomLog(logId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_symptom_logs")
+    .delete()
+    .eq("id", logId)
+    .eq("client_id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}
+
+export async function addNutritionLog(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const logDate = String(formData.get("log_date") ?? "");
+  if (!logDate) throw new Error("Date is required.");
+
+  const numOrNull = (key: string) => {
+    const raw = String(formData.get(key) ?? "").trim();
+    return raw ? Number(raw) : null;
+  };
+  const textOrNull = (key: string) => {
+    const raw = String(formData.get(key) ?? "").trim();
+    return raw || null;
+  };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("client_nutrition_logs").insert({
+    client_id: me.id,
+    log_date: logDate,
+    meal_label: textOrNull("meal_label"),
+    description: textOrNull("description"),
+    hunger_before: numOrNull("hunger_before"),
+    fullness_after: numOrNull("fullness_after"),
+    satisfaction: numOrNull("satisfaction"),
+    calories: numOrNull("calories"),
+    protein_g: numOrNull("protein_g"),
+    carbs_g: numOrNull("carbs_g"),
+    fat_g: numOrNull("fat_g"),
+    notes: textOrNull("notes"),
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}
+
+export async function deleteNutritionLog(logId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_nutrition_logs")
+    .delete()
+    .eq("id", logId)
+    .eq("client_id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/tracker");
+}

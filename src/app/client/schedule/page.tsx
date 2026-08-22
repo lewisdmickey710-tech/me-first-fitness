@@ -30,30 +30,8 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
 });
 const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-const MOTIVATIONAL_QUOTES = [
-  "Show up for the version of you that's still becoming.",
-  "Strong today, stronger next lift.",
-  "Your mind sets the limit — go prove it wrong.",
-  "Every rep is a vote for who you're becoming.",
-  "Consistency beats intensity, every single time.",
-  "You don't have to love it. You just have to show up.",
-  "Progress, not perfection.",
-  "The work you do today is the strength you carry tomorrow.",
-  "Discipline is choosing between what you want now and what you want most.",
-  "Small sessions, big momentum.",
-  "You've never regretted a workout once it was done.",
-  "Muscle and mindset — build them together.",
-  "One more session, one step closer.",
-  "Trust the process. Show up for the reps.",
-  "Your future self is counting on today's session.",
-];
-
-function quoteOfTheDay(date: Date): string {
-  const dayOfYear = Math.floor(
-    (date.getTime() - Date.UTC(date.getUTCFullYear(), 0, 0)) / 86400000
-  );
-  return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
-}
+const SCHEDULE_QUOTE =
+  "Motivation is what gets you started, habits are what keep you going.";
 
 export default async function ClientSchedulePage({
   searchParams,
@@ -187,7 +165,7 @@ export default async function ClientSchedulePage({
       </h1>
       <p className="text-sm italic text-gray">
         <Heart className="mr-1" />
-        &quot;{quoteOfTheDay(now)}&quot;
+        &quot;{SCHEDULE_QUOTE}&quot;
       </p>
 
       <Collapsible label="Cancellation policy">

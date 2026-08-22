@@ -189,6 +189,50 @@ export interface ServiceCheckin {
   created_at: string;
 }
 
+export interface ClientHabit {
+  id: string;
+  client_id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ClientHabitLog {
+  id: string;
+  habit_id: string;
+  client_id: string;
+  log_date: string;
+  created_at: string;
+}
+
+export interface ClientSymptomLog {
+  id: string;
+  client_id: string;
+  log_date: string;
+  symptom: string;
+  severity: number | null;
+  notes: string | null;
+  shared_with_coach: boolean;
+  created_at: string;
+}
+
+export interface ClientNutritionLog {
+  id: string;
+  client_id: string;
+  log_date: string;
+  meal_label: string | null;
+  description: string | null;
+  hunger_before: number | null;
+  fullness_after: number | null;
+  satisfaction: number | null;
+  calories: number | null;
+  protein_g: number | null;
+  carbs_g: number | null;
+  fat_g: number | null;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface ClientSchedule {
   id: string;
   client_id: string;

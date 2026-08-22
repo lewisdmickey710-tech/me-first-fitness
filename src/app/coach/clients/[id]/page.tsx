@@ -33,7 +33,7 @@ import {
   nextSessionForClient,
   upcomingOccurrences,
 } from "@/lib/schedule";
-import { toDateString } from "@/lib/timezone";
+import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import type {
   Activity,
@@ -41,10 +41,14 @@ import type {
   Checkin,
   Client,
   ClientDocumentAssignment,
+  ClientHabit,
+  ClientHabitLog,
   ClientIntake,
   ClientMinorConsent,
+  ClientNutritionLog,
   ClientPhaseHistory,
   ClientSchedule,
+  ClientSymptomLog,
   LegalDocument,
   Measurement,
   OccurrenceStatus,
@@ -65,6 +69,7 @@ const TABS = [
   { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
+  { id: "wellness", label: "Wellness" },
 ] as const;
 
 const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
@@ -222,6 +227,40 @@ export default async function ClientDetailPage({
     .select("*")
     .order("name")) as { data: CareProfile[] | null };
 
+  const sevenDaysAgo = toDateString(
+    new Date(nowInBusinessTz().getTime() - 6 * 86400000)
+  );
+  const [{ data: habits }, { data: habitLogs }, { data: symptomLogs }, { data: nutritionLogs }] =
+    await Promise.all([
+      supabase
+        .from("client_habits")
+        .select("*")
+        .eq("client_id", id)
+        .eq("active", true)
+        .order("created_at") as unknown as Promise<{ data: ClientHabit[] | null }>,
+      supabase
+        .from("client_habit_logs")
+        .select("*")
+        .eq("client_id", id)
+        .gte("log_date", sevenDaysAgo) as unknown as Promise<{
+        data: ClientHabitLog[] | null;
+      }>,
+      // RLS scopes the coach's view of this table to shared_with_coach = true
+      // rows only -- nothing further to filter here.
+      supabase
+        .from("client_symptom_logs")
+        .select("*")
+        .eq("client_id", id)
+        .order("log_date", { ascending: false })
+        .limit(20) as unknown as Promise<{ data: ClientSymptomLog[] | null }>,
+      supabase
+        .from("client_nutrition_logs")
+        .select("*")
+        .eq("client_id", id)
+        .order("log_date", { ascending: false })
+        .limit(20) as unknown as Promise<{ data: ClientNutritionLog[] | null }>,
+    ]);
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -310,6 +349,14 @@ export default async function ClientDetailPage({
       )}
       {tab === "payments" && (
         <PaymentsTab clientId={id} payments={payments ?? []} />
+      )}
+      {tab === "wellness" && (
+        <WellnessTab
+          habits={habits ?? []}
+          habitLogs={habitLogs ?? []}
+          symptomLogs={symptomLogs ?? []}
+          nutritionLogs={nutritionLogs ?? []}
+        />
       )}
     </div>
   );
@@ -1349,6 +1396,127 @@ function CheckinsTab({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function WellnessTab({
+  habits,
+  habitLogs,
+  symptomLogs,
+  nutritionLogs,
+}: {
+  habits: ClientHabit[];
+  habitLogs: ClientHabitLog[];
+  symptomLogs: ClientSymptomLog[];
+  nutritionLogs: ClientNutritionLog[];
+}) {
+  const loggedCountByHabit = new Map<string, number>();
+  for (const l of habitLogs) {
+    loggedCountByHabit.set(l.habit_id, (loggedCountByHabit.get(l.habit_id) ?? 0) + 1);
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm font-medium text-gray">Habits (last 7 days)</p>
+        {habits.length === 0 ? (
+          <EmptyState
+            title="No habits tracked"
+            body="This client hasn't set up any personal habit tracking yet — entirely optional on their end."
+          />
+        ) : (
+          <div className="mt-2 space-y-2">
+            {habits.map((h) => (
+              <Card key={h.id} className="flex items-center justify-between">
+                <span className="text-sm text-ink">{h.name}</span>
+                <Badge tone="teal">
+                  {loggedCountByHabit.get(h.id) ?? 0}/7 days
+                </Badge>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-gray">
+          Symptom log (shared with you)
+        </p>
+        <p className="mt-1 text-xs text-gray">
+          Clients keep this mainly for their own doctor/PT visits — you only
+          see an entry if they choose to share it.
+        </p>
+        {symptomLogs.length === 0 ? (
+          <EmptyState
+            title="Nothing shared yet"
+            body="No shared symptom entries from this client."
+          />
+        ) : (
+          <div className="mt-2 space-y-2">
+            {symptomLogs.map((s) => (
+              <Card key={s.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">
+                    {s.symptom}
+                    {s.severity ? (
+                      <span className="ml-2 text-sm text-gray">
+                        severity {s.severity}/5
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="text-sm text-gray">{s.log_date}</p>
+                </div>
+                {s.notes ? (
+                  <p className="mt-1 text-sm text-ink">{s.notes}</p>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-gray">Nutrition log</p>
+        {nutritionLogs.length === 0 ? (
+          <EmptyState
+            title="No nutrition entries yet"
+            body="This client hasn't logged any meals in their tracker yet."
+          />
+        ) : (
+          <div className="mt-2 space-y-2">
+            {nutritionLogs.map((n) => (
+              <Card key={n.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">
+                    {n.log_date}
+                    {n.meal_label ? ` · ${n.meal_label}` : ""}
+                  </p>
+                </div>
+                {n.description ? (
+                  <p className="mt-1 text-sm text-ink">{n.description}</p>
+                ) : null}
+                <p className="mt-1 text-xs text-gray">
+                  {[
+                    n.hunger_before ? `hunger ${n.hunger_before}/10` : null,
+                    n.fullness_after ? `fullness ${n.fullness_after}/10` : null,
+                    n.satisfaction ? `satisfaction ${n.satisfaction}/5` : null,
+                    n.calories ? `${n.calories} cal` : null,
+                    n.protein_g ? `${n.protein_g}g protein` : null,
+                    n.carbs_g ? `${n.carbs_g}g carbs` : null,
+                    n.fat_g ? `${n.fat_g}g fat` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+                {n.notes ? (
+                  <p className="mt-1 text-sm text-gray">{n.notes}</p>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
