@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
 import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
-import { DAY_NAMES, formatTimeOfDay, upcomingOccurrences } from "@/lib/schedule";
+import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
+import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type { ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -14,7 +15,26 @@ const STATUS_LABEL: Record<string, string> = {
   rescheduled: "Rescheduled",
 };
 
-export default async function ClientSchedulePage() {
+const DOT_TONE: Record<string, string> = {
+  scheduled: "bg-teal",
+  completed: "bg-green",
+  cancelled: "bg-pink",
+  late_cancelled: "bg-pink",
+  rescheduled: "bg-gold",
+};
+
+const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+export default async function ClientSchedulePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ month?: string; date?: string }>;
+}) {
   const me = await getMyClient();
 
   if (!me) {
@@ -28,27 +48,19 @@ export default async function ClientSchedulePage() {
 
   const supabase = await createClient();
 
-  const [{ data: schedules }, { data: occurrences }, { data: unpaidFees }] =
-    await Promise.all([
-      supabase
-        .from("client_schedules")
-        .select("*")
-        .eq("client_id", me.id)
-        .eq("active", true) as unknown as Promise<{ data: ClientSchedule[] | null }>,
-      supabase
-        .from("session_occurrences")
-        .select("*")
-        .eq("client_id", me.id)
-        .gte("occurrence_date", new Date().toISOString().slice(0, 10)) as unknown as Promise<{
-        data: SessionOccurrence[] | null;
-      }>,
-      supabase
-        .from("payments")
-        .select("*")
-        .eq("client_id", me.id)
-        .eq("kind", "late_cancellation_fee")
-        .is("paid_on", null) as unknown as Promise<{ data: Payment[] | null }>,
-    ]);
+  const [{ data: schedules }, { data: unpaidFees }] = await Promise.all([
+    supabase
+      .from("client_schedules")
+      .select("*")
+      .eq("client_id", me.id)
+      .eq("active", true) as unknown as Promise<{ data: ClientSchedule[] | null }>,
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("client_id", me.id)
+      .eq("kind", "late_cancellation_fee")
+      .is("paid_on", null) as unknown as Promise<{ data: Payment[] | null }>,
+  ]);
 
   const frozen = (unpaidFees ?? []).length > 0;
 
@@ -76,12 +88,67 @@ export default async function ClientSchedulePage() {
     );
   }
 
+  const { month: monthParam, date: dateParam } = await searchParams;
+
+  const now = nowInBusinessTz();
+  const todayStr = toDateString(now);
+
+  let year = now.getUTCFullYear();
+  let month = now.getUTCMonth(); // 0-indexed
+  if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+    const [y, m] = monthParam.split("-").map(Number);
+    year = y;
+    month = m - 1;
+  }
+  const monthKey = `${year}-${String(month + 1).padStart(2, "0")}`;
+
+  const firstOfMonth = new Date(Date.UTC(year, month, 1));
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const leadingBlanks = firstOfMonth.getUTCDay();
+  const firstDateStr = toDateString(firstOfMonth);
+  const lastDateStr = toDateString(new Date(Date.UTC(year, month, daysInMonth)));
+
+  const activeSchedules = schedules ?? [];
+  const scheduleByDayOfWeek = new Map<number, ClientSchedule[]>();
+  for (const s of activeSchedules) {
+    const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
+    list.push(s);
+    scheduleByDayOfWeek.set(s.day_of_week, list);
+  }
+
+  const { data: monthOccurrences } = await supabase
+    .from("session_occurrences")
+    .select("*")
+    .eq("client_id", me.id)
+    .gte("occurrence_date", firstDateStr)
+    .lte("occurrence_date", lastDateStr);
+
   const occurrenceByDate = new Map<string, SessionOccurrence>();
-  for (const o of occurrences ?? []) {
+  for (const o of monthOccurrences ?? []) {
     occurrenceByDate.set(o.occurrence_date, o);
   }
 
-  const upcoming = upcomingOccurrences(schedules ?? [], new Set(), 56);
+  const cells: { day: number; date: string; status: string | null }[] = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(Date.UTC(year, month, day));
+    const dateStr = toDateString(date);
+    const existing = occurrenceByDate.get(dateStr);
+    const isScheduledDay = scheduleByDayOfWeek.has(date.getUTCDay());
+    const status = existing ? existing.status : isScheduledDay ? "scheduled" : null;
+    cells.push({ day, date: dateStr, status });
+  }
+
+  const selectedDate = dateParam ?? (monthKey === toDateString(now).slice(0, 7) ? todayStr : null);
+  const selectedCell = cells.find((c) => c.date === selectedDate) ?? null;
+  const selectedSchedules = selectedCell
+    ? scheduleByDayOfWeek.get(new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()) ?? []
+    : [];
+  const selectedOccurrence = selectedDate ? occurrenceByDate.get(selectedDate) : undefined;
+
+  const prevMonthDate = new Date(Date.UTC(year, month - 1, 1));
+  const nextMonthDate = new Date(Date.UTC(year, month + 1, 1));
+  const prevMonthKey = `${prevMonthDate.getUTCFullYear()}-${String(prevMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
+  const nextMonthKey = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
 
   return (
     <div className="space-y-6">
@@ -100,76 +167,156 @@ export default async function ClientSchedulePage() {
         it&apos;s paid.
       </p>
 
-      {upcoming.length === 0 ? (
-        <EmptyState
-          title="No upcoming sessions"
-          body="Your coach hasn't set a recurring weekly time yet — reach out if that seems off."
-        />
-      ) : (
-        <div className="space-y-3">
-          {upcoming.map((occ) => {
-            const existing = occurrenceByDate.get(occ.date);
-            const hours = hoursUntilOccurrence(occ.date, occ.timeOfDay);
-            const wouldBeLate = hours < LATE_CANCEL_NOTICE_HOURS;
+      <Card>
+        <div className="flex items-center justify-between">
+          <Link
+            href={`/client/schedule?month=${prevMonthKey}`}
+            className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
+          >
+            ← Prev
+          </Link>
+          <p className="font-medium text-ink">
+            {MONTH_LABEL_FMT.format(firstOfMonth)}
+          </p>
+          <Link
+            href={`/client/schedule?month=${nextMonthKey}`}
+            className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
+          >
+            Next →
+          </Link>
+        </div>
 
+        <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs text-gray">
+          {WEEKDAY_SHORT.map((d) => (
+            <div key={d} className="py-1">
+              {d}
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: leadingBlanks }).map((_, i) => (
+            <div key={`blank-${i}`} />
+          ))}
+          {cells.map((cell) => {
+            const isSelected = cell.date === selectedDate;
+            const isToday = cell.date === todayStr;
             return (
-              <Card key={occ.date} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-ink">
-                      {DAY_NAMES[occ.dayOfWeek]}, {occ.date} at{" "}
-                      {formatTimeOfDay(occ.timeOfDay)}
-                    </p>
-                    {occ.label ? (
-                      <p className="text-sm text-gray">{occ.label}</p>
-                    ) : null}
-                  </div>
-                  {existing ? (
-                    <Badge tone={existing.status === "completed" ? "green" : "gold"}>
-                      {STATUS_LABEL[existing.status]}
-                    </Badge>
-                  ) : (
-                    <Badge tone="teal">Scheduled</Badge>
-                  )}
-                </div>
-
-                {existing?.status === "rescheduled" && existing.rescheduled_to_date ? (
-                  <p className="text-sm text-gray">
-                    Moved to {existing.rescheduled_to_date}
-                  </p>
-                ) : null}
-
-                {!existing ? (
-                  <div className="flex flex-wrap items-center gap-2 border-t border-grayLt pt-3">
-                    {wouldBeLate ? (
-                      <p className="w-full text-xs text-pink">
-                        Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours
-                        notice — this will count as a late cancellation.
-                      </p>
-                    ) : null}
-                    <form
-                      action={async () => {
-                        "use server";
-                        await cancelMySession(occ.scheduleId, occ.date, occ.timeOfDay);
-                      }}
-                    >
-                      <Button type="submit" variant="danger">
-                        Cancel
-                      </Button>
-                    </form>
-                    <Link
-                      href={`/client/request?reschedule_from=${occ.date}`}
-                    >
-                      <Button type="button" variant="secondary">
-                        Request reschedule
-                      </Button>
-                    </Link>
-                  </div>
-                ) : null}
-              </Card>
+              <Link
+                key={cell.date}
+                href={`/client/schedule?month=${monthKey}&date=${cell.date}`}
+                className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-sm ${
+                  isSelected
+                    ? "bg-rose text-white"
+                    : isToday
+                      ? "border border-rose text-ink"
+                      : "text-ink hover:bg-bg"
+                }`}
+              >
+                {cell.day}
+                {cell.status ? (
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      isSelected ? "bg-white" : DOT_TONE[cell.status]
+                    }`}
+                  />
+                ) : (
+                  <span className="h-1.5 w-1.5" />
+                )}
+              </Link>
             );
           })}
         </div>
+      </Card>
+
+      {!selectedCell ? (
+        <EmptyState
+          title="No session that day"
+          body="Tap a highlighted date on the calendar to see details."
+        />
+      ) : (
+        <Card className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-ink">
+              {DAY_NAMES[new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()]},{" "}
+              {selectedCell.date}
+            </p>
+            {selectedCell.status ? (
+              <Badge
+                tone={
+                  selectedCell.status === "completed"
+                    ? "green"
+                    : selectedCell.status === "scheduled"
+                      ? "teal"
+                      : "gold"
+                }
+              >
+                {selectedCell.status === "scheduled"
+                  ? "Scheduled"
+                  : STATUS_LABEL[selectedCell.status]}
+              </Badge>
+            ) : null}
+          </div>
+
+          {selectedCell.status === null ? (
+            <p className="text-sm text-gray">Nothing on the schedule this day.</p>
+          ) : null}
+
+          {selectedOccurrence?.status === "rescheduled" &&
+          selectedOccurrence.rescheduled_to_date ? (
+            <p className="text-sm text-gray">
+              Moved to {selectedOccurrence.rescheduled_to_date}
+            </p>
+          ) : null}
+
+          {selectedSchedules.map((s) => (
+            <p key={s.id} className="text-sm text-gray">
+              {formatTimeOfDay(s.time_of_day)}
+              {s.label ? ` · ${s.label}` : ""}
+            </p>
+          ))}
+
+          {selectedCell.status === "scheduled" && selectedSchedules.length > 0 ? (
+            (() => {
+              const hours = hoursUntilOccurrence(
+                selectedCell.date,
+                selectedSchedules[0].time_of_day
+              );
+              const wouldBeLate = hours < LATE_CANCEL_NOTICE_HOURS;
+              const isPast = hours < -24;
+              if (isPast) return null;
+              return (
+                <div className="flex flex-wrap items-center gap-2 border-t border-grayLt pt-3">
+                  {wouldBeLate ? (
+                    <p className="w-full text-xs text-pink">
+                      Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours
+                      notice — this will count as a late cancellation.
+                    </p>
+                  ) : null}
+                  <form
+                    action={async () => {
+                      "use server";
+                      await cancelMySession(
+                        selectedSchedules[0].id,
+                        selectedCell.date,
+                        selectedSchedules[0].time_of_day
+                      );
+                    }}
+                  >
+                    <Button type="submit" variant="danger">
+                      Cancel
+                    </Button>
+                  </form>
+                  <Link href={`/client/request?reschedule_from=${selectedCell.date}`}>
+                    <Button type="button" variant="secondary">
+                      Request reschedule
+                    </Button>
+                  </Link>
+                </div>
+              );
+            })()
+          ) : null}
+        </Card>
       )}
     </div>
   );

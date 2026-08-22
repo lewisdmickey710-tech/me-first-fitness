@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
-import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
+import { loggedThisMonth } from "@/lib/measurement-window";
 import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
@@ -43,6 +43,7 @@ export default async function ClientDashboard() {
     { data: payments },
     { data: documents },
     { data: acks },
+    { data: recentMeasurements },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -93,6 +94,12 @@ export default async function ClientDashboard() {
       .eq("client_id", me.id) as unknown as Promise<{
       data: ClientDocumentAcknowledgment[] | null;
     }>,
+    supabase
+      .from("measurements")
+      .select("date")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })
+      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
   ]);
 
   const [{ data: clientIntake }, { data: docAssignments }, { data: minorConsent }] =
@@ -115,8 +122,11 @@ export default async function ClientDashboard() {
         .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
     ]);
 
+  // Prompted by measurements, not the calendar -- once Mickey has logged
+  // this month's measurements, that's the cue to also do the service
+  // check-in, whenever in the month that actually happens.
   const needsServiceCheckin =
-    isFirstWeekOfMonth() &&
+    loggedThisMonth((recentMeasurements ?? []).map((m) => m.date)) &&
     !loggedThisMonth((recentServiceCheckins ?? []).map((r) => r.date));
 
   const nextSession = nextSessionFromSchedules(schedules ?? []);

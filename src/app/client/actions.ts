@@ -486,6 +486,14 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
   const date = String(formData.get("date") ?? "");
   if (!date) throw new Error("Date is required.");
   const dayNotes = String(formData.get("day_notes") ?? "").trim();
+  const ratingRaw = String(formData.get("rating") ?? "").trim();
+  const rating = ratingRaw ? Number(ratingRaw) : null;
+
+  const sleep = String(formData.get("sleep") ?? "").trim();
+  const water = String(formData.get("water") ?? "").trim();
+  const food = String(formData.get("food") ?? "").trim();
+  const energy = String(formData.get("energy") ?? "").trim();
+  const mood = String(formData.get("mood") ?? "").trim();
 
   const { data: day } = await supabase
     .from("program_days")
@@ -565,11 +573,29 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
     day_label: `Day ${day.day_number}: ${day.day_label}`,
     date,
     entries,
+    rating,
     day_notes: dayNotes || null,
     logged_by: "client",
   });
 
   if (error) throw new Error(error.message);
+
+  // Captured in the same breath as the workout rating on purpose -- the
+  // point is to let the client (and coach) see the connection between how
+  // the week outside the gym went and how the session itself felt/went.
+  if (sleep || water || food || energy || mood) {
+    const { error: checkinError } = await supabase.from("checkins").insert({
+      client_id: me.id,
+      date,
+      sleep: sleep || null,
+      water: water || null,
+      food: food || null,
+      energy: energy || null,
+      mood: mood || null,
+      logged_by: "client",
+    });
+    if (checkinError) throw new Error(checkinError.message);
+  }
 
   // Same as when the coach logs a session -- a logged workout means that
   // date's occurrence was attended, feeding the existing attendance/risk

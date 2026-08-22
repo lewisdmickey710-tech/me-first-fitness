@@ -196,6 +196,41 @@ export function Select({
   );
 }
 
+export function StarRatingInput({
+  name,
+  defaultValue,
+  form,
+}: {
+  name: string;
+  defaultValue?: number;
+  form?: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <label
+          key={n}
+          className="flex cursor-pointer flex-col items-center gap-0.5"
+        >
+          <input
+            type="radio"
+            name={name}
+            value={n}
+            required
+            form={form}
+            defaultChecked={defaultValue === n}
+            className="peer sr-only"
+          />
+          <span className="text-2xl text-grayLt peer-checked:text-gold">
+            ★
+          </span>
+          <span className="text-xs text-gray peer-checked:text-ink">{n}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 export function Checkbox({
   label,
   name,

@@ -9,6 +9,7 @@ import {
   EmptyState,
   Input,
   PhaseBanner,
+  StarRatingInput,
   Textarea,
 } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
@@ -278,12 +279,34 @@ export default async function ClientProgramPage() {
                     </label>
                     <Input name="date" type="date" required defaultValue={today} />
                   </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-ink">
+                      How was your day outside the gym?
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input name="sleep" placeholder="Sleep — e.g. 7 hrs" />
+                      <Input name="water" placeholder="Water — e.g. 64 oz" />
+                      <Input name="food" placeholder="Food — on track / off track" />
+                      <Input name="energy" placeholder="Energy — e.g. Good" />
+                      <Input name="mood" placeholder="Mood — e.g. Steady" />
+                    </div>
+                  </div>
+
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
                       Anything else about how this session felt?
                     </label>
                     <Textarea name="day_notes" rows={2} />
                   </div>
+
+                  <div>
+                    <p className="mb-1 text-sm font-medium text-ink">
+                      Rate this workout to complete it
+                    </p>
+                    <StarRatingInput name="rating" />
+                  </div>
+
                   <Button type="submit" className="w-full">
                     Log this workout
                   </Button>
