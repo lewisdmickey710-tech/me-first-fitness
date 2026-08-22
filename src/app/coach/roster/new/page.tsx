@@ -1,6 +1,8 @@
 import { addClient } from "@/app/coach/actions";
 import { Button, Card, Heart, Input, Select, Textarea } from "@/components/ui";
-import { PHASES, TRACKS } from "@/lib/constants";
+import { PHASES } from "@/lib/constants";
+import { SORTING_QUESTIONS } from "@/lib/track-criteria";
+import { TrackPicker } from "./TrackPicker";
 
 export default function NewClientPage() {
   return (
@@ -9,6 +11,27 @@ export default function NewClientPage() {
         <Heart className="mr-1.5" />
         Add a client
       </h1>
+
+      <details className="rounded-2xl border border-grayLt bg-white p-4">
+        <summary className="cursor-pointer text-sm font-medium text-ink">
+          <Heart className="mr-1.5" />
+          Not sure which track? Work through these in order
+        </summary>
+        <ol className="mt-3 space-y-2 text-sm text-gray">
+          {SORTING_QUESTIONS.map((q, i) => (
+            <li key={i}>
+              <span className="font-medium text-ink">{i + 1}.</span> {q}
+            </li>
+          ))}
+        </ol>
+        <p className="mt-3 text-xs text-gray">
+          Most clients sort themselves into a track by question 2 or 3 — the
+          rest just confirm the fit. When more than one track could fit, the
+          more specific track (medical or population-based) wins over a
+          general frequency-based one. Pick a track below to see what it&apos;s
+          built for.
+        </p>
+      </details>
 
       <Card>
         <form action={addClient} className="space-y-4">
@@ -19,21 +42,7 @@ export default function NewClientPage() {
             <Input name="name" required placeholder="Client's full name" />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              Track
-            </label>
-            <Select name="track" required defaultValue="">
-              <option value="" disabled>
-                Choose a track
-              </option>
-              {TRACKS.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.id} — {t.name}
-                </option>
-              ))}
-            </Select>
-          </div>
+          <TrackPicker />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
