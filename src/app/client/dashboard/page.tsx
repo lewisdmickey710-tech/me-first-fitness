@@ -4,7 +4,15 @@ import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
-import type { CareProfile, SessionRequest, TrainingSession } from "@/lib/types";
+import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
+import { toDateString } from "@/lib/timezone";
+import type {
+  CareProfile,
+  ClientSchedule,
+  Payment,
+  SessionRequest,
+  TrainingSession,
+} from "@/lib/types";
 
 export default async function ClientDashboard() {
   const me = await getMyClient();
@@ -26,6 +34,8 @@ export default async function ClientDashboard() {
     { data: careProfile },
     currentPhase,
     { data: recentServiceCheckins },
+    { data: schedules },
+    { data: payments },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -54,11 +64,28 @@ export default async function ClientDashboard() {
       .eq("client_id", me.id)
       .order("date", { ascending: false })
       .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
+    supabase
+      .from("client_schedules")
+      .select("*")
+      .eq("client_id", me.id)
+      .eq("active", true) as unknown as Promise<{ data: ClientSchedule[] | null }>,
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("client_id", me.id)
+      .is("paid_on", null)
+      .order("due_date", { ascending: true }) as unknown as Promise<{
+      data: Payment[] | null;
+    }>,
   ]);
 
   const needsServiceCheckin =
     isFirstWeekOfMonth() &&
     !loggedThisMonth((recentServiceCheckins ?? []).map((r) => r.date));
+
+  const nextSession = nextSessionFromSchedules(schedules ?? []);
+  const nextDue = payments?.[0] ?? null;
+  const today = toDateString(new Date());
 
   const { count: sessionsUsed } = await supabase
     .from("sessions")
@@ -80,6 +107,31 @@ export default async function ClientDashboard() {
           Week {weekInPhase(currentPhase.started_on)} of this phase · Cycle{" "}
           {currentPhase.cycle_number}
         </p>
+      ) : null}
+
+      {nextSession ? (
+        <Card>
+          <p className="text-sm font-medium text-gray">Next session</p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)}
+            {nextSession.label ? ` · ${nextSession.label}` : ""}
+          </p>
+        </Card>
+      ) : null}
+
+      {nextDue ? (
+        <Card className={nextDue.due_date < today ? "border-pink/40 bg-pink/5" : ""}>
+          <p className="text-sm font-medium text-gray">
+            {nextDue.due_date < today ? "Payment overdue" : "Payment due"}
+          </p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            ${Number(nextDue.amount).toFixed(2)}
+            <span className="text-base font-normal text-gray">
+              {" "}
+              — {nextDue.description}, due {nextDue.due_date}
+            </span>
+          </p>
+        </Card>
       ) : null}
 
       <Card>

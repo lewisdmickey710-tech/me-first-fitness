@@ -82,6 +82,39 @@ Open [http://localhost:3000](http://localhost:3000).
 4. Deploy. The app is mobile-responsive out of the box — no app install
    needed for clients.
 
+## 6. Set up reminders (session + payment)
+
+The app emails clients a reminder the day before each recurring session
+time, and reminds them about payments as they come due or go overdue. This
+needs a couple of one-time setup steps beyond the base Supabase/Vercel
+deploy:
+
+1. **Get the service role key.** Supabase project → Settings → API →
+   `service_role` key (not the anon key). Add it as `SUPABASE_SERVICE_ROLE_KEY`
+   in Vercel's environment variables. Keep this secret — it bypasses every
+   RLS policy in the app.
+2. **Create a `CRON_SECRET`.** Any random string (e.g.
+   `openssl rand -hex 32`). Add it to Vercel's environment variables too —
+   this is what stops random people from triggering your reminder job.
+3. **Sign up for [Resend](https://resend.com)** (free tier: 100 emails/day).
+   Create an API key and add it as `RESEND_API_KEY` in Vercel.
+4. **Verify a sending domain in Resend** (Domains → Add Domain, then add the
+   DNS records it gives you at your domain registrar). Until you do this,
+   Resend's sandbox mode only delivers to your own account email — real
+   client reminders won't go out. Once verified, set `EMAIL_FROM` to an
+   address at that domain, e.g. `MeFirstFitness <reminders@mefirstfitness.com>`.
+5. **Redeploy.** Vercel reads `vercel.json` and automatically schedules the
+   `/api/cron/reminders` route to run once a day (13:00 UTC — roughly
+   morning Eastern time). No manual cron setup needed on Vercel's end.
+
+To use it: on a client's page, use the **Manage** link next to "Next
+session" on Overview to set their recurring weekly session time(s), and the
+**Payments** tab to record what they owe. Everything else is automatic.
+
+The business timezone is hardcoded in `src/lib/timezone.ts`
+(`BUSINESS_TIMEZONE`, currently `America/New_York`) — update it there if
+that's not right.
+
 ## Data model
 
 Tables map directly to the brief: `clients`, `sessions`, `checkins`,
@@ -93,9 +126,14 @@ and RLS policies have something to key off of. See
 
 ## What's intentionally out of scope for v1
 
-Per the build brief: calendar sync (beyond the request/confirm flow),
-payments, multi-coach support, and in-app exercise/nutrition content. See
+Per the build brief: multi-coach support and in-app nutrition content. See
 the brief for the full list.
+
+Scheduling and payments now have a lightweight version (see "Set up
+reminders" above): the coach sets each client's recurring weekly time(s)
+and tracks what's owed manually — there's no client-facing booking
+calendar and no online payment collection (Stripe or similar). Both are
+reasonable future upgrades if the business outgrows manual tracking.
 
 ## Pilot checklist before rolling out to the full roster
 

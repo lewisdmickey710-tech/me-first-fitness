@@ -221,3 +221,83 @@ export async function logCheckinAsCoach(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=checkins`);
 }
 
+export async function addClientSchedule(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const dayOfWeek = String(formData.get("day_of_week") ?? "");
+  const timeOfDay = String(formData.get("time_of_day") ?? "");
+  const label = String(formData.get("label") ?? "").trim();
+
+  if (dayOfWeek === "" || !timeOfDay) {
+    throw new Error("Day and time are required.");
+  }
+
+  const { error } = await supabase.from("client_schedules").insert({
+    client_id: clientId,
+    day_of_week: Number(dayOfWeek),
+    time_of_day: timeOfDay,
+    label: label || null,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}/schedule`);
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function removeClientSchedule(
+  scheduleId: string,
+  clientId: string
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("client_schedules")
+    .delete()
+    .eq("id", scheduleId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}/schedule`);
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function addPayment(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const description = String(formData.get("description") ?? "").trim();
+  const amount = String(formData.get("amount") ?? "");
+  const dueDate = String(formData.get("due_date") ?? "");
+
+  if (!description || !amount || !dueDate) {
+    throw new Error("Description, amount, and due date are required.");
+  }
+
+  const { error } = await supabase.from("payments").insert({
+    client_id: clientId,
+    description,
+    amount: Number(amount),
+    due_date: dueDate,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  redirect(`/coach/clients/${clientId}?tab=payments`);
+}
+
+export async function markPaymentPaid(paymentId: string, clientId: string) {
+  const supabase = await createClient();
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { error } = await supabase
+    .from("payments")
+    .update({ paid_on: today })
+    .eq("id", paymentId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+

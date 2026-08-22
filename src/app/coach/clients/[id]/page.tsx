@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { advancePhase, setRequestStatus } from "@/app/coach/actions";
+import { advancePhase, markPaymentPaid, setRequestStatus } from "@/app/coach/actions";
 import {
   Badge,
   Button,
@@ -15,13 +15,17 @@ import {
 import { phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
+import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
+import { toDateString } from "@/lib/timezone";
 import type {
   Activity,
   CareProfile,
   Checkin,
   Client,
   ClientPhaseHistory,
+  ClientSchedule,
   Measurement,
+  Payment,
   ServiceCheckin,
   SessionRequest,
   TrainingSession,
@@ -34,6 +38,7 @@ const TABS = [
   { id: "measurements", label: "Measurements" },
   { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
+  { id: "payments", label: "Payments" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -70,6 +75,8 @@ export default async function ClientDetailPage({
     { data: currentPhase },
     { data: measurements },
     { data: serviceCheckins },
+    { data: schedules },
+    { data: payments },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -121,6 +128,18 @@ export default async function ClientDetailPage({
       .order("date", { ascending: false }) as unknown as Promise<{
       data: ServiceCheckin[] | null;
     }>,
+    supabase
+      .from("client_schedules")
+      .select("*")
+      .eq("client_id", id)
+      .eq("active", true) as unknown as Promise<{ data: ClientSchedule[] | null }>,
+    supabase
+      .from("payments")
+      .select("*")
+      .eq("client_id", id)
+      .order("due_date", { ascending: true }) as unknown as Promise<{
+      data: Payment[] | null;
+    }>,
   ]);
 
   const pendingCount = (requests ?? []).filter(
@@ -168,6 +187,8 @@ export default async function ClientDetailPage({
           recentSessions={sessions?.slice(0, 3) ?? []}
           measurements={measurements ?? []}
           latestServiceCheckin={serviceCheckins?.[0] ?? null}
+          schedules={schedules ?? []}
+          payments={payments ?? []}
         />
       )}
       {tab === "sessions" && (
@@ -187,6 +208,9 @@ export default async function ClientDetailPage({
       {tab === "requests" && (
         <RequestsTab clientId={id} requests={requests ?? []} />
       )}
+      {tab === "payments" && (
+        <PaymentsTab clientId={id} payments={payments ?? []} />
+      )}
     </div>
   );
 }
@@ -199,6 +223,8 @@ function Overview({
   recentSessions,
   measurements,
   latestServiceCheckin,
+  schedules,
+  payments,
 }: {
   client: Client;
   currentPhase: ClientPhaseHistory | null;
@@ -207,8 +233,14 @@ function Overview({
   recentSessions: TrainingSession[];
   measurements: Measurement[];
   latestServiceCheckin: ServiceCheckin | null;
+  schedules: ClientSchedule[];
+  payments: Payment[];
 }) {
   const allotted = client.sessions_allotted;
+  const nextSession = nextSessionFromSchedules(schedules);
+  const today = toDateString(new Date());
+  const unpaid = payments.filter((p) => !p.paid_on);
+  const nextDue = unpaid.sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
 
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
@@ -259,6 +291,45 @@ function Overview({
           body="This client isn't on a care profile with phase tracking yet."
         />
       )}
+
+      <Card>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray">Next session</p>
+            {nextSession ? (
+              <p className="mt-1 text-lg font-semibold text-ink">
+                {formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)}
+                {nextSession.label ? ` · ${nextSession.label}` : ""}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-gray">
+                No recurring schedule set.
+              </p>
+            )}
+          </div>
+          <Link
+            href={`/coach/clients/${client.id}/schedule`}
+            className="shrink-0 text-sm text-gray hover:text-ink"
+          >
+            Manage
+          </Link>
+        </div>
+      </Card>
+
+      {nextDue ? (
+        <Card className={nextDue.due_date < today ? "border-pink/40 bg-pink/5" : ""}>
+          <p className="text-sm font-medium text-gray">
+            {nextDue.due_date < today ? "Payment overdue" : "Payment due"}
+          </p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            ${Number(nextDue.amount).toFixed(2)}
+            <span className="text-base font-normal text-gray">
+              {" "}
+              — {nextDue.description}, due {nextDue.due_date}
+            </span>
+          </p>
+        </Card>
+      ) : null}
 
       <Card>
         <p className="text-sm font-medium text-gray">Sessions</p>
@@ -700,6 +771,73 @@ function RequestsTab({
           ) : null}
         </Card>
       ))}
+    </div>
+  );
+}
+
+function PaymentsTab({
+  clientId,
+  payments,
+}: {
+  clientId: string;
+  payments: Payment[];
+}) {
+  const today = toDateString(new Date());
+
+  return (
+    <div className="space-y-4">
+      <Link
+        href={`/coach/clients/${clientId}/payments/new`}
+        className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+      >
+        + Add payment due
+      </Link>
+
+      {payments.length === 0 ? (
+        <EmptyState
+          title="No payments tracked yet"
+          body="Add what this client owes and the app will remind them by email as it comes due."
+        />
+      ) : (
+        <div className="space-y-3">
+          {payments.map((p) => {
+            const overdue = !p.paid_on && p.due_date < today;
+            return (
+              <Card
+                key={p.id}
+                className={overdue ? "border-pink/40 bg-pink/5" : ""}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">{p.description}</p>
+                  {p.paid_on ? (
+                    <Badge tone="green">paid {p.paid_on}</Badge>
+                  ) : overdue ? (
+                    <Badge tone="pink">overdue</Badge>
+                  ) : (
+                    <Badge tone="gold">due {p.due_date}</Badge>
+                  )}
+                </div>
+                <p className="mt-1 text-lg font-semibold text-ink">
+                  ${Number(p.amount).toFixed(2)}
+                </p>
+                {!p.paid_on ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await markPaymentPaid(p.id, clientId);
+                    }}
+                    className="mt-3"
+                  >
+                    <Button type="submit" variant="secondary">
+                      Mark paid
+                    </Button>
+                  </form>
+                ) : null}
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

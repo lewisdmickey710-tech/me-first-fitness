@@ -159,6 +159,27 @@ export interface ServiceCheckin {
   created_at: string;
 }
 
+export interface ClientSchedule {
+  id: string;
+  client_id: string;
+  day_of_week: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  time_of_day: string;
+  label: string | null;
+  active: boolean;
+  created_at: string;
+}
+
+export interface Payment {
+  id: string;
+  client_id: string;
+  description: string;
+  amount: number;
+  due_date: string;
+  paid_on: string | null;
+  reminder_sent_at: string | null;
+  created_at: string;
+}
+
 export interface Measurement {
   id: string;
   client_id: string;
