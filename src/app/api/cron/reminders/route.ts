@@ -209,11 +209,15 @@ export async function GET(request: Request) {
     }
   }
 
-  // ---- Documents pending: any legal document not yet acknowledged at its
-  // current version ----
+  // ---- Documents pending: any assigned legal document not yet
+  // acknowledged at its current version. A document only counts against a
+  // client if it's assigned_to_all, or the coach specifically assigned it
+  // to that client (client_document_assignments). Minor Consent is never
+  // assigned_to_all and is tracked separately (client_minor_consent.signed_at
+  // instead of a generic acknowledgment) since it's a fillable form. ----
   const { data: documents } = await supabase
     .from("legal_documents")
-    .select("id, version");
+    .select("id, key, version, assigned_to_all");
 
   if (documents && documents.length > 0) {
     const { data: docClients } = await supabase
@@ -229,21 +233,48 @@ export async function GET(request: Request) {
 
     if (eligibleClients.length > 0) {
       const eligibleClientIds = eligibleClients.map((c) => c.id);
-      const { data: acks } = await supabase
-        .from("client_document_acknowledgments")
-        .select("client_id, document_id, document_version")
-        .in("client_id", eligibleClientIds);
+      const [{ data: acks }, { data: assignments }, { data: minorConsents }] =
+        await Promise.all([
+          supabase
+            .from("client_document_acknowledgments")
+            .select("client_id, document_id, document_version")
+            .in("client_id", eligibleClientIds),
+          supabase
+            .from("client_document_assignments")
+            .select("client_id, document_id")
+            .in("client_id", eligibleClientIds),
+          supabase
+            .from("client_minor_consent")
+            .select("client_id, signed_at")
+            .in("client_id", eligibleClientIds),
+        ]);
 
       const ackedKeys = new Set(
         (acks ?? []).map(
           (a) => `${a.client_id}:${a.document_id}:${a.document_version}`
         )
       );
+      const assignedKeys = new Set(
+        (assignments ?? []).map((a) => `${a.client_id}:${a.document_id}`)
+      );
+      const signedMinorConsentClientIds = new Set(
+        (minorConsents ?? []).filter((c) => c.signed_at).map((c) => c.client_id)
+      );
+
+      const minorConsentDoc = documents.find((d) => d.key === "minor_consent");
+      const otherDocuments = documents.filter((d) => d.key !== "minor_consent");
 
       for (const client of eligibleClients) {
-        const hasPending = documents.some(
-          (d) => !ackedKeys.has(`${client.id}:${d.id}:${d.version}`)
-        );
+        const hasPendingOther = otherDocuments.some((d) => {
+          const isAssigned =
+            d.assigned_to_all || assignedKeys.has(`${client.id}:${d.id}`);
+          return isAssigned && !ackedKeys.has(`${client.id}:${d.id}:${d.version}`);
+        });
+        const hasPendingMinorConsent =
+          !!minorConsentDoc &&
+          assignedKeys.has(`${client.id}:${minorConsentDoc.id}`) &&
+          !signedMinorConsentClientIds.has(client.id);
+        const hasPending = hasPendingOther || hasPendingMinorConsent;
         if (!hasPending || !client.user_id) continue;
 
         const { data: userResult, error: userError } =

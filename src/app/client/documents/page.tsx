@@ -12,7 +12,12 @@ import {
   Heart,
   Input,
 } from "@/components/ui";
-import type { ClientDocumentAcknowledgment, LegalDocument } from "@/lib/types";
+import type {
+  ClientDocumentAcknowledgment,
+  ClientDocumentAssignment,
+  ClientMinorConsent,
+  LegalDocument,
+} from "@/lib/types";
 
 export default async function ClientDocumentsPage() {
   const me = await getMyClient();
@@ -28,22 +33,49 @@ export default async function ClientDocumentsPage() {
 
   const supabase = await createClient();
 
-  const [{ data: documents }, { data: acks }] = await Promise.all([
-    supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
-      data: LegalDocument[] | null;
-    }>,
-    supabase
-      .from("client_document_acknowledgments")
-      .select("*")
-      .eq("client_id", me.id) as unknown as Promise<{
-      data: ClientDocumentAcknowledgment[] | null;
-    }>,
-  ]);
+  const [{ data: documents }, { data: acks }, { data: assignments }, { data: minorConsent }] =
+    await Promise.all([
+      supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
+        data: LegalDocument[] | null;
+      }>,
+      supabase
+        .from("client_document_acknowledgments")
+        .select("*")
+        .eq("client_id", me.id) as unknown as Promise<{
+        data: ClientDocumentAcknowledgment[] | null;
+      }>,
+      supabase
+        .from("client_document_assignments")
+        .select("*")
+        .eq("client_id", me.id) as unknown as Promise<{
+        data: ClientDocumentAssignment[] | null;
+      }>,
+      supabase
+        .from("client_minor_consent")
+        .select("*")
+        .eq("client_id", me.id)
+        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+    ]);
 
   const ackByDocumentAndVersion = new Map<string, ClientDocumentAcknowledgment>();
   for (const a of acks ?? []) {
     ackByDocumentAndVersion.set(`${a.document_id}:${a.document_version}`, a);
   }
+
+  const assignedDocumentIds = new Set((assignments ?? []).map((a) => a.document_id));
+
+  // Minor Consent has its own fillable page (structured fields, not just a
+  // read-and-sign body) -- shown separately below, and only if the coach
+  // has actually assigned it to this client.
+  const visibleDocuments = (documents ?? []).filter(
+    (d) =>
+      d.key !== "minor_consent" &&
+      (d.assigned_to_all || assignedDocumentIds.has(d.id))
+  );
+  const minorConsentDoc = (documents ?? []).find((d) => d.key === "minor_consent");
+  const minorConsentAssigned = minorConsentDoc
+    ? assignedDocumentIds.has(minorConsentDoc.id)
+    : false;
 
   return (
     <div className="space-y-6">
@@ -57,7 +89,30 @@ export default async function ClientDocumentsPage() {
       </h1>
 
       <div className="space-y-4">
-        {(documents ?? []).map((doc) => {
+        {minorConsentAssigned ? (
+          <Card className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-medium text-ink">Minor Consent &amp; Intake Addendum</p>
+              {minorConsent?.signed_at ? (
+                <Badge tone="green">
+                  signed {minorConsent.signed_at.slice(0, 10)}
+                </Badge>
+              ) : (
+                <Badge tone="gold">needs your review</Badge>
+              )}
+            </div>
+            <p className="text-sm text-gray">
+              Required alongside your child&apos;s standard intake.
+            </p>
+            <Link href="/client/minor-consent">
+              <Button variant="secondary">
+                {minorConsent?.signed_at ? "Review or update" : "Fill it out"}
+              </Button>
+            </Link>
+          </Card>
+        ) : null}
+
+        {visibleDocuments.map((doc) => {
           const ack = ackByDocumentAndVersion.get(`${doc.id}:${doc.version}`);
           return (
             <Card key={doc.id} className="space-y-3">

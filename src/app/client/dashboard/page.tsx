@@ -9,7 +9,9 @@ import { toDateString } from "@/lib/timezone";
 import type {
   CareProfile,
   ClientDocumentAcknowledgment,
+  ClientDocumentAssignment,
   ClientIntake,
+  ClientMinorConsent,
   ClientSchedule,
   LegalDocument,
   Payment,
@@ -93,11 +95,25 @@ export default async function ClientDashboard() {
     }>,
   ]);
 
-  const { data: clientIntake } = (await supabase
-    .from("client_intake")
-    .select("*")
-    .eq("client_id", me.id)
-    .maybeSingle()) as { data: ClientIntake | null };
+  const [{ data: clientIntake }, { data: docAssignments }, { data: minorConsent }] =
+    await Promise.all([
+      supabase
+        .from("client_intake")
+        .select("*")
+        .eq("client_id", me.id)
+        .maybeSingle() as unknown as Promise<{ data: ClientIntake | null }>,
+      supabase
+        .from("client_document_assignments")
+        .select("*")
+        .eq("client_id", me.id) as unknown as Promise<{
+        data: ClientDocumentAssignment[] | null;
+      }>,
+      supabase
+        .from("client_minor_consent")
+        .select("*")
+        .eq("client_id", me.id)
+        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+    ]);
 
   const needsServiceCheckin =
     isFirstWeekOfMonth() &&
@@ -107,12 +123,22 @@ export default async function ClientDashboard() {
   const nextDue = payments?.[0] ?? null;
   const today = toDateString(new Date());
 
+  const assignedDocIds = new Set((docAssignments ?? []).map((a) => a.document_id));
   const ackedKeys = new Set(
     (acks ?? []).map((a) => `${a.document_id}:${a.document_version}`)
   );
-  const unacknowledgedCount = (documents ?? []).filter(
-    (d) => !ackedKeys.has(`${d.id}:${d.version}`)
-  ).length;
+  const visibleDocuments = (documents ?? []).filter(
+    (d) =>
+      d.key !== "minor_consent" && (d.assigned_to_all || assignedDocIds.has(d.id))
+  );
+  const minorConsentDoc = (documents ?? []).find((d) => d.key === "minor_consent");
+  const minorConsentPending =
+    !!minorConsentDoc &&
+    assignedDocIds.has(minorConsentDoc.id) &&
+    !minorConsent?.signed_at;
+  const unacknowledgedCount =
+    visibleDocuments.filter((d) => !ackedKeys.has(`${d.id}:${d.version}`)).length +
+    (minorConsentPending ? 1 : 0);
 
   const { count: sessionsUsed } = await supabase
     .from("sessions")

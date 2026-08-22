@@ -179,7 +179,6 @@ export async function submitClientIntake(formData: FormData) {
   const { error } = await supabase.from("client_intake").upsert(
     {
       client_id: me.id,
-      date_of_birth: textOrNull(formData, "date_of_birth"),
       why_here: textOrNull(formData, "why_here"),
       why_worthwhile: textOrNull(formData, "why_worthwhile"),
 
@@ -315,4 +314,61 @@ export async function submitClientProfile(formData: FormData) {
 
   revalidatePath("/client/dashboard");
   redirect("/client/dashboard");
+}
+
+export async function submitMinorConsent(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const textOrNull = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v || null;
+  };
+
+  const guardianSignature = textOrNull("guardian_signature_name");
+  const consented = formData.get("consent") === "on";
+  if (!consented || !guardianSignature) {
+    throw new Error(
+      "A parent/guardian must check the consent box and type their name to sign."
+    );
+  }
+
+  const minorAgeRaw = textOrNull("minor_age");
+
+  const { error } = await supabase.from("client_minor_consent").upsert(
+    {
+      client_id: me.id,
+      minor_full_name: textOrNull("minor_full_name"),
+      minor_date_of_birth: textOrNull("minor_date_of_birth"),
+      minor_age: minorAgeRaw ? Number(minorAgeRaw) : null,
+      minor_grade: textOrNull("minor_grade"),
+      minor_sports: textOrNull("minor_sports"),
+      guardian_full_name: textOrNull("guardian_full_name"),
+      guardian_phone: textOrNull("guardian_phone"),
+      guardian_email: textOrNull("guardian_email"),
+      guardian_relationship: textOrNull("guardian_relationship"),
+      guardian_update_preference: textOrNull("guardian_update_preference"),
+      emergency_contact_name: textOrNull("emergency_contact_name"),
+      emergency_contact_relationship: textOrNull("emergency_contact_relationship"),
+      emergency_contact_phone: textOrNull("emergency_contact_phone"),
+      physician_name: textOrNull("physician_name"),
+      physician_phone: textOrNull("physician_phone"),
+      diagnosis_treatment: textOrNull("diagnosis_treatment"),
+      other_conditions_meds_allergies: textOrNull("other_conditions_meds_allergies"),
+      athletic_training_clearance: textOrNull("athletic_training_clearance"),
+      guardian_signature_name: guardianSignature,
+      signed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "client_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/documents");
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/minor-consent");
+  redirect("/client/documents");
 }

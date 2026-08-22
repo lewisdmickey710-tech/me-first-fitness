@@ -5,6 +5,7 @@ import {
   advancePhase,
   logSessionOccurrence,
   markPaymentPaid,
+  setClientDocumentAssignment,
   setRequestStatus,
   updateClientProfile,
 } from "@/app/coach/actions";
@@ -12,6 +13,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   DeltaField,
   EmptyState,
   Heart,
@@ -36,9 +38,12 @@ import type {
   CareProfile,
   Checkin,
   Client,
+  ClientDocumentAssignment,
   ClientIntake,
+  ClientMinorConsent,
   ClientPhaseHistory,
   ClientSchedule,
+  LegalDocument,
   Measurement,
   OccurrenceStatus,
   Payment,
@@ -188,6 +193,26 @@ export default async function ClientDetailPage({
     .eq("client_id", id)
     .maybeSingle()) as { data: ClientIntake | null };
 
+  const [{ data: optionalDocuments }, { data: assignments }, { data: minorConsent }] =
+    await Promise.all([
+      supabase
+        .from("legal_documents")
+        .select("*")
+        .eq("assigned_to_all", false)
+        .order("key") as unknown as Promise<{ data: LegalDocument[] | null }>,
+      supabase
+        .from("client_document_assignments")
+        .select("*")
+        .eq("client_id", id) as unknown as Promise<{
+        data: ClientDocumentAssignment[] | null;
+      }>,
+      supabase
+        .from("client_minor_consent")
+        .select("*")
+        .eq("client_id", id)
+        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+    ]);
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -241,7 +266,13 @@ export default async function ClientDetailPage({
         />
       )}
       {tab === "profile" && (
-        <ProfileTab client={client} intake={clientIntake} />
+        <ProfileTab
+          client={client}
+          intake={clientIntake}
+          optionalDocuments={optionalDocuments ?? []}
+          assignments={assignments ?? []}
+          minorConsent={minorConsent}
+        />
       )}
       {tab === "sessions" && (
         <SessionsTab clientId={id} sessions={sessions ?? []} />
@@ -560,10 +591,17 @@ function Overview({
 function ProfileTab({
   client,
   intake,
+  optionalDocuments,
+  assignments,
+  minorConsent,
 }: {
   client: Client;
   intake: ClientIntake | null;
+  optionalDocuments: LegalDocument[];
+  assignments: ClientDocumentAssignment[];
+  minorConsent: ClientMinorConsent | null;
 }) {
+  const assignedDocIds = new Set(assignments.map((a) => a.document_id));
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
@@ -733,6 +771,53 @@ function ProfileTab({
           />
         )}
       </div>
+
+      {optionalDocuments.length > 0 ? (
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray">
+            Additional documents
+          </p>
+          <Card className="space-y-4">
+            <p className="text-sm text-gray">
+              These only go to clients checked below — not everyone.
+            </p>
+            {optionalDocuments.map((doc) => {
+              const isAssigned = assignedDocIds.has(doc.id);
+              return (
+                <div key={doc.id} className="space-y-2 border-t border-grayLt pt-3 first:border-0 first:pt-0">
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      await setClientDocumentAssignment(
+                        client.id,
+                        doc.id,
+                        formData.get("assigned") === "on"
+                      );
+                    }}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <Checkbox
+                      name="assigned"
+                      label={doc.title}
+                      defaultChecked={isAssigned}
+                    />
+                    <Button type="submit" variant="secondary">
+                      Save
+                    </Button>
+                  </form>
+                  {isAssigned && doc.key === "minor_consent" ? (
+                    <p className="text-xs text-gray">
+                      {minorConsent?.signed_at
+                        ? `Filled out and signed by ${minorConsent.guardian_signature_name} on ${minorConsent.signed_at.slice(0, 10)}`
+                        : "Assigned — not filled out yet."}
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }

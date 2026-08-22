@@ -18,10 +18,21 @@ const PLACEHOLDER_MARKER = "[PLACEHOLDER";
 export default async function CoachDocumentsPage() {
   const supabase = await createClient();
 
-  const { data: documents } = (await supabase
-    .from("legal_documents")
-    .select("*")
-    .order("key")) as { data: LegalDocument[] | null };
+  const [{ data: documents }, { data: assignments }] = await Promise.all([
+    supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
+      data: LegalDocument[] | null;
+    }>,
+    supabase
+      .from("client_document_assignments")
+      .select("document_id") as unknown as Promise<{
+      data: { document_id: string }[] | null;
+    }>,
+  ]);
+
+  const assignedCountByDoc = new Map<string, number>();
+  for (const a of assignments ?? []) {
+    assignedCountByDoc.set(a.document_id, (assignedCountByDoc.get(a.document_id) ?? 0) + 1);
+  }
 
   return (
     <div className="space-y-6">
@@ -59,11 +70,26 @@ export default async function CoachDocumentsPage() {
                   ) : (
                     <Badge tone="green">v{doc.version}</Badge>
                   )}
-                  {!isPlaceholder && doc.requires_signature ? (
+                  {!isPlaceholder && doc.key !== "minor_consent" && doc.requires_signature ? (
                     <Badge tone="rose">requires signature</Badge>
+                  ) : null}
+                  {!doc.assigned_to_all ? (
+                    <Badge tone="teal">
+                      assigned to {assignedCountByDoc.get(doc.id) ?? 0} client
+                      {assignedCountByDoc.get(doc.id) === 1 ? "" : "s"}
+                    </Badge>
                   ) : null}
                 </div>
               </div>
+              {!doc.assigned_to_all ? (
+                <p className="text-sm text-gray">
+                  This one doesn&apos;t go to everyone — turn it on per client
+                  from that client&apos;s Profile tab.
+                  {doc.key === "minor_consent"
+                    ? " It's a fillable form (guardian fills in the minor's info and signs) rather than a plain read-and-sign document, so it isn't editable below the same way — this text is just the consent language shown on that form."
+                    : ""}
+                </p>
+              ) : null}
 
               {!isPlaceholder ? (
                 <div className="rounded-xl border border-grayLt bg-bg/50 p-3">
@@ -96,11 +122,13 @@ export default async function CoachDocumentsPage() {
                       required
                     />
                   </div>
-                  <Checkbox
-                    name="requires_signature"
-                    label="Requires a typed signature (off = client just marks it as read)"
-                    defaultChecked={doc.requires_signature}
-                  />
+                  {doc.key !== "minor_consent" ? (
+                    <Checkbox
+                      name="requires_signature"
+                      label="Requires a typed signature (off = client just marks it as read)"
+                      defaultChecked={doc.requires_signature}
+                    />
+                  ) : null}
                   <Button type="submit">Save &amp; bump version</Button>
                 </form>
               </Collapsible>

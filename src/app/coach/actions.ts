@@ -379,6 +379,33 @@ export async function updateLegalDocument(
   revalidatePath("/coach/documents");
 }
 
+export async function setClientDocumentAssignment(
+  clientId: string,
+  documentId: string,
+  assigned: boolean
+) {
+  const supabase = await createClient();
+
+  if (assigned) {
+    const { error } = await supabase
+      .from("client_document_assignments")
+      .upsert(
+        { client_id: clientId, document_id: documentId },
+        { onConflict: "client_id,document_id" }
+      );
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("client_document_assignments")
+      .delete()
+      .eq("client_id", clientId)
+      .eq("document_id", documentId);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/client/documents");
+}
 
 export async function addClientForAccount(userId: string, formData: FormData) {
   const supabase = await createClient();

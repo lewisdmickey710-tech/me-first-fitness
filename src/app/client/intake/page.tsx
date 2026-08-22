@@ -59,13 +59,6 @@ export default async function ClientIntakePage() {
       <form action={submitClientIntake} className="space-y-6">
         <Card className="space-y-4">
           <SectionTitle>You</SectionTitle>
-          <Field label="Date of birth">
-            <Input
-              name="date_of_birth"
-              type="date"
-              defaultValue={intake?.date_of_birth ?? ""}
-            />
-          </Field>
           <Field label="What brought you to MeFirstFitness">
             <Textarea
               name="why_here"

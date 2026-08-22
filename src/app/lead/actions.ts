@@ -30,7 +30,6 @@ export async function submitLeadIntake(formData: FormData) {
   const { error } = await supabase.from("lead_intake").upsert(
     {
       lead_id: lead.id,
-      date_of_birth: textOrNull(formData, "date_of_birth"),
       why_here: textOrNull(formData, "why_here"),
       why_worthwhile: textOrNull(formData, "why_worthwhile"),
 

@@ -228,6 +228,41 @@ export interface LegalDocument {
   body: string;
   version: number;
   requires_signature: boolean;
+  assigned_to_all: boolean;
+  updated_at: string;
+}
+
+export interface ClientDocumentAssignment {
+  id: string;
+  client_id: string;
+  document_id: string;
+  assigned_at: string;
+}
+
+export interface ClientMinorConsent {
+  id: string;
+  client_id: string;
+  minor_full_name: string | null;
+  minor_date_of_birth: string | null;
+  minor_age: number | null;
+  minor_grade: string | null;
+  minor_sports: string | null;
+  guardian_full_name: string | null;
+  guardian_phone: string | null;
+  guardian_email: string | null;
+  guardian_relationship: string | null;
+  guardian_update_preference: "text" | "email" | "in_person" | null;
+  emergency_contact_name: string | null;
+  emergency_contact_relationship: string | null;
+  emergency_contact_phone: string | null;
+  physician_name: string | null;
+  physician_phone: string | null;
+  diagnosis_treatment: string | null;
+  other_conditions_meds_allergies: string | null;
+  athletic_training_clearance: string | null;
+  guardian_signature_name: string | null;
+  signed_at: string | null;
+  created_at: string;
   updated_at: string;
 }
 
