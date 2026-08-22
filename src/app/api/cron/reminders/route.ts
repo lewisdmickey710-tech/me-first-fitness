@@ -125,6 +125,51 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- One-off session reminders: confirmed time requests (status =
+  // 'scheduled', no backing recurring client_schedule) falling tomorrow.
+  // Dedup tracked directly on the occurrence row since
+  // session_reminders_log requires a client_schedule_id these don't have.
+  const { data: oneOffOccurrences } = await supabase
+    .from("session_occurrences")
+    .select("id, client_id, notes, reminder_sent_at, clients(name, user_id)")
+    .eq("status", "scheduled")
+    .eq("occurrence_date", tomorrowDateStr)
+    .is("reminder_sent_at", null);
+
+  for (const occurrence of oneOffOccurrences ?? []) {
+    const client = (occurrence as unknown as {
+      clients: { name: string; user_id: string | null } | null;
+    }).clients;
+    if (!client?.user_id) continue;
+    if (frozenClientIds.has(occurrence.client_id)) continue;
+
+    const { data: userResult, error: userError } =
+      await supabase.auth.admin.getUserById(client.user_id);
+    if (userError || !userResult?.user?.email) {
+      errors.push(`No email for client ${client.name}`);
+      continue;
+    }
+
+    const timeText = occurrence.notes?.startsWith("Confirmed request — ")
+      ? ` at ${occurrence.notes.replace("Confirmed request — ", "")}`
+      : "";
+
+    try {
+      await sendSessionReminderEmail(
+        userResult.user.email,
+        client.name,
+        `tomorrow${timeText}`
+      );
+      await supabase
+        .from("session_occurrences")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq("id", occurrence.id);
+      sessionReminders++;
+    } catch (e) {
+      errors.push(`Session email failed for ${client.name}: ${e}`);
+    }
+  }
+
   // ---- Payment reminders: due soon or overdue, not recently reminded ----
   const { data: payments } = await supabase
     .from("payments")

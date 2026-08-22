@@ -229,6 +229,7 @@ export interface SessionOccurrence {
   status: OccurrenceStatus;
   rescheduled_to_date: string | null;
   notes: string | null;
+  reminder_sent_at: string | null;
   created_at: string;
 }
 
