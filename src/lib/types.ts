@@ -198,7 +198,11 @@ export interface SessionOccurrence {
   created_at: string;
 }
 
-export type LegalDocumentKey = "contract" | "onboarding_form" | "disclaimer";
+export type LegalDocumentKey =
+  | "contract"
+  | "onboarding_form"
+  | "disclaimer"
+  | "minor_consent";
 
 export interface LegalDocument {
   id: string;
