@@ -137,6 +137,17 @@ export interface ClientProgramOverride {
   created_at: string;
 }
 
+export interface ServiceCheckin {
+  id: string;
+  client_id: string;
+  date: string;
+  satisfaction: number | null;
+  what_working: string | null;
+  what_would_help: string | null;
+  anything_else: string | null;
+  created_at: string;
+}
+
 export interface Measurement {
   id: string;
   client_id: string;

@@ -5,6 +5,30 @@ export function Heart({ className = "" }: { className?: string }) {
   return <span className={`text-rose ${className}`}>♥</span>;
 }
 
+export function Collapsible({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <details className={`group ${className}`}>
+      <summary className="cursor-pointer list-none text-sm font-medium text-rose">
+        <span className="inline-flex items-center gap-1">
+          {label}
+          <span className="text-xs transition-transform group-open:rotate-180">
+            ▾
+          </span>
+        </span>
+      </summary>
+      <div className="mt-2">{children}</div>
+    </details>
+  );
+}
+
 export function Card({
   children,
   className = "",

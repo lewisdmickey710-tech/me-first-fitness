@@ -9,7 +9,10 @@ export default function CoachLayout({
     <div className="min-h-screen">
       <TopNav
         title="MeFirstFitness Coach"
-        links={[{ href: "/coach/roster", label: "Roster" }]}
+        links={[
+          { href: "/coach/roster", label: "Roster" },
+          { href: "/coach/library", label: "Library" },
+        ]}
       />
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
     </div>
