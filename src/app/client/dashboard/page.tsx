@@ -129,6 +129,13 @@ export default async function ClientDashboard() {
         subtitle={careProfile?.name ?? undefined}
       />
 
+      <Link
+        href="/client/profile"
+        className="inline-block text-sm text-gray hover:text-ink"
+      >
+        Edit profile
+      </Link>
+
       {currentPhase ? (
         <p className="-mt-3 text-sm text-gray">
           Week {weekInPhase(currentPhase.started_on)} of this phase · Cycle{" "}

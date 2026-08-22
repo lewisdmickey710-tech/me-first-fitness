@@ -271,3 +271,39 @@ export async function submitClientIntake(formData: FormData) {
   revalidatePath("/client/dashboard");
   redirect("/client/dashboard");
 }
+
+export async function submitClientProfile(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const textOrNull = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v || null;
+  };
+
+  const name = textOrNull("name");
+  if (!name) throw new Error("Name is required.");
+
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      name,
+      preferred_name: textOrNull("preferred_name"),
+      date_of_birth: textOrNull("date_of_birth"),
+      phone: textOrNull("phone"),
+      email: textOrNull("email"),
+      emergency_contact_name: textOrNull("emergency_contact_name"),
+      emergency_contact_phone: textOrNull("emergency_contact_phone"),
+      physician_name: textOrNull("physician_name"),
+      physician_phone: textOrNull("physician_phone"),
+      profile_completed_at: me.profile_completed_at ?? new Date().toISOString(),
+    })
+    .eq("id", me.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/dashboard");
+  redirect("/client/dashboard");
+}

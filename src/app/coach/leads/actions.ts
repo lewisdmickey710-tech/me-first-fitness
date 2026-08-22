@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendWelcomeToClientEmail } from "@/lib/email";
 import type { RequestStatus } from "@/lib/types";
 
 export async function setLeadRequestStatus(
@@ -110,6 +111,17 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
       sessions_allotted: sessionsAllottedRaw
         ? Number(sessionsAllottedRaw)
         : null,
+      // Carry over their profile from the lead side so they aren't asked
+      // to redo contact info they already gave as a lead.
+      preferred_name: lead.preferred_name,
+      date_of_birth: lead.date_of_birth,
+      phone: lead.phone,
+      email: lead.email,
+      emergency_contact_name: lead.emergency_contact_name,
+      emergency_contact_phone: lead.emergency_contact_phone,
+      physician_name: lead.physician_name,
+      physician_phone: lead.physician_phone,
+      profile_completed_at: lead.profile_completed_at,
     })
     .select("id")
     .single();
@@ -162,6 +174,12 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
       .update({ role: "client" })
       .eq("id", lead.user_id);
     if (roleError) throw new Error(roleError.message);
+  }
+
+  try {
+    await sendWelcomeToClientEmail(lead.email, lead.name);
+  } catch (e) {
+    console.error(`Welcome email failed for ${lead.name}:`, e);
   }
 
   revalidatePath("/coach/leads");

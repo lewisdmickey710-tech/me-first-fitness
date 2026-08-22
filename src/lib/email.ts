@@ -88,3 +88,41 @@ export async function sendPaymentReminderEmail(
     `),
   });
 }
+
+export async function sendWelcomeToClientEmail(to: string, clientName: string) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping welcome email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Welcome aboard!",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>You're officially signed on — so excited to keep working with you. A couple of things to knock out in the app before your next session:</p>
+      <ul style="padding-left: 20px;">
+        <li>A quick intake questionnaire (health history, goals, how you like to be coached) — takes a few minutes and helps me build your program around you specifically.</li>
+        <li>Your contract and a couple of other documents, ready for your review and sign-off.</li>
+      </ul>
+      <p>Log in and you'll be walked through it. Let me know if anything comes up!</p>
+    `),
+  });
+}
+
+export async function sendDocumentsPendingEmail(to: string, clientName: string) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping documents pending email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "A document needs your attention",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>You've got at least one document waiting for your review in the app — nothing urgent, just wanted to flag it so it doesn't get lost.</p>
+      <p>Log in and check your Documents tab whenever you get a chance.</p>
+    `),
+  });
+}

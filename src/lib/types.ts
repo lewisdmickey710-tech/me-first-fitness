@@ -34,6 +34,8 @@ export interface Client {
   primary_goal: string | null;
   secondary_goal: string | null;
   key_health_notes: string | null;
+  profile_completed_at: string | null;
+  last_document_nudge_sent_at: string | null;
 }
 
 export interface SessionEntry {
@@ -266,6 +268,13 @@ export interface Lead {
   status: LeadStatus;
   converted_client_id: string | null;
   created_at: string;
+  preferred_name: string | null;
+  date_of_birth: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  physician_name: string | null;
+  physician_phone: string | null;
+  profile_completed_at: string | null;
 }
 
 export interface LeadAssessmentRequest {

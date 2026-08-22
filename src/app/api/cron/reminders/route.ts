@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  sendDocumentsPendingEmail,
   sendInactivityNudgeEmail,
   sendPaymentReminderEmail,
   sendSessionReminderEmail,
@@ -15,6 +16,7 @@ const PAYMENT_RESEND_COOLDOWN_DAYS = 7;
 // Re-check (and re-nudge) no more than once per this many days, so a
 // client who stays quiet doesn't get emailed daily forever.
 const INACTIVITY_NUDGE_COOLDOWN_DAYS = INACTIVITY_DAYS_THRESHOLD;
+const DOCUMENT_NUDGE_COOLDOWN_DAYS = 14;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -48,10 +50,15 @@ export async function GET(request: Request) {
   nudgeCooldownCutoff.setUTCDate(
     nudgeCooldownCutoff.getUTCDate() - INACTIVITY_NUDGE_COOLDOWN_DAYS
   );
+  const documentNudgeCooldownCutoff = new Date(now);
+  documentNudgeCooldownCutoff.setUTCDate(
+    documentNudgeCooldownCutoff.getUTCDate() - DOCUMENT_NUDGE_COOLDOWN_DAYS
+  );
 
   let sessionReminders = 0;
   let paymentReminders = 0;
   let inactivityNudges = 0;
+  let documentNudges = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -202,11 +209,70 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Documents pending: any legal document not yet acknowledged at its
+  // current version ----
+  const { data: documents } = await supabase
+    .from("legal_documents")
+    .select("id, version");
+
+  if (documents && documents.length > 0) {
+    const { data: docClients } = await supabase
+      .from("clients")
+      .select("id, name, user_id, last_document_nudge_sent_at")
+      .not("user_id", "is", null);
+
+    const eligibleClients = (docClients ?? []).filter(
+      (c) =>
+        !c.last_document_nudge_sent_at ||
+        c.last_document_nudge_sent_at < documentNudgeCooldownCutoff.toISOString()
+    );
+
+    if (eligibleClients.length > 0) {
+      const eligibleClientIds = eligibleClients.map((c) => c.id);
+      const { data: acks } = await supabase
+        .from("client_document_acknowledgments")
+        .select("client_id, document_id, document_version")
+        .in("client_id", eligibleClientIds);
+
+      const ackedKeys = new Set(
+        (acks ?? []).map(
+          (a) => `${a.client_id}:${a.document_id}:${a.document_version}`
+        )
+      );
+
+      for (const client of eligibleClients) {
+        const hasPending = documents.some(
+          (d) => !ackedKeys.has(`${client.id}:${d.id}:${d.version}`)
+        );
+        if (!hasPending || !client.user_id) continue;
+
+        const { data: userResult, error: userError } =
+          await supabase.auth.admin.getUserById(client.user_id);
+        if (userError || !userResult?.user?.email) {
+          errors.push(`No email for client ${client.name}`);
+          continue;
+        }
+
+        try {
+          await sendDocumentsPendingEmail(userResult.user.email, client.name);
+          await supabase
+            .from("clients")
+            .update({ last_document_nudge_sent_at: new Date().toISOString() })
+            .eq("id", client.id);
+          documentNudges++;
+        } catch (e) {
+          errors.push(`Documents email failed for ${client.name}: ${e}`);
+        }
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     sessionReminders,
     paymentReminders,
     inactivityNudges,
+    documentNudges,
     errors,
   });
 }

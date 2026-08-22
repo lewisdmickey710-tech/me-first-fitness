@@ -85,6 +85,55 @@ export async function updateSession(request: NextRequest) {
       url.pathname = homeFor(role);
       return NextResponse.redirect(url);
     }
+
+    // Mandatory onboarding gates: contact-info profile first (both leads
+    // and clients, on first sign-in), then -- once accepted as a client --
+    // the full intake questionnaire before anything else on the client
+    // side. Skip the check entirely on the destination page itself, or a
+    // redirect loop follows.
+    if (role === "lead" && path.startsWith("/lead") && path !== "/lead/profile") {
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("profile_completed_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (lead && !lead.profile_completed_at) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/lead/profile";
+        return NextResponse.redirect(url);
+      }
+    }
+
+    if (role === "client" && path.startsWith("/client")) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("id, profile_completed_at")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (client && !client.profile_completed_at && path !== "/client/profile") {
+        const url = request.nextUrl.clone();
+        url.pathname = "/client/profile";
+        return NextResponse.redirect(url);
+      }
+
+      if (
+        client?.profile_completed_at &&
+        path !== "/client/profile" &&
+        path !== "/client/intake"
+      ) {
+        const { data: intake } = await supabase
+          .from("client_intake")
+          .select("submitted_at")
+          .eq("client_id", client.id)
+          .maybeSingle();
+        if (!intake?.submitted_at) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/client/intake";
+          return NextResponse.redirect(url);
+        }
+      }
+    }
   }
 
   return response;

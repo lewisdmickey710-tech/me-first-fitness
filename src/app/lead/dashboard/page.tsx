@@ -42,10 +42,15 @@ export default async function LeadDashboard() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-ink">
-        <Heart className="mr-1.5" />
-        Hey, {lead.name.split(" ")[0]}
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          Hey, {lead.name.split(" ")[0]}
+        </h1>
+        <Link href="/lead/profile" className="text-sm text-gray hover:text-ink">
+          Edit profile
+        </Link>
+      </div>
       <p className="text-sm text-gray">
         So glad you reached out. Here&apos;s where things stand.
       </p>
