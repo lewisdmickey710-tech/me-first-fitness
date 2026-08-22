@@ -36,6 +36,7 @@ export interface Client {
   key_health_notes: string | null;
   profile_completed_at: string | null;
   last_document_nudge_sent_at: string | null;
+  last_service_checkin_nudge_sent_at: string | null;
 }
 
 export interface SessionEntry {

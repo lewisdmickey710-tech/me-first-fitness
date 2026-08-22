@@ -3,6 +3,7 @@ import {
   sendDocumentsPendingEmail,
   sendInactivityNudgeEmail,
   sendPaymentReminderEmail,
+  sendServiceCheckinDueEmail,
   sendSessionReminderEmail,
 } from "@/lib/email";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -17,6 +18,7 @@ const PAYMENT_RESEND_COOLDOWN_DAYS = 7;
 // client who stays quiet doesn't get emailed daily forever.
 const INACTIVITY_NUDGE_COOLDOWN_DAYS = INACTIVITY_DAYS_THRESHOLD;
 const DOCUMENT_NUDGE_COOLDOWN_DAYS = 14;
+const SERVICE_CHECKIN_NUDGE_COOLDOWN_DAYS = 14;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -54,11 +56,17 @@ export async function GET(request: Request) {
   documentNudgeCooldownCutoff.setUTCDate(
     documentNudgeCooldownCutoff.getUTCDate() - DOCUMENT_NUDGE_COOLDOWN_DAYS
   );
+  const serviceCheckinNudgeCooldownCutoff = new Date(now);
+  serviceCheckinNudgeCooldownCutoff.setUTCDate(
+    serviceCheckinNudgeCooldownCutoff.getUTCDate() - SERVICE_CHECKIN_NUDGE_COOLDOWN_DAYS
+  );
+  const monthStartStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
 
   let sessionReminders = 0;
   let paymentReminders = 0;
   let inactivityNudges = 0;
   let documentNudges = 0;
+  let serviceCheckinNudges = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -308,12 +316,80 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Service check-in due: a measurement was logged this month but no
+  // service check-in yet -- was previously just a passive dashboard card
+  // clients could easily miss (confirmed: happened), so this reaches out
+  // the same way a pending document does. ----
+  const { data: checkinClients } = await supabase
+    .from("clients")
+    .select("id, name, user_id, last_service_checkin_nudge_sent_at")
+    .not("user_id", "is", null);
+
+  const serviceCheckinEligible = (checkinClients ?? []).filter(
+    (c) =>
+      !c.last_service_checkin_nudge_sent_at ||
+      c.last_service_checkin_nudge_sent_at <
+        serviceCheckinNudgeCooldownCutoff.toISOString()
+  );
+
+  if (serviceCheckinEligible.length > 0) {
+    const eligibleIds = serviceCheckinEligible.map((c) => c.id);
+    const [{ data: measurementsThisMonth }, { data: checkinsThisMonth }] =
+      await Promise.all([
+        supabase
+          .from("measurements")
+          .select("client_id")
+          .in("client_id", eligibleIds)
+          .gte("date", monthStartStr),
+        supabase
+          .from("service_checkins")
+          .select("client_id")
+          .in("client_id", eligibleIds)
+          .gte("date", monthStartStr),
+      ]);
+
+    const hasMeasurementThisMonth = new Set(
+      (measurementsThisMonth ?? []).map((m) => m.client_id)
+    );
+    const hasCheckinThisMonth = new Set(
+      (checkinsThisMonth ?? []).map((c) => c.client_id)
+    );
+
+    for (const client of serviceCheckinEligible) {
+      if (
+        !hasMeasurementThisMonth.has(client.id) ||
+        hasCheckinThisMonth.has(client.id) ||
+        !client.user_id
+      )
+        continue;
+
+      const { data: userResult, error: userError } =
+        await supabase.auth.admin.getUserById(client.user_id);
+      if (userError || !userResult?.user?.email) {
+        errors.push(`No email for client ${client.name}`);
+        continue;
+      }
+
+      try {
+        await sendServiceCheckinDueEmail(userResult.user.email, client.name);
+        await supabase
+          .from("clients")
+          .update({ last_service_checkin_nudge_sent_at: new Date().toISOString() })
+          .eq("id", client.id);
+        serviceCheckinNudges++;
+      } catch (e) {
+        errors.push(`Service check-in email failed for ${client.name}: ${e}`);
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     sessionReminders,
     paymentReminders,
     inactivityNudges,
     documentNudges,
+    serviceCheckinNudges,
     errors,
   });
 }

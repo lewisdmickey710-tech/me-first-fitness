@@ -110,6 +110,23 @@ export async function sendWelcomeToClientEmail(to: string, clientName: string) {
   });
 }
 
+export async function sendServiceCheckinDueEmail(to: string, clientName: string) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping service check-in email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Quick check-in — how's it going overall?",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>Now that this month's measurements are in, it's a good time for your quick service check-in — how coaching's feeling overall, what's working, what's not.</p>
+      <p>Log in and you'll see it waiting on your dashboard. Takes just a minute.</p>
+    `),
+  });
+}
+
 export async function sendDocumentsPendingEmail(to: string, clientName: string) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping documents pending email");
