@@ -142,7 +142,9 @@ function ClientLogin() {
         {loading ? "Sending…" : "Send me a login link"}
       </Button>
       <p className="text-center text-xs text-gray">
-        No password needed — we&apos;ll email you a one-time link.
+        No password needed — we&apos;ll email you a one-time link. Look for
+        an email from <strong>MeFirstFitness</strong> (check spam if you
+        don&apos;t see it in a couple minutes).
       </p>
     </form>
   );

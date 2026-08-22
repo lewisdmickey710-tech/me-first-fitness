@@ -172,6 +172,17 @@ export default async function ClientDashboard() {
         </p>
       ) : null}
 
+      <div className="grid grid-cols-3 gap-3">
+        <QuickAction href="/client/program" label="My program" />
+        <QuickAction href="/client/schedule" label="My schedule" />
+        <QuickAction href="/client/checkin" label="Log check-in" />
+        <QuickAction href="/client/activity" label="Log activity" />
+        <QuickAction href="/client/request" label="Request time" />
+        <QuickAction href="/client/service-checkin" label="Service check-in" />
+        <QuickAction href="/client/guide" label="Wellness guide" />
+        <QuickAction href="/client/documents" label="Documents" />
+      </div>
+
       {hasUnpaidLateFee ? (
         <Card className="space-y-1 border-pink/40 bg-pink/5">
           <p className="font-medium text-pink">Sessions paused</p>
@@ -326,17 +337,6 @@ export default async function ClientDashboard() {
           </div>
         </Card>
       ) : null}
-
-      <div className="grid grid-cols-3 gap-3">
-        <QuickAction href="/client/schedule" label="My schedule" />
-        <QuickAction href="/client/program" label="My program" />
-        <QuickAction href="/client/checkin" label="Log check-in" />
-        <QuickAction href="/client/activity" label="Log activity" />
-        <QuickAction href="/client/request" label="Request time" />
-        <QuickAction href="/client/service-checkin" label="Service check-in" />
-        <QuickAction href="/client/guide" label="Wellness guide" />
-        <QuickAction href="/client/documents" label="Documents" />
-      </div>
 
       <div>
         <p className="mb-2 text-sm font-medium text-gray">Recent sessions</p>

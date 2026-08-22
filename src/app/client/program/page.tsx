@@ -125,12 +125,18 @@ export default async function ClientProgramPage() {
             const sortedExercises = day.program_day_exercises
               .slice()
               .sort((a, b) => a.position - b.position);
+            const logFormId = `log-day-${day.id}`;
 
             return (
               <Card key={day.id}>
                 <p className="font-medium text-ink">
                   Day {day.day_number}: {day.day_label}
                 </p>
+                <p className="mt-1 text-xs text-gray">
+                  Enter what you used and how it felt as you go, then log
+                  the whole day at the bottom.
+                </p>
+
                 <div className="mt-3 space-y-4">
                   {sortedExercises.map((pde) => {
                     const base = pde.exercises;
@@ -149,7 +155,7 @@ export default async function ClientProgramPage() {
                     return (
                       <div
                         key={pde.id}
-                        className="border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
+                        className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
@@ -171,10 +177,7 @@ export default async function ClientProgramPage() {
                         </div>
 
                         {effective?.client_description ? (
-                          <Collapsible
-                            label="About this movement"
-                            className="mt-1"
-                          >
+                          <Collapsible label="About this movement">
                             <p className="whitespace-pre-wrap text-sm text-gray">
                               {effective.client_description}
                             </p>
@@ -187,14 +190,13 @@ export default async function ClientProgramPage() {
                               "use server";
                               await setProgramExerciseSwap(pde.id, null);
                             }}
-                            className="mt-2"
                           >
                             <Button type="submit" variant="secondary">
                               Back to prescribed: {base?.name}
                             </Button>
                           </form>
                         ) : regress || progress ? (
-                          <Collapsible label="Swap this movement" className="mt-2">
+                          <Collapsible label="Swap this movement">
                             <div className="flex flex-wrap gap-2">
                               {regress ? (
                                 <form
@@ -229,66 +231,63 @@ export default async function ClientProgramPage() {
                             </div>
                           </Collapsible>
                         ) : null}
+
+                        {/* These belong to the day's log form below (via
+                            the form= attribute) even though they render
+                            here, right in this exercise's own box. */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <Input
+                            form={logFormId}
+                            name={`weight_${pde.id}`}
+                            placeholder="Weight used"
+                          />
+                          <Input
+                            form={logFormId}
+                            name={`notes_${pde.id}`}
+                            placeholder="Notes (optional)"
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-gray">
+                            Photo or video of your form (optional)
+                          </label>
+                          <input
+                            form={logFormId}
+                            type="file"
+                            name={`file_${pde.id}`}
+                            accept="image/*,video/*"
+                            className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+                          />
+                        </div>
                       </div>
                     );
                   })}
                 </div>
 
-                <Collapsible label="Log this workout" className="mt-4 border-t border-grayLt pt-3">
-                  <form
-                    action={async (formData: FormData) => {
-                      "use server";
-                      await logMyWorkout(day.id, formData);
-                    }}
-                    className="space-y-4"
-                  >
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-ink">
-                        Date
-                      </label>
-                      <Input name="date" type="date" required defaultValue={today} />
-                    </div>
-
-                    {sortedExercises.map((pde) => {
-                      const substituteId = overrideByPdeId.get(pde.id) ?? null;
-                      const substitute = substituteId
-                        ? extraById.get(substituteId)
-                        : null;
-                      const effective = substitute ?? pde.exercises;
-                      return (
-                        <div key={pde.id} className="space-y-2">
-                          <p className="text-sm font-medium text-ink">
-                            {effective?.name}{" "}
-                            <span className="font-normal text-gray">
-                              ({pde.sets}×{pde.reps})
-                            </span>
-                          </p>
-                          <div className="grid grid-cols-2 gap-3">
-                            <Input
-                              name={`weight_${pde.id}`}
-                              placeholder="Weight used"
-                            />
-                            <Input
-                              name={`notes_${pde.id}`}
-                              placeholder="Notes (optional)"
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-ink">
-                        Anything else about how this session felt?
-                      </label>
-                      <Textarea name="day_notes" rows={2} />
-                    </div>
-
-                    <Button type="submit" className="w-full">
-                      Log this workout
-                    </Button>
-                  </form>
-                </Collapsible>
+                <form
+                  id={logFormId}
+                  action={async (formData: FormData) => {
+                    "use server";
+                    await logMyWorkout(day.id, formData);
+                  }}
+                  className="mt-4 space-y-4 border-t border-grayLt pt-4"
+                >
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink">
+                      Date
+                    </label>
+                    <Input name="date" type="date" required defaultValue={today} />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink">
+                      Anything else about how this session felt?
+                    </label>
+                    <Textarea name="day_notes" rows={2} />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    Log this workout
+                  </Button>
+                </form>
               </Card>
             );
           })}

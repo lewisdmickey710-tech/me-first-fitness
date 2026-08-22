@@ -275,7 +275,7 @@ export default async function ClientDetailPage({
         />
       )}
       {tab === "sessions" && (
-        <SessionsTab clientId={id} sessions={sessions ?? []} />
+        <SessionsTab clientId={id} sessions={sessions ?? []} supabase={supabase} />
       )}
       {tab === "attendance" && (
         <AttendanceTab
@@ -1066,13 +1066,33 @@ function ClientIntakeSummary({ intake }: { intake: ClientIntake }) {
   );
 }
 
-function SessionsTab({
+async function SessionsTab({
   clientId,
   sessions,
+  supabase,
 }: {
   clientId: string;
   sessions: TrainingSession[];
+  supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
+  const mediaPaths = [
+    ...new Set(
+      sessions.flatMap((s) => s.entries.map((e) => e.media_path).filter(Boolean))
+    ),
+  ] as string[];
+
+  const mediaUrlByPath = new Map<string, string>();
+  if (mediaPaths.length > 0) {
+    await Promise.all(
+      mediaPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) mediaUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
+
   return (
     <div className="space-y-4">
       <Link
@@ -1111,6 +1131,16 @@ function SessionsTab({
                         <span className="block text-xs text-gray/80">
                           {e.notes}
                         </span>
+                      ) : null}
+                      {e.media_path && mediaUrlByPath.has(e.media_path) ? (
+                        <a
+                          href={mediaUrlByPath.get(e.media_path)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block text-xs text-rose hover:underline"
+                        >
+                          View photo/video →
+                        </a>
                       ) : null}
                     </li>
                   ))}

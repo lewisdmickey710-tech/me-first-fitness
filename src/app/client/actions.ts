@@ -527,23 +527,38 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
     .slice()
     .sort((a, b) => a.position - b.position);
 
-  const entries = pdes.map((pde) => {
-    const substituteId = overrideMap.get(pde.id) ?? null;
-    const effectiveName = substituteId
-      ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
-      : pde.exercises?.name ?? "";
-    const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
-    const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
-    return {
-      exercise: effectiveName,
-      exercise_id: pde.exercise_id,
-      substitute_exercise_id: substituteId,
-      sets: pde.sets ?? "",
-      reps: pde.reps ?? "",
-      weight,
-      notes,
-    };
-  });
+  const entries = await Promise.all(
+    pdes.map(async (pde) => {
+      const substituteId = overrideMap.get(pde.id) ?? null;
+      const effectiveName = substituteId
+        ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
+        : pde.exercises?.name ?? "";
+      const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
+      const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
+
+      let mediaPath: string | null = null;
+      const file = formData.get(`file_${pde.id}`);
+      if (file instanceof File && file.size > 0) {
+        const path = `${me.id}/${crypto.randomUUID()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("form-checks")
+          .upload(path, file, { contentType: file.type });
+        if (uploadError) throw new Error(uploadError.message);
+        mediaPath = path;
+      }
+
+      return {
+        exercise: effectiveName,
+        exercise_id: pde.exercise_id,
+        substitute_exercise_id: substituteId,
+        sets: pde.sets ?? "",
+        reps: pde.reps ?? "",
+        weight,
+        notes,
+        media_path: mediaPath,
+      };
+    })
+  );
 
   const { error } = await supabase.from("sessions").insert({
     client_id: me.id,

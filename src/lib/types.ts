@@ -49,6 +49,10 @@ export interface SessionEntry {
   exercise_id?: string;
   substitute_exercise_id?: string | null;
   notes?: string;
+  // Storage object path in the private "form-checks" bucket, e.g.
+  // "{client_id}/{uuid}-{filename}" -- not a URL. Generate a short-lived
+  // signed URL when actually displaying it.
+  media_path?: string | null;
 }
 
 export interface TrainingSession {
