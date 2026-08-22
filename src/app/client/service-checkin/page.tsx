@@ -8,7 +8,7 @@ export default function ServiceCheckinPage() {
   return (
     <div className="space-y-6">
       <Link
-        href="/client/dashboard"
+        href="/client/documents"
         className="text-sm text-gray hover:text-ink"
       >
         ← Back

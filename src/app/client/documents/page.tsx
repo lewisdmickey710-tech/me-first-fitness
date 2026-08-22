@@ -12,6 +12,7 @@ import {
   Heart,
   Input,
 } from "@/components/ui";
+import { loggedThisMonth } from "@/lib/measurement-window";
 import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
@@ -33,29 +34,54 @@ export default async function ClientDocumentsPage() {
 
   const supabase = await createClient();
 
-  const [{ data: documents }, { data: acks }, { data: assignments }, { data: minorConsent }] =
-    await Promise.all([
-      supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
-        data: LegalDocument[] | null;
-      }>,
-      supabase
-        .from("client_document_acknowledgments")
-        .select("*")
-        .eq("client_id", me.id) as unknown as Promise<{
-        data: ClientDocumentAcknowledgment[] | null;
-      }>,
-      supabase
-        .from("client_document_assignments")
-        .select("*")
-        .eq("client_id", me.id) as unknown as Promise<{
-        data: ClientDocumentAssignment[] | null;
-      }>,
-      supabase
-        .from("client_minor_consent")
-        .select("*")
-        .eq("client_id", me.id)
-        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
-    ]);
+  const [
+    { data: documents },
+    { data: acks },
+    { data: assignments },
+    { data: minorConsent },
+    { data: recentMeasurements },
+    { data: recentServiceCheckins },
+  ] = await Promise.all([
+    supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
+      data: LegalDocument[] | null;
+    }>,
+    supabase
+      .from("client_document_acknowledgments")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{
+      data: ClientDocumentAcknowledgment[] | null;
+    }>,
+    supabase
+      .from("client_document_assignments")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{
+      data: ClientDocumentAssignment[] | null;
+    }>,
+    supabase
+      .from("client_minor_consent")
+      .select("*")
+      .eq("client_id", me.id)
+      .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+    supabase
+      .from("measurements")
+      .select("date")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })
+      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
+    supabase
+      .from("service_checkins")
+      .select("date")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })
+      .limit(3) as unknown as Promise<{ data: { date: string }[] | null }>,
+  ]);
+
+  const serviceCheckinDue =
+    loggedThisMonth((recentMeasurements ?? []).map((m) => m.date)) &&
+    !loggedThisMonth((recentServiceCheckins ?? []).map((c) => c.date));
+  const serviceCheckinDoneThisMonth = loggedThisMonth(
+    (recentServiceCheckins ?? []).map((c) => c.date)
+  );
 
   const ackByDocumentAndVersion = new Map<string, ClientDocumentAcknowledgment>();
   for (const a of acks ?? []) {
@@ -85,10 +111,30 @@ export default async function ClientDocumentsPage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Contract &amp; documents
+        Documents &amp; check-in
       </h1>
 
       <div className="space-y-4">
+        <Card className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-ink">Service check-in</p>
+            {serviceCheckinDoneThisMonth ? (
+              <Badge tone="green">done this month</Badge>
+            ) : serviceCheckinDue ? (
+              <Badge tone="gold">due</Badge>
+            ) : null}
+          </div>
+          <p className="text-sm text-gray">
+            A quick, honest read on how coaching&apos;s going overall — what&apos;s
+            working, what&apos;s not.
+          </p>
+          <Link href="/client/service-checkin">
+            <Button variant="secondary">
+              {serviceCheckinDoneThisMonth ? "Review or update" : "Do it now"}
+            </Button>
+          </Link>
+        </Card>
+
         {minorConsentAssigned ? (
           <Card className="space-y-2">
             <div className="flex items-center justify-between">

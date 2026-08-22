@@ -97,8 +97,9 @@ export async function submitServiceCheckin(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  revalidatePath("/client/documents");
   revalidatePath("/client/dashboard");
-  redirect("/client/dashboard");
+  redirect("/client/documents");
 }
 
 export async function submitRequest(formData: FormData) {
