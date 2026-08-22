@@ -115,9 +115,9 @@ export default async function LeadDashboard() {
             I&apos;m Mickey — a solo coach, not a gym or a franchise. I train
             the whole person, not just the workout: your body, your history,
             your actual life. Every new client starts with a free
-            assessment like the one you just requested, followed by a
-            discount on your first paid session. No pressure, no obligation
-            — just a chance to see if this feels right.
+            assessment, then 50% off your first paid session after you sign
+            on. No pressure, no obligation — just a chance to see if this
+            feels right.
           </p>
           <p>
             Every program moves through the same four phases (Stability →
@@ -128,6 +128,27 @@ export default async function LeadDashboard() {
             macro tracking, food &amp; mood journaling, photos, or just
             talking it through.
           </p>
+          <p className="text-xs text-gray">
+            $40/session in-person · $25/session virtual · $50 self-led plan
+          </p>
+        </Card>
+
+        <Card>
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            Curious what you&apos;d get access to?
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            The same wellness guide I hand every client at their
+            assessment — movement, nutrition, mindset, and recovery, all in
+            one place.
+          </p>
+          <Link
+            href="/lead/guide"
+            className="mt-2 inline-block text-sm font-medium text-rose hover:opacity-80"
+          >
+            Read the guide →
+          </Link>
         </Card>
 
         {(careProfiles ?? []).length > 0 ? (

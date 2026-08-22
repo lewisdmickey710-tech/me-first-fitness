@@ -12,11 +12,18 @@ export default function RequestAssessmentPage() {
           MeFirstFitness
         </h1>
         <p className="mt-1 text-sm text-gray">Mind &amp; Muscle Mechanics</p>
+        <p className="mt-3 text-lg font-medium text-rose">
+          Feel Strong. Feel Free. Feel You.
+        </p>
         <p className="mt-4 text-sm text-ink">
-          Every new client starts with a free assessment — no pressure, no
-          obligation. It&apos;s just a chance for us to actually meet, for me
-          to understand your body and your goals, and for you to see if
-          working together feels right.
+          Every new client starts with a free assessment — movement,
+          posture &amp; goals — then 50% off your first paid session after
+          you sign on. No pressure, no obligation. It&apos;s just a chance
+          for us to actually meet, for me to understand your body and your
+          goals, and for you to see if working together feels right.
+        </p>
+        <p className="mt-3 text-xs text-gray">
+          $40/session in-person · $25/session virtual · $50 self-led plan
         </p>
       </div>
 
