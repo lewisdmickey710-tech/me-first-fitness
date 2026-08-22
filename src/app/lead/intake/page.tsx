@@ -82,6 +82,50 @@ export default async function LeadIntakePage() {
         </Card>
 
         <Card className="space-y-4">
+          <SectionTitle>Your body right now</SectionTitle>
+          <Field label="How would you describe your current fitness level?">
+            <Select
+              name="fitness_level"
+              defaultValue={intake?.fitness_level ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="complete_beginner">Complete beginner</option>
+              <option value="some_experience">Some experience</option>
+              <option value="moderately_active">Moderately active</option>
+              <option value="previously_very_active">
+                Previously very active
+              </option>
+              <option value="athlete_competitive">
+                Athlete / competitive
+              </option>
+            </Select>
+          </Field>
+          <Field label="Current satisfaction with how your body feels (1 = very dissatisfied, 10 = completely at ease)">
+            <Input
+              name="body_satisfaction_scale"
+              type="number"
+              min="1"
+              max="10"
+              defaultValue={intake?.body_satisfaction_scale ?? ""}
+            />
+          </Field>
+          <Field label="Areas of your body that feel strong or capable">
+            <Textarea
+              name="strong_areas"
+              rows={2}
+              defaultValue={intake?.strong_areas ?? ""}
+            />
+          </Field>
+          <Field label="Any injuries, surgeries, or physical limitations Mickey should know about">
+            <Textarea
+              name="injuries_limitations"
+              rows={2}
+              defaultValue={intake?.injuries_limitations ?? ""}
+            />
+          </Field>
+        </Card>
+
+        <Card className="space-y-4">
           <SectionTitle>Balance &amp; falls</SectionTitle>
           <div className="grid grid-cols-2 gap-2">
             <Checkbox
@@ -155,6 +199,58 @@ export default async function LeadIntakePage() {
               defaultValue={intake?.bones_notes ?? ""}
             />
           </Field>
+        </Card>
+
+        <Card className="space-y-4">
+          <SectionTitle>General health history</SectionTitle>
+          <p className="text-sm text-gray">Check all that apply:</p>
+          <div className="grid grid-cols-2 gap-2">
+            <Checkbox
+              name="heart_condition"
+              label="Heart condition"
+              defaultChecked={intake?.heart_condition}
+            />
+            <Checkbox
+              name="high_blood_pressure"
+              label="High blood pressure"
+              defaultChecked={intake?.high_blood_pressure}
+            />
+            <Checkbox
+              name="diabetes"
+              label="Diabetes"
+              defaultChecked={intake?.diabetes}
+            />
+            <Checkbox
+              name="asthma"
+              label="Asthma"
+              defaultChecked={intake?.asthma}
+            />
+            <Checkbox
+              name="thyroid_condition"
+              label="Thyroid condition"
+              defaultChecked={intake?.thyroid_condition}
+            />
+            <Checkbox
+              name="joint_issues"
+              label="Joint issues"
+              defaultChecked={intake?.joint_issues}
+            />
+            <Checkbox
+              name="anxiety_depression"
+              label="Anxiety / depression"
+              defaultChecked={intake?.anxiety_depression}
+            />
+            <Checkbox
+              name="eating_disorder_history"
+              label="Eating disorder history"
+              defaultChecked={intake?.eating_disorder_history}
+            />
+            <Checkbox
+              name="pregnancy_postpartum"
+              label="Pregnancy / postpartum"
+              defaultChecked={intake?.pregnancy_postpartum}
+            />
+          </div>
         </Card>
 
         <Card className="space-y-4">
@@ -309,6 +405,51 @@ export default async function LeadIntakePage() {
         </Card>
 
         <Card className="space-y-4">
+          <SectionTitle>Your goals</SectionTitle>
+          <Field label="In your own words, what do you most want to change or feel differently about?">
+            <Textarea
+              name="goal_change_description"
+              rows={2}
+              defaultValue={intake?.goal_change_description ?? ""}
+            />
+          </Field>
+          <Field label="What does success look like to you 3 months from now?">
+            <Textarea
+              name="goal_success_3_months"
+              rows={2}
+              defaultValue={intake?.goal_success_3_months ?? ""}
+            />
+          </Field>
+          <Field label="What has held you back from reaching your goals before?">
+            <Textarea
+              name="goal_held_back_before"
+              rows={2}
+              defaultValue={intake?.goal_held_back_before ?? ""}
+            />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Goal importance (1 = not very important, 10 = top priority)">
+              <Input
+                name="goal_importance_scale"
+                type="number"
+                min="1"
+                max="10"
+                defaultValue={intake?.goal_importance_scale ?? ""}
+              />
+            </Field>
+            <Field label="Confidence to change (1 = not confident, 10 = fully ready)">
+              <Input
+                name="confidence_to_change_scale"
+                type="number"
+                min="1"
+                max="10"
+                defaultValue={intake?.confidence_to_change_scale ?? ""}
+              />
+            </Field>
+          </div>
+        </Card>
+
+        <Card className="space-y-4">
           <SectionTitle>Nutrition</SectionTitle>
           <Field label="Your relationship with food right now">
             <Select
@@ -329,6 +470,38 @@ export default async function LeadIntakePage() {
               defaultValue={intake?.nutrition_notes ?? ""}
             />
           </Field>
+          <Field label="Foods you love that you'd never want to give up">
+            <Textarea
+              name="foods_loved"
+              rows={2}
+              defaultValue={intake?.foods_loved ?? ""}
+            />
+          </Field>
+          <Field label="Foods that feel scary, forbidden, or guilt-inducing">
+            <Textarea
+              name="foods_scary"
+              rows={2}
+              defaultValue={intake?.foods_scary ?? ""}
+            />
+          </Field>
+          <Field label="Have you ever been on a structured diet or weight loss program?">
+            <Select name="diet_history" defaultValue={intake?.diet_history ?? ""}>
+              <option value="">— Choose one —</option>
+              <option value="never">Never</option>
+              <option value="once_or_twice">Once or twice</option>
+              <option value="many_times">Many times</option>
+              <option value="currently_on_one">Currently on one</option>
+            </Select>
+          </Field>
+          <Field label="How much does food stress affect your daily mood? (1 = not at all, 10 = significantly every day)">
+            <Input
+              name="food_stress_scale"
+              type="number"
+              min="1"
+              max="10"
+              defaultValue={intake?.food_stress_scale ?? ""}
+            />
+          </Field>
         </Card>
 
         <Card className="space-y-4">
@@ -346,6 +519,151 @@ export default async function LeadIntakePage() {
               rows={2}
               defaultValue={intake?.competing_demands ?? ""}
             />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Average sleep per night">
+              <Input
+                name="average_sleep_hours"
+                defaultValue={intake?.average_sleep_hours ?? ""}
+              />
+            </Field>
+            <Field label="How long have you slept this way?">
+              <Input
+                name="sleep_duration_pattern"
+                defaultValue={intake?.sleep_duration_pattern ?? ""}
+              />
+            </Field>
+          </div>
+          <Field label="Main sources of stress in your life right now">
+            <Textarea
+              name="stress_sources"
+              rows={2}
+              defaultValue={intake?.stress_sources ?? ""}
+            />
+          </Field>
+          <Field label="How do you typically cope with stress?">
+            <Textarea
+              name="stress_coping"
+              rows={2}
+              defaultValue={intake?.stress_coping ?? ""}
+            />
+          </Field>
+        </Card>
+
+        <Card className="space-y-4">
+          <SectionTitle>How you like to be coached</SectionTitle>
+          <Field label="How do you like to be coached during a session?">
+            <Select
+              name="coaching_style"
+              defaultValue={intake?.coaching_style ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="lots_of_encouragement">
+                Lots of encouragement
+              </option>
+              <option value="push_me_challenge_me">
+                Push me / challenge me
+              </option>
+              <option value="quiet_and_focused">Quiet and focused</option>
+              <option value="flexible_read_my_mood">
+                Flexible — read my mood
+              </option>
+            </Select>
+          </Field>
+          <Field label="How do you prefer feedback in the moment?">
+            <Select
+              name="feedback_style"
+              defaultValue={intake?.feedback_style ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="direct_and_honest">Direct and honest</option>
+              <option value="mix_of_both">Mix of both</option>
+              <option value="gentle_and_encouraging">
+                Gentle and encouraging
+              </option>
+              <option value="mostly_positive_correct_big_issues">
+                Mostly positive, correct only big issues
+              </option>
+            </Select>
+          </Field>
+          <Field label="Best way to reach you between sessions?">
+            <Select
+              name="contact_method"
+              defaultValue={intake?.contact_method ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="text">Text</option>
+              <option value="email">Email</option>
+              <option value="call">Call</option>
+              <option value="reach_out_if_needed">
+                I&apos;ll reach out if needed
+              </option>
+            </Select>
+          </Field>
+          <Field label="How often would you like check-ins between sessions?">
+            <Select
+              name="checkin_frequency"
+              defaultValue={intake?.checkin_frequency ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="weekly">Weekly</option>
+              <option value="every_session_only">Every session only</option>
+              <option value="only_if_i_reach_out">Only if I reach out</option>
+              <option value="not_at_all_session_time_only">
+                Not at all, just session time
+              </option>
+            </Select>
+          </Field>
+          <Field label="What kind of accountability helps you most?">
+            <Select
+              name="accountability_style"
+              defaultValue={intake?.accountability_style ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="regular_checkins_from_mickey">
+                Regular check-ins from Mickey
+              </option>
+              <option value="tracking_own_progress">
+                Tracking my own progress
+              </option>
+              <option value="scheduled_sessions_enough">
+                Scheduled sessions are enough
+              </option>
+              <option value="friendly_reminders_nudges">
+                Friendly reminders / nudges
+              </option>
+            </Select>
+          </Field>
+          <Field label="Anything that has NOT worked for you with past coaches or trainers">
+            <Textarea
+              name="past_coach_what_didnt_work"
+              rows={2}
+              defaultValue={intake?.past_coach_what_didnt_work ?? ""}
+            />
+          </Field>
+        </Card>
+
+        <Card className="space-y-4">
+          <SectionTitle>Anything else?</SectionTitle>
+          <Field label="Is there anything else you'd like Mickey to know before your assessment session?">
+            <Textarea
+              name="anything_else"
+              rows={2}
+              defaultValue={intake?.anything_else ?? ""}
+            />
+          </Field>
+          <Field label="How did you hear about MeFirstFitness?">
+            <Select
+              name="referral_source"
+              defaultValue={intake?.referral_source ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="friend_family">Friend / family referral</option>
+              <option value="social_media">Social media</option>
+              <option value="flyer">Flyer</option>
+              <option value="google">Google</option>
+              <option value="other">Other</option>
+            </Select>
           </Field>
         </Card>
 

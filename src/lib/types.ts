@@ -228,6 +228,44 @@ export type NutritionRelationship =
   | "complicated"
   | "actively_working"
   | "rather_not_say";
+export type FitnessLevel =
+  | "complete_beginner"
+  | "some_experience"
+  | "moderately_active"
+  | "previously_very_active"
+  | "athlete_competitive";
+export type DietHistory =
+  | "never"
+  | "once_or_twice"
+  | "many_times"
+  | "currently_on_one";
+export type CoachingStyle =
+  | "lots_of_encouragement"
+  | "push_me_challenge_me"
+  | "quiet_and_focused"
+  | "flexible_read_my_mood";
+export type FeedbackStyle =
+  | "direct_and_honest"
+  | "mix_of_both"
+  | "gentle_and_encouraging"
+  | "mostly_positive_correct_big_issues";
+export type ContactMethod = "text" | "email" | "call" | "reach_out_if_needed";
+export type CheckinFrequency =
+  | "weekly"
+  | "every_session_only"
+  | "only_if_i_reach_out"
+  | "not_at_all_session_time_only";
+export type AccountabilityStyle =
+  | "regular_checkins_from_mickey"
+  | "tracking_own_progress"
+  | "scheduled_sessions_enough"
+  | "friendly_reminders_nudges";
+export type ReferralSource =
+  | "friend_family"
+  | "social_media"
+  | "flyer"
+  | "google"
+  | "other";
 
 export interface LeadIntake {
   id: string;
@@ -267,6 +305,40 @@ export interface LeadIntake {
   nutrition_notes: string | null;
   support_system: string | null;
   competing_demands: string | null;
+  fitness_level: FitnessLevel | null;
+  body_satisfaction_scale: number | null;
+  strong_areas: string | null;
+  injuries_limitations: string | null;
+  heart_condition: boolean;
+  high_blood_pressure: boolean;
+  diabetes: boolean;
+  thyroid_condition: boolean;
+  joint_issues: boolean;
+  asthma: boolean;
+  anxiety_depression: boolean;
+  eating_disorder_history: boolean;
+  pregnancy_postpartum: boolean;
+  goal_change_description: string | null;
+  goal_success_3_months: string | null;
+  goal_held_back_before: string | null;
+  goal_importance_scale: number | null;
+  confidence_to_change_scale: number | null;
+  foods_loved: string | null;
+  foods_scary: string | null;
+  diet_history: DietHistory | null;
+  food_stress_scale: number | null;
+  average_sleep_hours: string | null;
+  sleep_duration_pattern: string | null;
+  stress_sources: string | null;
+  stress_coping: string | null;
+  coaching_style: CoachingStyle | null;
+  feedback_style: FeedbackStyle | null;
+  contact_method: ContactMethod | null;
+  checkin_frequency: CheckinFrequency | null;
+  accountability_style: AccountabilityStyle | null;
+  past_coach_what_didnt_work: string | null;
+  anything_else: string | null;
+  referral_source: ReferralSource | null;
   submitted_at: string | null;
   created_at: string;
 }

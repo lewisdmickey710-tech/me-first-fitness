@@ -421,6 +421,17 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
     intake.drives_self && "drives self",
     intake.stairs_daily && "stairs daily",
   ].filter(Boolean);
+  const healthHistoryFlags = [
+    intake.heart_condition && "heart condition",
+    intake.high_blood_pressure && "high blood pressure",
+    intake.diabetes && "diabetes",
+    intake.thyroid_condition && "thyroid condition",
+    intake.joint_issues && "joint issues",
+    intake.asthma && "asthma",
+    intake.anxiety_depression && "anxiety/depression",
+    intake.eating_disorder_history && "eating disorder history",
+    intake.pregnancy_postpartum && "pregnancy/postpartum",
+  ].filter(Boolean);
 
   return (
     <Card className="space-y-3 text-sm">
@@ -447,6 +458,33 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
       ) : null}
       {intake.bones_notes ? (
         <SummaryRow label="Bones notes" value={intake.bones_notes} />
+      ) : null}
+      {intake.fitness_level ? (
+        <SummaryRow
+          label="Fitness level"
+          value={intake.fitness_level.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.body_satisfaction_scale != null ? (
+        <SummaryRow
+          label="Body satisfaction"
+          value={`${intake.body_satisfaction_scale}/10`}
+        />
+      ) : null}
+      {intake.strong_areas ? (
+        <SummaryRow label="Strong areas" value={intake.strong_areas} />
+      ) : null}
+      {intake.injuries_limitations ? (
+        <SummaryRow
+          label="Injuries / limitations"
+          value={intake.injuries_limitations}
+        />
+      ) : null}
+      {healthHistoryFlags.length > 0 ? (
+        <SummaryRow
+          label="General health history"
+          value={healthHistoryFlags.join(", ")}
+        />
       ) : null}
       {intake.medications ? (
         <SummaryRow label="Medications" value={intake.medications} />
@@ -485,6 +523,31 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
         label="Energy / Sleep / Stress / Confidence"
         value={`${intake.energy_scale ?? "—"} / ${intake.sleep_scale ?? "—"} / ${intake.stress_scale ?? "—"} / ${intake.confidence_scale ?? "—"}`}
       />
+      {intake.goal_change_description ? (
+        <SummaryRow
+          label="What they want to change"
+          value={intake.goal_change_description}
+        />
+      ) : null}
+      {intake.goal_success_3_months ? (
+        <SummaryRow
+          label="Success in 3 months"
+          value={intake.goal_success_3_months}
+        />
+      ) : null}
+      {intake.goal_held_back_before ? (
+        <SummaryRow
+          label="What's held them back before"
+          value={intake.goal_held_back_before}
+        />
+      ) : null}
+      {intake.goal_importance_scale != null ||
+      intake.confidence_to_change_scale != null ? (
+        <SummaryRow
+          label="Goal importance / Confidence to change"
+          value={`${intake.goal_importance_scale ?? "—"} / ${intake.confidence_to_change_scale ?? "—"}`}
+        />
+      ) : null}
       {intake.nutrition_relationship ? (
         <SummaryRow
           label="Nutrition relationship"
@@ -494,6 +557,24 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
       {intake.nutrition_notes ? (
         <SummaryRow label="Nutrition notes" value={intake.nutrition_notes} />
       ) : null}
+      {intake.foods_loved ? (
+        <SummaryRow label="Foods they love" value={intake.foods_loved} />
+      ) : null}
+      {intake.foods_scary ? (
+        <SummaryRow label="Foods that feel scary" value={intake.foods_scary} />
+      ) : null}
+      {intake.diet_history ? (
+        <SummaryRow
+          label="Diet history"
+          value={intake.diet_history.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.food_stress_scale != null ? (
+        <SummaryRow
+          label="Food stress impact"
+          value={`${intake.food_stress_scale}/10`}
+        />
+      ) : null}
       {intake.support_system ? (
         <SummaryRow label="Support system" value={intake.support_system} />
       ) : null}
@@ -501,6 +582,63 @@ function IntakeSummary({ intake }: { intake: LeadIntake }) {
         <SummaryRow
           label="Competing demands"
           value={intake.competing_demands}
+        />
+      ) : null}
+      {intake.average_sleep_hours || intake.sleep_duration_pattern ? (
+        <SummaryRow
+          label="Sleep"
+          value={`${intake.average_sleep_hours ?? "—"} per night, for ${intake.sleep_duration_pattern ?? "—"}`}
+        />
+      ) : null}
+      {intake.stress_sources ? (
+        <SummaryRow label="Stress sources" value={intake.stress_sources} />
+      ) : null}
+      {intake.stress_coping ? (
+        <SummaryRow label="How they cope" value={intake.stress_coping} />
+      ) : null}
+      {intake.coaching_style ? (
+        <SummaryRow
+          label="Coaching style preference"
+          value={intake.coaching_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.feedback_style ? (
+        <SummaryRow
+          label="Feedback style preference"
+          value={intake.feedback_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.contact_method ? (
+        <SummaryRow
+          label="Preferred contact method"
+          value={intake.contact_method.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.checkin_frequency ? (
+        <SummaryRow
+          label="Check-in frequency"
+          value={intake.checkin_frequency.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.accountability_style ? (
+        <SummaryRow
+          label="Accountability style"
+          value={intake.accountability_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.past_coach_what_didnt_work ? (
+        <SummaryRow
+          label="What hasn't worked before"
+          value={intake.past_coach_what_didnt_work}
+        />
+      ) : null}
+      {intake.anything_else ? (
+        <SummaryRow label="Anything else" value={intake.anything_else} />
+      ) : null}
+      {intake.referral_source ? (
+        <SummaryRow
+          label="How they heard about us"
+          value={intake.referral_source.replaceAll("_", " ")}
         />
       ) : null}
     </Card>

@@ -74,6 +74,53 @@ export async function submitLeadIntake(formData: FormData) {
       support_system: textOrNull(formData, "support_system"),
       competing_demands: textOrNull(formData, "competing_demands"),
 
+      fitness_level: textOrNull(formData, "fitness_level"),
+      body_satisfaction_scale: scaleOrNull(formData, "body_satisfaction_scale"),
+      strong_areas: textOrNull(formData, "strong_areas"),
+      injuries_limitations: textOrNull(formData, "injuries_limitations"),
+
+      heart_condition: checked(formData, "heart_condition"),
+      high_blood_pressure: checked(formData, "high_blood_pressure"),
+      diabetes: checked(formData, "diabetes"),
+      thyroid_condition: checked(formData, "thyroid_condition"),
+      joint_issues: checked(formData, "joint_issues"),
+      asthma: checked(formData, "asthma"),
+      anxiety_depression: checked(formData, "anxiety_depression"),
+      eating_disorder_history: checked(formData, "eating_disorder_history"),
+      pregnancy_postpartum: checked(formData, "pregnancy_postpartum"),
+
+      goal_change_description: textOrNull(formData, "goal_change_description"),
+      goal_success_3_months: textOrNull(formData, "goal_success_3_months"),
+      goal_held_back_before: textOrNull(formData, "goal_held_back_before"),
+      goal_importance_scale: scaleOrNull(formData, "goal_importance_scale"),
+      confidence_to_change_scale: scaleOrNull(
+        formData,
+        "confidence_to_change_scale"
+      ),
+
+      foods_loved: textOrNull(formData, "foods_loved"),
+      foods_scary: textOrNull(formData, "foods_scary"),
+      diet_history: textOrNull(formData, "diet_history"),
+      food_stress_scale: scaleOrNull(formData, "food_stress_scale"),
+
+      average_sleep_hours: textOrNull(formData, "average_sleep_hours"),
+      sleep_duration_pattern: textOrNull(formData, "sleep_duration_pattern"),
+      stress_sources: textOrNull(formData, "stress_sources"),
+      stress_coping: textOrNull(formData, "stress_coping"),
+
+      coaching_style: textOrNull(formData, "coaching_style"),
+      feedback_style: textOrNull(formData, "feedback_style"),
+      contact_method: textOrNull(formData, "contact_method"),
+      checkin_frequency: textOrNull(formData, "checkin_frequency"),
+      accountability_style: textOrNull(formData, "accountability_style"),
+      past_coach_what_didnt_work: textOrNull(
+        formData,
+        "past_coach_what_didnt_work"
+      ),
+
+      anything_else: textOrNull(formData, "anything_else"),
+      referral_source: textOrNull(formData, "referral_source"),
+
       submitted_at: new Date().toISOString(),
     },
     { onConflict: "lead_id" }
