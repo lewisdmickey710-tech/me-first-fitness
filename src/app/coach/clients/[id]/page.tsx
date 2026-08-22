@@ -1092,7 +1092,12 @@ function SessionsTab({
           {sessions.map((s) => (
             <Card key={s.id}>
               <div className="flex items-center justify-between">
-                <p className="font-medium text-ink">{s.day_label}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-ink">{s.day_label}</p>
+                  {s.logged_by === "client" ? (
+                    <Badge tone="teal">logged by client</Badge>
+                  ) : null}
+                </div>
                 <p className="text-sm text-gray">{s.date}</p>
               </div>
               {s.entries.length > 0 ? (
@@ -1101,6 +1106,12 @@ function SessionsTab({
                     <li key={i}>
                       {e.exercise} — {e.sets}x{e.reps}
                       {e.weight ? ` @ ${e.weight}` : ""}
+                      {e.substitute_exercise_id ? " (swapped)" : ""}
+                      {e.notes ? (
+                        <span className="block text-xs text-gray/80">
+                          {e.notes}
+                        </span>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

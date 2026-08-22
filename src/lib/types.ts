@@ -43,6 +43,12 @@ export interface SessionEntry {
   sets: string;
   reps: string;
   weight: string;
+  // Present only on entries logged from the client's own program page --
+  // ties the free-text entry back to the actual prescribed movement (and
+  // whichever swap was active, if any) instead of just a typed name.
+  exercise_id?: string;
+  substitute_exercise_id?: string | null;
+  notes?: string;
 }
 
 export interface TrainingSession {
@@ -53,7 +59,7 @@ export interface TrainingSession {
   entries: SessionEntry[];
   rating: number | null;
   day_notes: string | null;
-  logged_by: string;
+  logged_by: "coach" | "client";
   created_at: string;
 }
 

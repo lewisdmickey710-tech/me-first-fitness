@@ -447,3 +447,124 @@ export async function submitMinorConsent(formData: FormData) {
   revalidatePath("/client/minor-consent");
   redirect("/client/documents");
 }
+
+export async function setProgramExerciseSwap(
+  programDayExerciseId: string,
+  substituteExerciseId: string | null
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  // The DB trigger enforces that substituteExerciseId can only ever be
+  // this exercise's own designated regress_to/progress_to target (or
+  // null, to revert to the prescribed movement) -- this isn't a free
+  // swap to any exercise in the library.
+  const { error } = await supabase.from("client_program_overrides").upsert(
+    {
+      client_id: me.id,
+      program_day_exercise_id: programDayExerciseId,
+      substitute_exercise_id: substituteExerciseId,
+      edited_by: "client",
+      active: substituteExerciseId !== null,
+    },
+    { onConflict: "client_id,program_day_exercise_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/program");
+}
+
+export async function logMyWorkout(programDayId: string, formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  if (!date) throw new Error("Date is required.");
+  const dayNotes = String(formData.get("day_notes") ?? "").trim();
+
+  const { data: day } = await supabase
+    .from("program_days")
+    .select(
+      "day_number, day_label, program_day_exercises(id, position, sets, reps, exercise_id, exercises(name))"
+    )
+    .eq("id", programDayId)
+    .single();
+
+  if (!day) throw new Error("Program day not found.");
+
+  const { data: overrides } = await supabase
+    .from("client_program_overrides")
+    .select("program_day_exercise_id, substitute_exercise_id")
+    .eq("client_id", me.id)
+    .eq("active", true);
+
+  const overrideMap = new Map(
+    (overrides ?? []).map((o) => [o.program_day_exercise_id, o.substitute_exercise_id])
+  );
+
+  const substituteIds = [...overrideMap.values()].filter(
+    (id): id is string => !!id
+  );
+  const { data: subs } = substituteIds.length
+    ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
+    : { data: [] as { id: string; name: string }[] };
+  const subNameById = new Map((subs ?? []).map((s) => [s.id, s.name]));
+
+  type Pde = {
+    id: string;
+    position: number;
+    sets: string | null;
+    reps: string | null;
+    exercise_id: string;
+    exercises: { name: string } | null;
+  };
+  const pdes = ((day.program_day_exercises ?? []) as unknown as Pde[])
+    .slice()
+    .sort((a, b) => a.position - b.position);
+
+  const entries = pdes.map((pde) => {
+    const substituteId = overrideMap.get(pde.id) ?? null;
+    const effectiveName = substituteId
+      ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
+      : pde.exercises?.name ?? "";
+    const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
+    const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
+    return {
+      exercise: effectiveName,
+      exercise_id: pde.exercise_id,
+      substitute_exercise_id: substituteId,
+      sets: pde.sets ?? "",
+      reps: pde.reps ?? "",
+      weight,
+      notes,
+    };
+  });
+
+  const { error } = await supabase.from("sessions").insert({
+    client_id: me.id,
+    day_label: `Day ${day.day_number}: ${day.day_label}`,
+    date,
+    entries,
+    day_notes: dayNotes || null,
+    logged_by: "client",
+  });
+
+  if (error) throw new Error(error.message);
+
+  // Same as when the coach logs a session -- a logged workout means that
+  // date's occurrence was attended, feeding the existing attendance/risk
+  // tracking. Doesn't overwrite an already-completed row (the trigger
+  // blocks that) and never touches cancelled/late_cancelled history.
+  await supabase.from("session_occurrences").upsert(
+    { client_id: me.id, occurrence_date: date, status: "completed" },
+    { onConflict: "client_id,occurrence_date" }
+  );
+
+  revalidatePath("/client/program");
+  revalidatePath("/client/dashboard");
+}
