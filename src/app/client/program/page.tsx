@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
@@ -120,6 +121,13 @@ export default async function ClientProgramPage() {
         }
       />
 
+      <Link
+        href="/client/history"
+        className="inline-block text-sm text-gray hover:text-ink"
+      >
+        View past workouts →
+      </Link>
+
       {programDays.length === 0 ? (
         <EmptyState
           title="No program assigned yet"
@@ -135,10 +143,8 @@ export default async function ClientProgramPage() {
 
             return (
               <Card key={day.id}>
-                <p className="font-medium text-ink">
-                  Day {day.day_number}: {day.day_label}
-                </p>
-                <p className="mt-1 text-xs text-gray">
+                <Collapsible label={`Day ${day.day_number}: ${day.day_label}`}>
+                <p className="text-xs text-gray">
                   Enter what you used and how it felt as you go, then log
                   the whole day at the bottom.
                 </p>
@@ -316,6 +322,7 @@ export default async function ClientProgramPage() {
                     Log this workout
                   </Button>
                 </form>
+                </Collapsible>
               </Card>
             );
           })}

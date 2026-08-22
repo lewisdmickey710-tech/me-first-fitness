@@ -529,5 +529,33 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
 
   if (error) throw new Error(error.message);
 
+  // Bootstraps phase tracking for a client who never got a starting
+  // client_phase_history row -- normally created automatically when a
+  // client is first added, but a legacy client (predating the care
+  // profile/phase system) or one added without a care profile never got
+  // one, and without it their program page has no phase to pull days
+  // from even once a care profile is set.
+  if (care_profile_id) {
+    const { data: existingPhase } = await supabase
+      .from("client_phase_history")
+      .select("id")
+      .eq("client_id", clientId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!existingPhase) {
+      const { error: phaseError } = await supabase
+        .from("client_phase_history")
+        .insert({
+          client_id: clientId,
+          cycle_number: 1,
+          phase: "1",
+          started_on: new Date().toISOString().slice(0, 10),
+          planned_weeks: 4,
+        });
+      if (phaseError) throw new Error(phaseError.message);
+    }
+  }
+
   revalidatePath(`/coach/clients/${clientId}`);
 }
