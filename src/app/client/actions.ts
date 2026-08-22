@@ -4,6 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
+import {
+  isLateCancellation,
+  LATE_CANCELLATION_FEE,
+  LATE_CANCEL_WINDOW_DAYS,
+} from "@/lib/cancellation";
 
 export async function logCheckin(formData: FormData) {
   const me = await getMyClient();
@@ -104,6 +109,8 @@ export async function submitRequest(formData: FormData) {
   const preferred_date = String(formData.get("preferred_date") ?? "");
   const preferred_time = String(formData.get("preferred_time") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
+  const reschedule_from_date =
+    String(formData.get("reschedule_from_date") ?? "").trim() || null;
 
   if (!preferred_date) throw new Error("Preferred date is required.");
 
@@ -112,13 +119,81 @@ export async function submitRequest(formData: FormData) {
     preferred_date,
     preferred_time: preferred_time || null,
     note: note || null,
+    reschedule_from_date,
     status: "pending",
   });
 
   if (error) throw new Error(error.message);
 
   revalidatePath("/client/dashboard");
+  revalidatePath("/client/schedule");
   redirect("/client/dashboard");
+}
+
+export async function cancelMySession(
+  clientScheduleId: string,
+  occurrenceDate: string,
+  timeOfDay: string
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const late = isLateCancellation(occurrenceDate, timeOfDay);
+  const status = late ? "late_cancelled" : "cancelled";
+
+  const { data: occurrence, error } = await supabase
+    .from("session_occurrences")
+    .upsert(
+      {
+        client_id: me.id,
+        client_schedule_id: clientScheduleId,
+        occurrence_date: occurrenceDate,
+        status,
+      },
+      { onConflict: "client_id,occurrence_date" }
+    )
+    .select("id")
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  if (late) {
+    const windowCutoff = new Date();
+    windowCutoff.setUTCDate(windowCutoff.getUTCDate() - LATE_CANCEL_WINDOW_DAYS);
+
+    const { count } = await supabase
+      .from("session_occurrences")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", me.id)
+      .eq("status", "late_cancelled")
+      .gte("occurrence_date", windowCutoff.toISOString().slice(0, 10));
+
+    if ((count ?? 0) >= 2) {
+      const { data: existingFee } = await supabase
+        .from("payments")
+        .select("id")
+        .eq("session_occurrence_id", occurrence.id)
+        .eq("kind", "late_cancellation_fee")
+        .maybeSingle();
+
+      if (!existingFee) {
+        const { error: feeError } = await supabase.from("payments").insert({
+          client_id: me.id,
+          description: "Late cancellation fee (2nd late cancellation within 16 weeks)",
+          amount: LATE_CANCELLATION_FEE,
+          due_date: new Date().toISOString().slice(0, 10),
+          kind: "late_cancellation_fee",
+          session_occurrence_id: occurrence.id,
+        });
+        if (feeError) throw new Error(feeError.message);
+      }
+    }
+  }
+
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
 }
 
 export async function acknowledgeDocument(

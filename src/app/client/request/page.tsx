@@ -2,11 +2,17 @@ import Link from "next/link";
 import { submitRequest } from "@/app/client/actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 
-export default function RequestTimePage() {
+export default async function RequestTimePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ reschedule_from?: string }>;
+}) {
+  const { reschedule_from: rescheduleFrom } = await searchParams;
+
   return (
     <div className="space-y-6">
       <Link
-        href="/client/dashboard"
+        href={rescheduleFrom ? "/client/schedule" : "/client/dashboard"}
         className="text-sm text-gray hover:text-ink"
       >
         ← Back
@@ -14,7 +20,9 @@ export default function RequestTimePage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Request a session time
+        {rescheduleFrom
+          ? `Request to reschedule ${rescheduleFrom}`
+          : "Request a session time"}
       </h1>
       <p className="text-sm text-gray">
         Propose a time that works for you — your coach will confirm or
@@ -23,10 +31,13 @@ export default function RequestTimePage() {
 
       <Card>
         <form action={submitRequest} className="space-y-4">
+          {rescheduleFrom ? (
+            <input type="hidden" name="reschedule_from_date" value={rescheduleFrom} />
+          ) : null}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Preferred date
+                {rescheduleFrom ? "New date" : "Preferred date"}
               </label>
               <Input name="preferred_date" type="date" required />
             </div>

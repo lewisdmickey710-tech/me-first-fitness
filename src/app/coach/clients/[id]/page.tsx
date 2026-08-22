@@ -1463,6 +1463,11 @@ function RequestsTab({
         <Card key={r.id}>
           <div className="flex items-center justify-between">
             <div>
+              {r.reschedule_from_date ? (
+                <p className="text-xs font-medium text-rose">
+                  Reschedule from {r.reschedule_from_date} →
+                </p>
+              ) : null}
               <p className="font-medium text-ink">
                 {r.preferred_date}
                 {r.preferred_time ? ` at ${r.preferred_time}` : ""}

@@ -95,12 +95,34 @@ export async function setRequestStatus(
   status: RequestStatus
 ) {
   const supabase = await createClient();
-  const { error } = await supabase
+
+  const { data: request, error } = await supabase
     .from("requests")
     .update({ status })
-    .eq("id", requestId);
+    .eq("id", requestId)
+    .select("preferred_date, reschedule_from_date")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // Confirming a reschedule request (one tied to a specific existing
+  // session, not a freeform new-time request) closes the loop
+  // automatically -- the original date's attendance record is marked
+  // rescheduled instead of being left to drift out of sync.
+  if (status === "confirmed" && request?.reschedule_from_date) {
+    const { error: occurrenceError } = await supabase
+      .from("session_occurrences")
+      .upsert(
+        {
+          client_id: clientId,
+          occurrence_date: request.reschedule_from_date,
+          status: "rescheduled",
+          rescheduled_to_date: request.preferred_date,
+        },
+        { onConflict: "client_id,occurrence_date" }
+      );
+    if (occurrenceError) throw new Error(occurrenceError.message);
+  }
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");

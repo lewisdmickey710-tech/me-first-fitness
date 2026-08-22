@@ -121,6 +121,9 @@ export default async function ClientDashboard() {
 
   const nextSession = nextSessionFromSchedules(schedules ?? []);
   const nextDue = payments?.[0] ?? null;
+  const hasUnpaidLateFee = (payments ?? []).some(
+    (p) => p.kind === "late_cancellation_fee"
+  );
   const today = toDateString(new Date());
 
   const assignedDocIds = new Set((docAssignments ?? []).map((a) => a.document_id));
@@ -169,13 +172,28 @@ export default async function ClientDashboard() {
         </p>
       ) : null}
 
-      {nextSession ? (
+      {hasUnpaidLateFee ? (
+        <Card className="space-y-1 border-pink/40 bg-pink/5">
+          <p className="font-medium text-pink">Sessions paused</p>
+          <p className="text-sm text-ink">
+            A late cancellation fee is outstanding — your upcoming sessions
+            are paused until it&apos;s paid. Reach out to Mickey to settle
+            it, then your schedule picks back up right away.
+          </p>
+        </Card>
+      ) : nextSession ? (
         <Card>
           <p className="text-sm font-medium text-gray">Next session</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             {formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)}
             {nextSession.label ? ` · ${nextSession.label}` : ""}
           </p>
+          <Link
+            href="/client/schedule"
+            className="mt-2 inline-block text-sm text-rose hover:underline"
+          >
+            View your schedule →
+          </Link>
         </Card>
       ) : null}
 
@@ -310,6 +328,7 @@ export default async function ClientDashboard() {
       ) : null}
 
       <div className="grid grid-cols-3 gap-3">
+        <QuickAction href="/client/schedule" label="My schedule" />
         <QuickAction href="/client/program" label="My program" />
         <QuickAction href="/client/checkin" label="Log check-in" />
         <QuickAction href="/client/activity" label="Log activity" />

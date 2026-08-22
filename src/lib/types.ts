@@ -90,6 +90,7 @@ export interface SessionRequest {
   preferred_time: string | null;
   note: string | null;
   status: RequestStatus;
+  reschedule_from_date: string | null;
   created_at: string;
 }
 
@@ -187,6 +188,8 @@ export interface ClientSchedule {
   created_at: string;
 }
 
+export type PaymentKind = "session" | "late_cancellation_fee";
+
 export interface Payment {
   id: string;
   client_id: string;
@@ -195,6 +198,8 @@ export interface Payment {
   due_date: string;
   paid_on: string | null;
   reminder_sent_at: string | null;
+  kind: PaymentKind;
+  session_occurrence_id: string | null;
   created_at: string;
 }
 

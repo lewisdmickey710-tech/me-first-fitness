@@ -62,6 +62,13 @@ export async function GET(request: Request) {
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
+  const { data: frozenClientRows } = await supabase
+    .from("payments")
+    .select("client_id")
+    .eq("kind", "late_cancellation_fee")
+    .is("paid_on", null);
+  const frozenClientIds = new Set((frozenClientRows ?? []).map((p) => p.client_id));
+
   const { data: schedules } = await supabase
     .from("client_schedules")
     .select("id, client_id, time_of_day, label, clients(name, user_id)")
@@ -73,6 +80,9 @@ export async function GET(request: Request) {
       clients: { name: string; user_id: string | null } | null;
     }).clients;
     if (!client?.user_id) continue;
+    // Sessions are paused app-wide while a late cancellation fee is
+    // unpaid -- don't remind the client about a session while frozen.
+    if (frozenClientIds.has(schedule.client_id)) continue;
 
     const { data: existingLog } = await supabase
       .from("session_reminders_log")
