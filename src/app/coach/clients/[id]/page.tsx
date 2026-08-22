@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { CareProfilePicker } from "@/app/coach/roster/new/CareProfilePicker";
 import {
   advancePhase,
   logSessionOccurrence,
@@ -213,6 +214,11 @@ export default async function ClientDetailPage({
         .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
     ]);
 
+  const { data: careProfiles } = (await supabase
+    .from("care_profiles")
+    .select("*")
+    .order("name")) as { data: CareProfile[] | null };
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -272,6 +278,7 @@ export default async function ClientDetailPage({
           optionalDocuments={optionalDocuments ?? []}
           assignments={assignments ?? []}
           minorConsent={minorConsent}
+          careProfiles={careProfiles ?? []}
         />
       )}
       {tab === "sessions" && (
@@ -594,12 +601,14 @@ function ProfileTab({
   optionalDocuments,
   assignments,
   minorConsent,
+  careProfiles,
 }: {
   client: Client;
   intake: ClientIntake | null;
   optionalDocuments: LegalDocument[];
   assignments: ClientDocumentAssignment[];
   minorConsent: ClientMinorConsent | null;
+  careProfiles: CareProfile[];
 }) {
   const assignedDocIds = new Set(assignments.map((a) => a.document_id));
   return (
@@ -613,6 +622,11 @@ function ProfileTab({
           }}
           className="space-y-4"
         >
+          <CareProfilePicker
+            careProfiles={careProfiles}
+            defaultValue={client.care_profile_id ?? undefined}
+            required={false}
+          />
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">

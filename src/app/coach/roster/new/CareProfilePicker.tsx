@@ -6,10 +6,14 @@ import type { CareProfile } from "@/lib/types";
 
 export function CareProfilePicker({
   careProfiles,
+  defaultValue,
+  required = true,
 }: {
   careProfiles: CareProfile[];
+  defaultValue?: string;
+  required?: boolean;
 }) {
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(defaultValue ?? "");
   const profile = careProfiles.find((p) => p.id === selected);
 
   return (
@@ -19,7 +23,7 @@ export function CareProfilePicker({
       </label>
       <Select
         name="care_profile_id"
-        required
+        required={required}
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
       >

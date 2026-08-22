@@ -505,10 +505,12 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   };
 
   const payment_schedule = String(formData.get("payment_schedule") ?? "");
+  const care_profile_id = String(formData.get("care_profile_id") ?? "").trim();
 
   const { error } = await supabase
     .from("clients")
     .update({
+      ...(care_profile_id ? { care_profile_id } : {}),
       preferred_name: textOrNull("preferred_name"),
       date_of_birth: textOrNull("date_of_birth"),
       phone: textOrNull("phone"),
