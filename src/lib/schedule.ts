@@ -1,4 +1,4 @@
-import { nowInBusinessTz } from "@/lib/timezone";
+import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 
 export const DAY_NAMES = [
   "Sunday",
@@ -62,6 +62,72 @@ export function nextSessionFromSchedules(
       timeOfDay: s.time_of_day,
       label: s.label,
     }));
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => a.date.localeCompare(b.date));
+  return candidates[0];
+}
+
+export interface NextSessionForClient {
+  date: string;
+  dayOfWeek: number;
+  timeOfDay: string | null;
+  label: string | null;
+  isOneOff: boolean;
+}
+
+/**
+ * The single soonest upcoming session across BOTH a client's recurring
+ * client_schedules and any one-off confirmed session_occurrences (status
+ * "scheduled", created when a coach confirms a time request that isn't
+ * tied to a recurring day). A recurring day is skipped for the week its
+ * occurrence has been cancelled/late-cancelled/rescheduled away.
+ */
+export function nextSessionForClient(
+  schedules: { day_of_week: number; time_of_day: string; label: string | null; active: boolean }[],
+  occurrences: { occurrence_date: string; status: string; notes?: string | null }[],
+  from: Date = nowInBusinessTz()
+): NextSessionForClient | null {
+  const todayStr = toDateString(from);
+  const occByDate = new Map(occurrences.map((o) => [o.occurrence_date, o]));
+  const activeSchedules = schedules.filter((s) => s.active);
+  const candidates: NextSessionForClient[] = [];
+
+  for (const s of activeSchedules) {
+    for (let offset = 0; offset <= 7; offset++) {
+      const d = new Date(from);
+      d.setUTCDate(d.getUTCDate() + offset);
+      if (d.getUTCDay() !== s.day_of_week) continue;
+      const dateStr = toDateString(d);
+      const status = occByDate.get(dateStr)?.status;
+      if (status === "cancelled" || status === "late_cancelled" || status === "rescheduled") {
+        continue;
+      }
+      candidates.push({
+        date: dateStr,
+        dayOfWeek: s.day_of_week,
+        timeOfDay: s.time_of_day,
+        label: s.label,
+        isOneOff: false,
+      });
+      break;
+    }
+  }
+
+  const candidateDates = new Set(candidates.map((c) => c.date));
+  for (const o of occurrences) {
+    if (o.status !== "scheduled" || o.occurrence_date < todayStr) continue;
+    if (candidateDates.has(o.occurrence_date)) continue;
+    const dayOfWeek = new Date(`${o.occurrence_date}T00:00:00Z`).getUTCDay();
+    const timeMatch = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    candidates.push({
+      date: o.occurrence_date,
+      dayOfWeek,
+      timeOfDay: timeMatch?.[1] ?? null,
+      label: null,
+      isOneOff: true,
+    });
+  }
+
   if (candidates.length === 0) return null;
   candidates.sort((a, b) => a.date.localeCompare(b.date));
   return candidates[0];

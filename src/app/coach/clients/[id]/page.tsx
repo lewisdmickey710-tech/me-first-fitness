@@ -28,8 +28,9 @@ import { phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
 import {
+  DAY_NAMES,
   formatSchedule,
-  nextSessionFromSchedules,
+  nextSessionForClient,
   upcomingOccurrences,
 } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
@@ -342,7 +343,7 @@ function Overview({
   activities: Activity[];
 }) {
   const allotted = client.sessions_allotted;
-  const nextSession = nextSessionFromSchedules(schedules);
+  const nextSession = nextSessionForClient(schedules, occurrences);
   const today = toDateString(new Date());
   const unpaid = payments.filter((p) => !p.paid_on);
   const nextDue = unpaid.sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
@@ -437,8 +438,13 @@ function Overview({
             <p className="text-sm font-medium text-gray">Next session</p>
             {nextSession ? (
               <p className="mt-1 text-lg font-semibold text-ink">
-                {formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)}
-                {nextSession.label ? ` · ${nextSession.label}` : ""}
+                {nextSession.timeOfDay
+                  ? formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)
+                  : `${DAY_NAMES[nextSession.dayOfWeek]}, ${nextSession.date}`}
+                {nextSession.label ? ` · ${nextSession.label}` : ""}{" "}
+                <Badge tone={nextSession.isOneOff ? "teal" : "gray"}>
+                  {nextSession.isOneOff ? "One-off" : "Recurring"}
+                </Badge>
               </p>
             ) : (
               <p className="mt-1 text-sm text-gray">
