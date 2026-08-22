@@ -227,6 +227,7 @@ export interface LegalDocument {
   title: string;
   body: string;
   version: number;
+  requires_signature: boolean;
   updated_at: string;
 }
 
@@ -235,6 +236,7 @@ export interface ClientDocumentAcknowledgment {
   client_id: string;
   document_id: string;
   document_version: number;
+  signed_name: string | null;
   acknowledged_at: string;
 }
 

@@ -2,7 +2,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { acknowledgeDocument } from "@/app/client/actions";
-import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Checkbox,
+  DocumentBody,
+  EmptyState,
+  Heart,
+  Input,
+} from "@/components/ui";
 import type { ClientDocumentAcknowledgment, LegalDocument } from "@/lib/types";
 
 export default async function ClientDocumentsPage() {
@@ -56,21 +65,53 @@ export default async function ClientDocumentsPage() {
                 <p className="font-medium text-ink">{doc.title}</p>
                 {ack ? (
                   <Badge tone="green">
-                    agreed {ack.acknowledged_at.slice(0, 10)}
+                    {ack.signed_name
+                      ? `signed ${ack.acknowledged_at.slice(0, 10)}`
+                      : `read ${ack.acknowledged_at.slice(0, 10)}`}
                   </Badge>
                 ) : (
                   <Badge tone="gold">needs your review</Badge>
                 )}
               </div>
-              <p className="whitespace-pre-wrap text-sm text-ink">{doc.body}</p>
+              <DocumentBody text={doc.body} />
+              {ack?.signed_name ? (
+                <p className="text-xs text-gray">
+                  Signed by {ack.signed_name} on {ack.acknowledged_at.slice(0, 10)}
+                </p>
+              ) : null}
               {!ack ? (
                 <form
-                  action={async () => {
+                  action={async (formData: FormData) => {
                     "use server";
-                    await acknowledgeDocument(doc.id, doc.version);
+                    await acknowledgeDocument(
+                      doc.id,
+                      doc.version,
+                      doc.requires_signature,
+                      formData
+                    );
                   }}
+                  className="space-y-3 border-t border-grayLt pt-3"
                 >
-                  <Button type="submit">I have read and agree</Button>
+                  {doc.requires_signature ? (
+                    <div>
+                      <label className="mb-1 block text-sm font-medium text-ink">
+                        Type your full legal name to sign
+                      </label>
+                      <Input name="signed_name" required />
+                    </div>
+                  ) : null}
+                  <Checkbox
+                    name="agree"
+                    required
+                    label={
+                      doc.requires_signature
+                        ? "I have read and agree to the terms above"
+                        : "I have read this"
+                    }
+                  />
+                  <Button type="submit">
+                    {doc.requires_signature ? "Sign & agree" : "Mark as read"}
+                  </Button>
                 </form>
               ) : null}
             </Card>

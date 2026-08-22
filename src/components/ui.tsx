@@ -201,11 +201,13 @@ export function Checkbox({
   name,
   value,
   defaultChecked,
+  required,
 }: {
   label: string;
   name: string;
   value?: string;
   defaultChecked?: boolean;
+  required?: boolean;
 }) {
   return (
     <label className="flex items-center gap-2 text-sm text-ink">
@@ -214,6 +216,7 @@ export function Checkbox({
         name={name}
         value={value}
         defaultChecked={defaultChecked}
+        required={required}
         className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
       />
       {label}
@@ -242,6 +245,64 @@ export function Badge({
     >
       {children}
     </span>
+  );
+}
+
+function renderInline(line: string, keyPrefix: string) {
+  const parts = line.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={`${keyPrefix}-${i}`}>{part.slice(2, -2)}</strong>
+    ) : (
+      <span key={`${keyPrefix}-${i}`}>{part}</span>
+    )
+  );
+}
+
+// Renders legal-document bodies written with a light markup convention:
+// blank-line-separated blocks, "## " for a section heading, "- " for a
+// bullet list (a block where every line starts with "- "), "**text**" for
+// inline bold. Deliberately not full markdown -- just enough structure so a
+// contract typed into a plain textarea still reads like a real document.
+export function DocumentBody({ text }: { text: string }) {
+  const blocks = text.trim().split(/\n\s*\n/);
+
+  return (
+    <div className="space-y-3 text-sm text-ink">
+      {blocks.map((block, i) => {
+        const lines = block.split("\n").filter((l) => l.trim() !== "");
+        if (lines.length === 0) return null;
+
+        if (lines[0].startsWith("## ")) {
+          return (
+            <p key={i} className="pt-2 font-semibold text-ink first:pt-0">
+              {renderInline(lines[0].slice(3), `${i}-h`)}
+            </p>
+          );
+        }
+
+        if (lines.every((l) => l.startsWith("- "))) {
+          return (
+            <ul key={i} className="list-disc space-y-1 pl-5">
+              {lines.map((l, j) => (
+                <li key={j}>{renderInline(l.slice(2), `${i}-${j}`)}</li>
+              ))}
+            </ul>
+          );
+        }
+
+        return (
+          <p key={i} className="whitespace-pre-wrap">
+            {lines.map((l, j) => (
+              <span key={j}>
+                {renderInline(l, `${i}-${j}`)}
+                {j < lines.length - 1 ? <br /> : null}
+              </span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
   );
 }
 

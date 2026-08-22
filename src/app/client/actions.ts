@@ -123,10 +123,18 @@ export async function submitRequest(formData: FormData) {
 
 export async function acknowledgeDocument(
   documentId: string,
-  documentVersion: number
+  documentVersion: number,
+  requiresSignature: boolean,
+  formData: FormData
 ) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
+
+  const signedName = String(formData.get("signed_name") ?? "").trim();
+
+  if (requiresSignature && !signedName) {
+    throw new Error("Type your full legal name to sign this document.");
+  }
 
   const supabase = await createClient();
 
@@ -135,6 +143,7 @@ export async function acknowledgeDocument(
       client_id: me.id,
       document_id: documentId,
       document_version: documentVersion,
+      signed_name: requiresSignature ? signedName : null,
     },
     { onConflict: "client_id,document_id,document_version" }
   );

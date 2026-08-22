@@ -354,6 +354,7 @@ export async function updateLegalDocument(
 
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
+  const requiresSignature = formData.get("requires_signature") === "on";
 
   if (!title || !body) {
     throw new Error("Title and body are required.");
@@ -364,7 +365,13 @@ export async function updateLegalDocument(
   // asked to review and re-acknowledge next time they visit.
   const { error } = await supabase
     .from("legal_documents")
-    .update({ title, body, version: currentVersion + 1, updated_at: new Date().toISOString() })
+    .update({
+      title,
+      body,
+      requires_signature: requiresSignature,
+      version: currentVersion + 1,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", documentId);
 
   if (error) throw new Error(error.message);
