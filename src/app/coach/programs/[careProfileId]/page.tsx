@@ -1,0 +1,168 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { saveProgramDay } from "@/app/coach/programs/actions";
+import { Button, Card, Heart, Input, Select } from "@/components/ui";
+import { PHASES } from "@/lib/constants";
+import type { CareProfile, Exercise, ProgramDayExercise } from "@/lib/types";
+
+const ROWS = 10;
+
+interface ProgramDayWithExercises {
+  id: string;
+  day_number: number;
+  day_label: string;
+  program_day_exercises: ProgramDayExercise[];
+}
+
+export default async function CareProfileProgramPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ careProfileId: string }>;
+  searchParams: Promise<{ phase?: string }>;
+}) {
+  const { careProfileId } = await params;
+  const { phase: phaseParam } = await searchParams;
+  const phase = ["1", "2", "3", "4"].includes(phaseParam ?? "")
+    ? phaseParam!
+    : "1";
+
+  const supabase = await createClient();
+
+  const [{ data: careProfile }, { data: exercises }, { data: days }] =
+    await Promise.all([
+      supabase
+        .from("care_profiles")
+        .select("*")
+        .eq("id", careProfileId)
+        .single() as unknown as Promise<{ data: CareProfile | null }>,
+      supabase.from("exercises").select("*").order("name") as unknown as Promise<{
+        data: Exercise[] | null;
+      }>,
+      supabase
+        .from("program_days")
+        .select("*, program_day_exercises(*)")
+        .eq("care_profile_id", careProfileId)
+        .eq("phase", phase)
+        .order("day_number") as unknown as Promise<{
+        data: ProgramDayWithExercises[] | null;
+      }>,
+    ]);
+
+  if (!careProfile) notFound();
+
+  const exerciseList = exercises ?? [];
+  const daysByNumber = new Map((days ?? []).map((d) => [d.day_number, d]));
+
+  return (
+    <div className="space-y-6">
+      <Link
+        href="/coach/programs"
+        className="text-sm text-gray hover:text-ink"
+      >
+        ← Back to program templates
+      </Link>
+
+      <h1 className="text-xl font-semibold text-ink">
+        <Heart className="mr-1.5" />
+        {careProfile.name}
+      </h1>
+
+      <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">
+        {PHASES.filter((p) => p.id !== "n/a").map((p) => (
+          <Link
+            key={p.id}
+            href={`/coach/programs/${careProfileId}?phase=${p.id}`}
+            className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${
+              phase === p.id
+                ? "bg-rose text-white"
+                : "text-gray hover:text-ink"
+            }`}
+          >
+            {p.name}
+          </Link>
+        ))}
+      </div>
+
+      <div className="space-y-6">
+        {[1, 2, 3].map((dayNumber) => {
+          const day = daysByNumber.get(dayNumber);
+          const existingRows = (day?.program_day_exercises ?? [])
+            .slice()
+            .sort((a, b) => a.position - b.position);
+          const rows = Array.from({ length: ROWS }, (_, i) => existingRows[i]);
+          const boundSave = saveProgramDay.bind(
+            null,
+            careProfileId,
+            phase,
+            dayNumber
+          );
+
+          return (
+            <Card key={dayNumber}>
+              <form action={boundSave} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-ink">
+                    Day {dayNumber} label
+                  </label>
+                  <Input
+                    name="day_label"
+                    required
+                    defaultValue={day?.day_label ?? ""}
+                    placeholder="e.g. Legs & Glutes"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  {rows.map((row, i) => (
+                    <div key={i} className="grid grid-cols-12 gap-2">
+                      <Select
+                        name="exercise_id"
+                        className="col-span-6"
+                        defaultValue={row?.exercise_id ?? ""}
+                      >
+                        <option value="">— Exercise —</option>
+                        {exerciseList.map((ex) => (
+                          <option key={ex.id} value={ex.id}>
+                            {ex.name}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input
+                        name="sets"
+                        placeholder="Sets"
+                        className="col-span-2"
+                        defaultValue={row?.sets ?? ""}
+                      />
+                      <Input
+                        name="reps"
+                        placeholder="Reps"
+                        className="col-span-2"
+                        defaultValue={row?.reps ?? ""}
+                      />
+                      <Input
+                        name="superset_group"
+                        placeholder="A/B"
+                        className="col-span-2"
+                        defaultValue={row?.superset_group ?? ""}
+                        title="For phases 2 & 4: mark paired exercises the same number with A/B, e.g. 1A and 1B"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray">
+                  For superset phases (2 &amp; 4), give paired rows the same
+                  A/B tag — e.g. &quot;1A&quot; and &quot;1B&quot; — so they
+                  read as a pair. Leave a row blank to skip it.
+                </p>
+
+                <Button type="submit">Save Day {dayNumber}</Button>
+              </form>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
