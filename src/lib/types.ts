@@ -6,6 +6,8 @@ export interface Profile {
   created_at: string;
 }
 
+export type PaymentSchedule = "pay_as_you_go" | "monthly";
+
 export interface Client {
   id: string;
   name: string;
@@ -19,6 +21,19 @@ export interface Client {
   days_per_week: 1 | 2 | 3 | null;
   session_mode: "in_person" | "virtual" | "mixed" | null;
   last_inactivity_nudge_sent_at: string | null;
+  preferred_name: string | null;
+  date_of_birth: string | null;
+  phone: string | null;
+  email: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
+  physician_name: string | null;
+  physician_phone: string | null;
+  start_date: string | null;
+  payment_schedule: PaymentSchedule | null;
+  primary_goal: string | null;
+  secondary_goal: string | null;
+  key_health_notes: string | null;
 }
 
 export interface SessionEntry {
@@ -383,6 +398,83 @@ export interface LeadIntake {
   submitted_at: string | null;
   created_at: string;
 }
+
+export interface ClientIntake {
+  id: string;
+  client_id: string;
+  date_of_birth: string | null;
+  why_here: string | null;
+  why_worthwhile: string | null;
+  fall_past_year: boolean;
+  near_fall: boolean;
+  fear_of_falling: boolean;
+  balance_notes: string | null;
+  osteoporosis: boolean;
+  joint_replacement: boolean;
+  arthritis: boolean;
+  hypermobility: boolean;
+  pots_dysautonomia: boolean;
+  mcas: boolean;
+  autoimmune_condition: boolean;
+  bones_notes: string | null;
+  medications: string | null;
+  doctor_name: string | null;
+  medical_clearance: MedicalClearance | null;
+  lives_alone: boolean;
+  drives_self: boolean;
+  stairs_daily: boolean;
+  day_to_day_notes: string | null;
+  pain_location: string | null;
+  pain_duration: string | null;
+  pain_better: string | null;
+  pain_worse: string | null;
+  pain_type: string[] | null;
+  energy_scale: number | null;
+  sleep_scale: number | null;
+  stress_scale: number | null;
+  confidence_scale: number | null;
+  nutrition_relationship: NutritionRelationship | null;
+  nutrition_notes: string | null;
+  support_system: string | null;
+  competing_demands: string | null;
+  fitness_level: FitnessLevel | null;
+  body_satisfaction_scale: number | null;
+  strong_areas: string | null;
+  injuries_limitations: string | null;
+  heart_condition: boolean;
+  high_blood_pressure: boolean;
+  diabetes: boolean;
+  thyroid_condition: boolean;
+  joint_issues: boolean;
+  asthma: boolean;
+  anxiety_depression: boolean;
+  eating_disorder_history: boolean;
+  pregnancy_postpartum: boolean;
+  goal_change_description: string | null;
+  goal_success_3_months: string | null;
+  goal_held_back_before: string | null;
+  goal_importance_scale: number | null;
+  confidence_to_change_scale: number | null;
+  foods_loved: string | null;
+  foods_scary: string | null;
+  diet_history: DietHistory | null;
+  food_stress_scale: number | null;
+  average_sleep_hours: string | null;
+  sleep_duration_pattern: string | null;
+  stress_sources: string | null;
+  stress_coping: string | null;
+  coaching_style: CoachingStyle | null;
+  feedback_style: FeedbackStyle | null;
+  contact_method: ContactMethod | null;
+  checkin_frequency: CheckinFrequency | null;
+  accountability_style: AccountabilityStyle | null;
+  past_coach_what_didnt_work: string | null;
+  anything_else: string | null;
+  referral_source: ReferralSource | null;
+  submitted_at: string | null;
+  created_at: string;
+}
+
 
 export type MovementName =
   | "squat"

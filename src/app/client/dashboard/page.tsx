@@ -9,6 +9,7 @@ import { toDateString } from "@/lib/timezone";
 import type {
   CareProfile,
   ClientDocumentAcknowledgment,
+  ClientIntake,
   ClientSchedule,
   LegalDocument,
   Payment,
@@ -91,6 +92,12 @@ export default async function ClientDashboard() {
       data: ClientDocumentAcknowledgment[] | null;
     }>,
   ]);
+
+  const { data: clientIntake } = (await supabase
+    .from("client_intake")
+    .select("*")
+    .eq("client_id", me.id)
+    .maybeSingle()) as { data: ClientIntake | null };
 
   const needsServiceCheckin =
     isFirstWeekOfMonth() &&
@@ -197,6 +204,40 @@ export default async function ClientDashboard() {
           </Link>
         </Card>
       ) : null}
+
+      {!clientIntake?.submitted_at ? (
+        <Card className="border-gold/50 bg-gold/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            A little about you
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            A few things I&apos;d love to know — goals, health history, how
+            you like to be coached. Nothing here is a test.
+          </p>
+          <Link
+            href="/client/intake"
+            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            Fill it out
+          </Link>
+        </Card>
+      ) : (
+        <Card>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-ink">
+              Your intake questionnaire
+            </p>
+            <Badge tone="green">submitted</Badge>
+          </div>
+          <Link
+            href="/client/intake"
+            className="mt-2 inline-block text-sm text-gray hover:text-ink"
+          >
+            Review or update your answers →
+          </Link>
+        </Card>
+      )}
 
       {unacknowledgedCount > 0 ? (
         <Card className="border-gold/50 bg-gold/5">

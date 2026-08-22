@@ -439,3 +439,37 @@ export async function linkExistingClientToAccount(
   revalidatePath("/coach/roster");
   revalidatePath(`/coach/clients/${clientId}`);
 }
+
+export async function updateClientProfile(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const textOrNull = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v || null;
+  };
+
+  const payment_schedule = String(formData.get("payment_schedule") ?? "");
+
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      preferred_name: textOrNull("preferred_name"),
+      date_of_birth: textOrNull("date_of_birth"),
+      phone: textOrNull("phone"),
+      email: textOrNull("email"),
+      emergency_contact_name: textOrNull("emergency_contact_name"),
+      emergency_contact_phone: textOrNull("emergency_contact_phone"),
+      physician_name: textOrNull("physician_name"),
+      physician_phone: textOrNull("physician_phone"),
+      start_date: textOrNull("start_date"),
+      payment_schedule: payment_schedule || null,
+      primary_goal: textOrNull("primary_goal"),
+      secondary_goal: textOrNull("secondary_goal"),
+      key_health_notes: textOrNull("key_health_notes"),
+    })
+    .eq("id", clientId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}

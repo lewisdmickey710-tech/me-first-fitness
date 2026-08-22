@@ -6,6 +6,7 @@ import {
   logSessionOccurrence,
   markPaymentPaid,
   setRequestStatus,
+  updateClientProfile,
 } from "@/app/coach/actions";
 import {
   Badge,
@@ -14,6 +15,7 @@ import {
   DeltaField,
   EmptyState,
   Heart,
+  Input,
   PhaseBanner,
   Select,
   Sparkline,
@@ -34,6 +36,7 @@ import type {
   CareProfile,
   Checkin,
   Client,
+  ClientIntake,
   ClientPhaseHistory,
   ClientSchedule,
   Measurement,
@@ -47,6 +50,7 @@ import type {
 
 const TABS = [
   { id: "overview", label: "Overview" },
+  { id: "profile", label: "Profile" },
   { id: "sessions", label: "Sessions" },
   { id: "attendance", label: "Attendance" },
   { id: "checkins", label: "Check-ins" },
@@ -178,6 +182,12 @@ export default async function ClientDetailPage({
     }>,
   ]);
 
+  const { data: clientIntake } = (await supabase
+    .from("client_intake")
+    .select("*")
+    .eq("client_id", id)
+    .maybeSingle()) as { data: ClientIntake | null };
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -229,6 +239,9 @@ export default async function ClientDetailPage({
           checkins={checkins ?? []}
           activities={activities ?? []}
         />
+      )}
+      {tab === "profile" && (
+        <ProfileTab client={client} intake={clientIntake} />
       )}
       {tab === "sessions" && (
         <SessionsTab clientId={id} sessions={sessions ?? []} />
@@ -541,6 +554,430 @@ function Overview({
         )}
       </div>
     </div>
+  );
+}
+
+function ProfileTab({
+  client,
+  intake,
+}: {
+  client: Client;
+  intake: ClientIntake | null;
+}) {
+  return (
+    <div className="space-y-4">
+      <Card className="space-y-4">
+        <p className="font-medium text-rose">Basic information</p>
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            await updateClientProfile(client.id, formData);
+          }}
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Preferred name
+              </label>
+              <Input
+                name="preferred_name"
+                defaultValue={client.preferred_name ?? ""}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Date of birth
+              </label>
+              <Input
+                name="date_of_birth"
+                type="date"
+                defaultValue={client.date_of_birth ?? ""}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Phone
+              </label>
+              <Input name="phone" defaultValue={client.phone ?? ""} />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Email
+              </label>
+              <Input name="email" defaultValue={client.email ?? ""} />
+            </div>
+          </div>
+
+          <p className="pt-2 text-sm font-medium text-gray">
+            Emergency contact
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Name
+              </label>
+              <Input
+                name="emergency_contact_name"
+                defaultValue={client.emergency_contact_name ?? ""}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Phone
+              </label>
+              <Input
+                name="emergency_contact_phone"
+                defaultValue={client.emergency_contact_phone ?? ""}
+              />
+            </div>
+          </div>
+
+          <p className="pt-2 text-sm font-medium text-gray">
+            Physician / provider
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Name
+              </label>
+              <Input
+                name="physician_name"
+                defaultValue={client.physician_name ?? ""}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Phone
+              </label>
+              <Input
+                name="physician_phone"
+                defaultValue={client.physician_phone ?? ""}
+              />
+            </div>
+          </div>
+
+          <p className="pt-2 text-sm font-medium text-gray">
+            Program overview
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Start date
+              </label>
+              <Input
+                name="start_date"
+                type="date"
+                defaultValue={client.start_date ?? ""}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Payment schedule
+              </label>
+              <Select
+                name="payment_schedule"
+                defaultValue={client.payment_schedule ?? ""}
+              >
+                <option value="">— Choose one —</option>
+                <option value="pay_as_you_go">Pay-as-you-go</option>
+                <option value="monthly">Monthly client</option>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Primary goal
+            </label>
+            <Input name="primary_goal" defaultValue={client.primary_goal ?? ""} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Secondary goal
+            </label>
+            <Input
+              name="secondary_goal"
+              defaultValue={client.secondary_goal ?? ""}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Key health notes{" "}
+              <span className="font-normal text-gray">
+                (flags, limitations, medications)
+              </span>
+            </label>
+            <Textarea
+              name="key_health_notes"
+              rows={3}
+              defaultValue={client.key_health_notes ?? ""}
+            />
+          </div>
+
+          <Button type="submit">Save</Button>
+        </form>
+      </Card>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-gray">
+          Intake questionnaire
+        </p>
+        {intake?.submitted_at ? (
+          <ClientIntakeSummary intake={intake} />
+        ) : (
+          <EmptyState
+            title="Not submitted yet"
+            body="The client hasn't filled out their intake questionnaire yet."
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ClientIntakeSummary({ intake }: { intake: ClientIntake }) {
+  const balanceFlags = [
+    intake.fall_past_year && "fall in the past year",
+    intake.near_fall && "near-fall/stumble",
+    intake.fear_of_falling && "fear of falling",
+  ].filter(Boolean);
+  const boneFlags = [
+    intake.osteoporosis && "osteoporosis/osteopenia",
+    intake.joint_replacement && "joint replacement",
+    intake.arthritis && "arthritis",
+    intake.hypermobility && "hypermobility",
+    intake.pots_dysautonomia && "POTS/dysautonomia",
+    intake.mcas && "MCAS",
+    intake.autoimmune_condition && "autoimmune condition",
+  ].filter(Boolean);
+  const dayFlags = [
+    intake.lives_alone && "lives alone",
+    intake.drives_self && "drives self",
+    intake.stairs_daily && "stairs daily",
+  ].filter(Boolean);
+  const healthHistoryFlags = [
+    intake.heart_condition && "heart condition",
+    intake.high_blood_pressure && "high blood pressure",
+    intake.diabetes && "diabetes",
+    intake.thyroid_condition && "thyroid condition",
+    intake.joint_issues && "joint issues",
+    intake.asthma && "asthma",
+    intake.anxiety_depression && "anxiety/depression",
+    intake.eating_disorder_history && "eating disorder history",
+    intake.pregnancy_postpartum && "pregnancy/postpartum",
+  ].filter(Boolean);
+
+  return (
+    <Card className="space-y-3 text-sm">
+      {intake.why_here ? (
+        <Field label="Why they're here" value={intake.why_here} />
+      ) : null}
+      {intake.why_worthwhile ? (
+        <Field
+          label="What would make it worthwhile"
+          value={intake.why_worthwhile}
+        />
+      ) : null}
+      {balanceFlags.length > 0 ? (
+        <Field label="Balance & falls" value={balanceFlags.join(", ")} />
+      ) : null}
+      {intake.balance_notes ? (
+        <Field label="Balance notes" value={intake.balance_notes} />
+      ) : null}
+      {boneFlags.length > 0 ? (
+        <Field
+          label="Bones, joints & chronic conditions"
+          value={boneFlags.join(", ")}
+        />
+      ) : null}
+      {intake.bones_notes ? (
+        <Field label="Bones notes" value={intake.bones_notes} />
+      ) : null}
+      {intake.fitness_level ? (
+        <Field
+          label="Fitness level"
+          value={intake.fitness_level.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.body_satisfaction_scale != null ? (
+        <Field
+          label="Body satisfaction"
+          value={`${intake.body_satisfaction_scale}/10`}
+        />
+      ) : null}
+      {intake.strong_areas ? (
+        <Field label="Strong areas" value={intake.strong_areas} />
+      ) : null}
+      {intake.injuries_limitations ? (
+        <Field
+          label="Injuries / limitations"
+          value={intake.injuries_limitations}
+        />
+      ) : null}
+      {healthHistoryFlags.length > 0 ? (
+        <Field
+          label="General health history"
+          value={healthHistoryFlags.join(", ")}
+        />
+      ) : null}
+      {intake.medications ? (
+        <Field label="Medications" value={intake.medications} />
+      ) : null}
+      {intake.doctor_name ? (
+        <Field label="Doctor" value={intake.doctor_name} />
+      ) : null}
+      {intake.medical_clearance ? (
+        <Field
+          label="Medical clearance"
+          value={intake.medical_clearance.replaceAll("_", " ")}
+        />
+      ) : null}
+      {dayFlags.length > 0 ? (
+        <Field label="Day to day" value={dayFlags.join(", ")} />
+      ) : null}
+      {intake.day_to_day_notes ? (
+        <Field label="Day to day notes" value={intake.day_to_day_notes} />
+      ) : null}
+      {intake.pain_location ? (
+        <Field label="Pain location" value={intake.pain_location} />
+      ) : null}
+      {intake.pain_duration ? (
+        <Field label="Pain duration" value={intake.pain_duration} />
+      ) : null}
+      {intake.pain_better ? (
+        <Field label="What helps" value={intake.pain_better} />
+      ) : null}
+      {intake.pain_worse ? (
+        <Field label="What worsens it" value={intake.pain_worse} />
+      ) : null}
+      {intake.pain_type && intake.pain_type.length > 0 ? (
+        <Field label="Pain type" value={intake.pain_type.join(", ")} />
+      ) : null}
+      <Field
+        label="Energy / Sleep / Stress / Confidence"
+        value={`${intake.energy_scale ?? "—"} / ${intake.sleep_scale ?? "—"} / ${intake.stress_scale ?? "—"} / ${intake.confidence_scale ?? "—"}`}
+      />
+      {intake.goal_change_description ? (
+        <Field
+          label="What they want to change"
+          value={intake.goal_change_description}
+        />
+      ) : null}
+      {intake.goal_success_3_months ? (
+        <Field
+          label="Success in 3 months"
+          value={intake.goal_success_3_months}
+        />
+      ) : null}
+      {intake.goal_held_back_before ? (
+        <Field
+          label="What's held them back before"
+          value={intake.goal_held_back_before}
+        />
+      ) : null}
+      {intake.goal_importance_scale != null ||
+      intake.confidence_to_change_scale != null ? (
+        <Field
+          label="Goal importance / Confidence to change"
+          value={`${intake.goal_importance_scale ?? "—"} / ${intake.confidence_to_change_scale ?? "—"}`}
+        />
+      ) : null}
+      {intake.nutrition_relationship ? (
+        <Field
+          label="Nutrition relationship"
+          value={intake.nutrition_relationship.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.nutrition_notes ? (
+        <Field label="Nutrition notes" value={intake.nutrition_notes} />
+      ) : null}
+      {intake.foods_loved ? (
+        <Field label="Foods they love" value={intake.foods_loved} />
+      ) : null}
+      {intake.foods_scary ? (
+        <Field label="Foods that feel scary" value={intake.foods_scary} />
+      ) : null}
+      {intake.diet_history ? (
+        <Field
+          label="Diet history"
+          value={intake.diet_history.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.food_stress_scale != null ? (
+        <Field
+          label="Food stress impact"
+          value={`${intake.food_stress_scale}/10`}
+        />
+      ) : null}
+      {intake.support_system ? (
+        <Field label="Support system" value={intake.support_system} />
+      ) : null}
+      {intake.competing_demands ? (
+        <Field
+          label="Competing demands"
+          value={intake.competing_demands}
+        />
+      ) : null}
+      {intake.average_sleep_hours || intake.sleep_duration_pattern ? (
+        <Field
+          label="Sleep"
+          value={`${intake.average_sleep_hours ?? "—"} per night, for ${intake.sleep_duration_pattern ?? "—"}`}
+        />
+      ) : null}
+      {intake.stress_sources ? (
+        <Field label="Stress sources" value={intake.stress_sources} />
+      ) : null}
+      {intake.stress_coping ? (
+        <Field label="How they cope" value={intake.stress_coping} />
+      ) : null}
+      {intake.coaching_style ? (
+        <Field
+          label="Coaching style preference"
+          value={intake.coaching_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.feedback_style ? (
+        <Field
+          label="Feedback style preference"
+          value={intake.feedback_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.contact_method ? (
+        <Field
+          label="Preferred contact method"
+          value={intake.contact_method.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.checkin_frequency ? (
+        <Field
+          label="Check-in frequency"
+          value={intake.checkin_frequency.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.accountability_style ? (
+        <Field
+          label="Accountability style"
+          value={intake.accountability_style.replaceAll("_", " ")}
+        />
+      ) : null}
+      {intake.past_coach_what_didnt_work ? (
+        <Field
+          label="What hasn't worked before"
+          value={intake.past_coach_what_didnt_work}
+        />
+      ) : null}
+      {intake.anything_else ? (
+        <Field label="Anything else" value={intake.anything_else} />
+      ) : null}
+      {intake.referral_source ? (
+        <Field
+          label="How they heard about us"
+          value={intake.referral_source.replaceAll("_", " ")}
+        />
+      ) : null}
+    </Card>
   );
 }
 

@@ -135,6 +135,24 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
 
   if (leadUpdateError) throw new Error(leadUpdateError.message);
 
+  // Carry over their intake answers so they aren't asked to redo the whole
+  // questionnaire as a client -- same column set on both tables, just a
+  // different owning id.
+  const { data: leadIntake } = await supabase
+    .from("lead_intake")
+    .select("*")
+    .eq("lead_id", leadId)
+    .maybeSingle();
+
+  if (leadIntake) {
+    const { id: _id, lead_id: _leadId, created_at: _createdAt, ...intakeFields } =
+      leadIntake;
+    const { error: intakeError } = await supabase
+      .from("client_intake")
+      .insert({ ...intakeFields, client_id: client.id });
+    if (intakeError) throw new Error(intakeError.message);
+  }
+
   // Flip the linked login from lead to client -- profiles has no coach-write
   // RLS policy (by design, it's sensitive), so this needs the admin client.
   if (lead.user_id) {
