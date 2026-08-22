@@ -167,6 +167,23 @@ export default async function ClientSchedulePage({
         it&apos;s paid.
       </p>
 
+      <Card className="flex items-center justify-between gap-3">
+        <div>
+          <p className="font-medium text-ink">
+            <Heart className="mr-1.5" />
+            Want more &quot;me time&quot;?
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            Ask for an extra session or a different time.
+          </p>
+        </div>
+        <Link href="/client/request" className="shrink-0">
+          <Button type="button" variant="secondary">
+            Request time
+          </Button>
+        </Link>
+      </Card>
+
       <Card>
         <div className="flex items-center justify-between">
           <Link

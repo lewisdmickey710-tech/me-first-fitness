@@ -164,7 +164,6 @@ export default async function ClientDashboard() {
         <QuickAction href="/client/program" label="My program" />
         <QuickAction href="/client/schedule" label="My schedule" />
         <QuickAction href="/client/checkin" label="Log check-in" />
-        <QuickAction href="/client/request" label="Request time" />
         <QuickAction href="/client/guide" label="Wellness guide" />
         <QuickAction href="/client/documents" label="Documents" />
       </div>
