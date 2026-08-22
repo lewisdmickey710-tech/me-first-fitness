@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addClient } from "@/app/coach/actions";
 import { Button, Card, Heart, Input, Select, Textarea } from "@/components/ui";
@@ -79,8 +80,12 @@ export default async function NewClientPage() {
 
       <p className="text-sm text-gray">
         They start at Phase 1, week 1 of a new cycle automatically. Once
-        they have a login, invite them by adding their email as a Supabase
-        user and linking it to this client — see the README.
+        they log in for the first time (client tab on the login page),
+        you&apos;ll find them under{" "}
+        <Link href="/coach/signups" className="text-rose hover:underline">
+          Signups
+        </Link>{" "}
+        to link their login to this client record.
       </p>
     </div>
   );

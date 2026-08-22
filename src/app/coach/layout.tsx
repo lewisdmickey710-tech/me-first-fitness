@@ -11,6 +11,7 @@ export default function CoachLayout({
         title="MeFirstFitness Coach"
         links={[
           { href: "/coach/roster", label: "Roster" },
+          { href: "/coach/signups", label: "Signups" },
           { href: "/coach/leads", label: "Leads" },
           { href: "/coach/library", label: "Library" },
           { href: "/coach/programs", label: "Programs" },

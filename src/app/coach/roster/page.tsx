@@ -21,6 +21,7 @@ export default async function RosterPage() {
 
   const [
     { data: pendingRequests },
+    { data: clientProfileRows },
     { data: phaseRows },
     { data: measurementRows },
     { data: serviceCheckinRows },
@@ -32,6 +33,7 @@ export default async function RosterPage() {
     { data: satisfactionRows },
   ] = await Promise.all([
     supabase.from("requests").select("client_id").eq("status", "pending"),
+    supabase.from("profiles").select("id").eq("role", "client"),
     clientIds.length > 0
       ? supabase
           .from("client_phase_history")
@@ -143,6 +145,13 @@ export default async function RosterPage() {
     }
   }
 
+  const linkedUserIds = new Set(
+    (clients ?? []).filter((c) => c.user_id).map((c) => c.user_id)
+  );
+  const pendingSignupCount = (clientProfileRows ?? []).filter(
+    (p) => !linkedUserIds.has(p.id)
+  ).length;
+
   const inWindow = isFirstWeekOfMonth();
   const clientsNeedingWindow = (clients ?? []).filter(
     (c) =>
@@ -192,6 +201,24 @@ export default async function RosterPage() {
           + Add client
         </Link>
       </div>
+
+      {pendingSignupCount > 0 ? (
+        <Card className="border-rose/50 bg-rose/5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-ink">
+              {pendingSignupCount} new signup
+              {pendingSignupCount > 1 ? "s" : ""} waiting to be linked to a
+              client
+            </p>
+            <Link
+              href="/coach/signups"
+              className="shrink-0 text-sm font-medium text-rose hover:opacity-80"
+            >
+              Review →
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       {clientsNeedingWindow > 0 ? (
         <Card className="border-gold/50 bg-gold/5">
