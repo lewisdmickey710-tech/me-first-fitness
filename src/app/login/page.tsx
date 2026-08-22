@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Heart, Input } from "@/components/ui";
 
@@ -8,6 +8,13 @@ type Tab = "client" | "coach";
 
 export default function LoginPage() {
   const [tab, setTab] = useState<Tab>("client");
+  const [callbackError, setCallbackError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get("error");
+    if (err) setCallbackError(err);
+  }, []);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4 py-12">
@@ -18,6 +25,17 @@ export default function LoginPage() {
         </h1>
         <p className="mt-1 text-sm text-gray">Mind &amp; Muscle Mechanics</p>
       </div>
+
+      {callbackError ? (
+        <div className="mb-4 w-full max-w-sm rounded-xl border border-pink/40 bg-pink/5 px-4 py-3 text-sm text-ink">
+          <p className="font-medium">That login link didn&apos;t work</p>
+          <p className="mt-1 text-gray">{callbackError}</p>
+          <p className="mt-1 text-gray">
+            Try requesting a new link below — links only work once, and
+            expire after a while.
+          </p>
+        </div>
+      ) : null}
 
       <Card className="w-full max-w-sm">
         <div className="mb-5 flex rounded-xl bg-bg p-1">
