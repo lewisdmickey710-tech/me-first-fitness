@@ -186,7 +186,7 @@ export async function cancelMySession(
       if (!existingFee) {
         const { error: feeError } = await supabase.from("payments").insert({
           client_id: me.id,
-          description: "Late cancellation fee (2nd late cancellation within 16 weeks)",
+          description: `Late cancellation fee (#${count} late cancellation within 16 weeks)`,
           amount: LATE_CANCELLATION_FEE,
           due_date: new Date().toISOString().slice(0, 10),
           kind: "late_cancellation_fee",

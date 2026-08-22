@@ -1,9 +1,10 @@
 import { nowInBusinessTz } from "@/lib/timezone";
 
 // Real policy, from the signed Client Services Agreement (Section 3): under
-// 12 hours' notice is a late cancellation. The 2nd late cancellation within
-// a rolling 16-week window (one training cycle) triggers a flat fee, and
-// the count resets 16 weeks after each late cancellation.
+// 12 hours' notice is a late cancellation. The 1st within a rolling 16-week
+// window (one training cycle) is just noted; every one after that in the
+// same window triggers a flat fee, and the count resets 16 weeks after each
+// late cancellation.
 export const LATE_CANCEL_NOTICE_HOURS = 12;
 export const LATE_CANCEL_WINDOW_DAYS = 16 * 7;
 export const LATE_CANCELLATION_FEE = 10;

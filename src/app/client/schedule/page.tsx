@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
-import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
+import { Badge, Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -29,6 +29,31 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+const MOTIVATIONAL_QUOTES = [
+  "Show up for the version of you that's still becoming.",
+  "Strong today, stronger next lift.",
+  "Your mind sets the limit — go prove it wrong.",
+  "Every rep is a vote for who you're becoming.",
+  "Consistency beats intensity, every single time.",
+  "You don't have to love it. You just have to show up.",
+  "Progress, not perfection.",
+  "The work you do today is the strength you carry tomorrow.",
+  "Discipline is choosing between what you want now and what you want most.",
+  "Small sessions, big momentum.",
+  "You've never regretted a workout once it was done.",
+  "Muscle and mindset — build them together.",
+  "One more session, one step closer.",
+  "Trust the process. Show up for the reps.",
+  "Your future self is counting on today's session.",
+];
+
+function quoteOfTheDay(date: Date): string {
+  const dayOfYear = Math.floor(
+    (date.getTime() - Date.UTC(date.getUTCFullYear(), 0, 0)) / 86400000
+  );
+  return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
+}
 
 export default async function ClientSchedulePage({
   searchParams,
@@ -160,12 +185,19 @@ export default async function ClientSchedulePage({
         <Heart className="mr-1.5" />
         Your schedule
       </h1>
-      <p className="text-sm text-gray">
-        Cancelling with less than {LATE_CANCEL_NOTICE_HOURS} hours notice
-        counts as a late cancellation. A first one is just noted — a second
-        one within 16 weeks brings a $10 fee and pauses your sessions until
-        it&apos;s paid.
+      <p className="text-sm italic text-gray">
+        <Heart className="mr-1" />
+        &quot;{quoteOfTheDay(now)}&quot;
       </p>
+
+      <Collapsible label="Cancellation policy">
+        <p className="text-sm text-gray">
+          Cancelling with less than {LATE_CANCEL_NOTICE_HOURS} hours notice
+          counts as a late cancellation. A first one is just noted — every
+          one after that within 16 weeks brings a $10 fee and pauses your
+          sessions until it&apos;s paid.
+        </p>
+      </Collapsible>
 
       <Card className="flex items-center justify-between gap-3">
         <div>
