@@ -120,3 +120,27 @@ export async function submitRequest(formData: FormData) {
   revalidatePath("/client/dashboard");
   redirect("/client/dashboard");
 }
+
+export async function acknowledgeDocument(
+  documentId: string,
+  documentVersion: number
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("client_document_acknowledgments").upsert(
+    {
+      client_id: me.id,
+      document_id: documentId,
+      document_version: documentVersion,
+    },
+    { onConflict: "client_id,document_id,document_version" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/documents");
+  revalidatePath("/client/dashboard");
+}

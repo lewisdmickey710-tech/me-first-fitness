@@ -40,6 +40,23 @@ export async function sendSessionReminderEmail(
   });
 }
 
+export async function sendInactivityNudgeEmail(to: string, clientName: string) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping inactivity nudge email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Haven't seen you check in",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>Just checking in — I haven't seen a check-in or activity log from you in a bit. No pressure at all, just wanted you to know I noticed and I'm here if anything's come up.</p>
+      <p>Whenever you get a chance, log a quick check-in in the app so I can see how things are going.</p>
+    `),
+  });
+}
+
 export async function sendPaymentReminderEmail(
   to: string,
   clientName: string,

@@ -18,6 +18,7 @@ export interface Client {
   care_profile_id: string | null;
   days_per_week: 1 | 2 | 3 | null;
   session_mode: "in_person" | "virtual" | "mixed" | null;
+  last_inactivity_nudge_sent_at: string | null;
 }
 
 export interface SessionEntry {
@@ -178,6 +179,42 @@ export interface Payment {
   paid_on: string | null;
   reminder_sent_at: string | null;
   created_at: string;
+}
+
+export type OccurrenceStatus =
+  | "completed"
+  | "rescheduled"
+  | "cancelled"
+  | "late_cancelled";
+
+export interface SessionOccurrence {
+  id: string;
+  client_id: string;
+  client_schedule_id: string | null;
+  occurrence_date: string;
+  status: OccurrenceStatus;
+  rescheduled_to_date: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export type LegalDocumentKey = "contract" | "onboarding_form" | "disclaimer";
+
+export interface LegalDocument {
+  id: string;
+  key: LegalDocumentKey;
+  title: string;
+  body: string;
+  version: number;
+  updated_at: string;
+}
+
+export interface ClientDocumentAcknowledgment {
+  id: string;
+  client_id: string;
+  document_id: string;
+  document_version: number;
+  acknowledged_at: string;
 }
 
 export interface Measurement {

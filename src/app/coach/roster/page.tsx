@@ -3,7 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
-import type { Client } from "@/lib/types";
+import { computeCancellationRisk } from "@/lib/risk";
+import { toDateString } from "@/lib/timezone";
+import type { Client, OccurrenceStatus } from "@/lib/types";
 
 type ClientRow = Client & { care_profiles: { name: string } | null };
 
@@ -22,6 +24,12 @@ export default async function RosterPage() {
     { data: phaseRows },
     { data: measurementRows },
     { data: serviceCheckinRows },
+    { data: checkinRows },
+    { data: activityRows },
+    { data: paymentRows },
+    { data: occurrenceRows },
+    { data: sessionRows },
+    { data: satisfactionRows },
   ] = await Promise.all([
     supabase.from("requests").select("client_id").eq("status", "pending"),
     clientIds.length > 0
@@ -36,6 +44,36 @@ export default async function RosterPage() {
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
       ? supabase.from("service_checkins").select("client_id, date").in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase.from("checkins").select("client_id, date").in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase.from("activities").select("client_id, date").in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("payments")
+          .select("client_id, due_date, paid_on")
+          .in("client_id", clientIds)
+          .is("paid_on", null)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("session_occurrences")
+          .select("client_id, status, occurrence_date")
+          .in("client_id", clientIds)
+          .order("occurrence_date", { ascending: false })
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase.from("sessions").select("client_id, date").in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("service_checkins")
+          .select("client_id, date, satisfaction")
+          .in("client_id", clientIds)
+          .order("date", { ascending: false })
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -64,6 +102,47 @@ export default async function RosterPage() {
   const measurementDatesByClient = datesByClient(measurementRows);
   const serviceCheckinDatesByClient = datesByClient(serviceCheckinRows);
 
+  const today = toDateString(new Date());
+
+  const lastTrackedByClient = new Map<string, string>();
+  for (const row of [...(checkinRows ?? []), ...(activityRows ?? [])]) {
+    const prev = lastTrackedByClient.get(row.client_id);
+    if (!prev || row.date > prev) lastTrackedByClient.set(row.client_id, row.date);
+  }
+
+  const overdueByClient = new Set(
+    (paymentRows ?? [])
+      .filter((p) => p.due_date < today)
+      .map((p) => p.client_id)
+  );
+
+  const occurrencesByClient = new Map<string, OccurrenceStatus[]>();
+  for (const row of occurrenceRows ?? []) {
+    occurrencesByClient.set(row.client_id, [
+      ...(occurrencesByClient.get(row.client_id) ?? []),
+      row.status as OccurrenceStatus,
+    ]);
+  }
+
+  const sessionCountByClient = new Map<string, number>();
+  const fourWeeksAgo = new Date();
+  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  for (const row of sessionRows ?? []) {
+    if (new Date(row.date) >= fourWeeksAgo) {
+      sessionCountByClient.set(
+        row.client_id,
+        (sessionCountByClient.get(row.client_id) ?? 0) + 1
+      );
+    }
+  }
+
+  const latestSatisfactionByClient = new Map<string, number | null>();
+  for (const row of satisfactionRows ?? []) {
+    if (!latestSatisfactionByClient.has(row.client_id)) {
+      latestSatisfactionByClient.set(row.client_id, row.satisfaction ?? null);
+    }
+  }
+
   const inWindow = isFirstWeekOfMonth();
   const clientsNeedingWindow = (clients ?? []).filter(
     (c) =>
@@ -71,6 +150,33 @@ export default async function RosterPage() {
       (!loggedThisMonth(measurementDatesByClient.get(c.id) ?? []) ||
         !loggedThisMonth(serviceCheckinDatesByClient.get(c.id) ?? []))
   ).length;
+
+  const riskByClient = new Map<string, boolean>();
+  for (const c of clients ?? []) {
+    const lastTracked = lastTrackedByClient.get(c.id);
+    const daysSince = lastTracked
+      ? Math.floor(
+          (new Date(today).getTime() - new Date(lastTracked).getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      : null;
+    const expectedCount = (c.days_per_week ?? 3) * 4;
+    const consistencyPct =
+      expectedCount > 0
+        ? Math.min(
+            100,
+            Math.round(((sessionCountByClient.get(c.id) ?? 0) / expectedCount) * 100)
+          )
+        : null;
+    const { isHighRisk } = computeCancellationRisk({
+      recentOccurrenceStatuses: occurrencesByClient.get(c.id) ?? [],
+      daysSinceLastCheckinOrActivity: daysSince,
+      hasOverduePayment: overdueByClient.has(c.id),
+      consistencyPct,
+      latestServiceCheckinSatisfaction: latestSatisfactionByClient.get(c.id) ?? null,
+    });
+    riskByClient.set(c.id, isHighRisk);
+  }
 
   return (
     <div className="space-y-6">
@@ -112,6 +218,7 @@ export default async function RosterPage() {
               inWindow &&
               (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
                 !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []));
+            const highRisk = riskByClient.get(client.id) ?? false;
             return (
               <Link key={client.id} href={`/coach/clients/${client.id}`}>
                 <Card className="flex items-center justify-between transition hover:border-rose/40">
@@ -122,6 +229,9 @@ export default async function RosterPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {highRisk ? (
+                      <Badge tone="pink">high cancellation risk</Badge>
+                    ) : null}
                     {needsWindow ? (
                       <Badge tone="gold">needs monthly check-in</Badge>
                     ) : null}

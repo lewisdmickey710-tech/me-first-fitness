@@ -1,8 +1,9 @@
 // Single business timezone for the whole app -- this is a solo local
 // coaching business, not a multi-timezone product, so one constant is
-// simpler and more correct than per-user timezone handling. Update this
-// if the business timezone isn't US Eastern.
-export const BUSINESS_TIMEZONE = "America/New_York";
+// simpler and more correct than per-user timezone handling. Mickey is
+// based in Texas, which is Central time (not Eastern -- update this if
+// the business ever relocates).
+export const BUSINESS_TIMEZONE = "America/Chicago";
 
 /**
  * A Date whose UTC fields (getUTCDay, getUTCDate, getUTCHours, ...) reflect

@@ -14,6 +14,7 @@ export default function CoachLayout({
           { href: "/coach/leads", label: "Leads" },
           { href: "/coach/library", label: "Library" },
           { href: "/coach/programs", label: "Programs" },
+          { href: "/coach/documents", label: "Documents" },
         ]}
       />
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>

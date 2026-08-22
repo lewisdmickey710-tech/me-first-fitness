@@ -66,3 +66,52 @@ export function nextSessionFromSchedules(
   candidates.sort((a, b) => a.date.localeCompare(b.date));
   return candidates[0];
 }
+
+export interface UpcomingOccurrence {
+  date: string;
+  dayOfWeek: number;
+  timeOfDay: string;
+  label: string | null;
+  scheduleId: string;
+}
+
+/**
+ * Every occurrence (today through `daysAhead` days out) implied by a
+ * client's active recurring schedules, excluding dates that already have
+ * a session_occurrences row (passed in as `resolvedDates`) -- i.e. the
+ * ones still needing a completed/cancelled/rescheduled/late-cancelled
+ * status.
+ */
+export function upcomingOccurrences(
+  schedules: {
+    id: string;
+    day_of_week: number;
+    time_of_day: string;
+    label: string | null;
+    active: boolean;
+  }[],
+  resolvedDates: Set<string>,
+  daysAhead = 14,
+  from: Date = nowInBusinessTz()
+): UpcomingOccurrence[] {
+  const results: UpcomingOccurrence[] = [];
+  for (const s of schedules) {
+    if (!s.active) continue;
+    for (let offset = 0; offset <= daysAhead; offset++) {
+      const d = new Date(from);
+      d.setUTCDate(d.getUTCDate() + offset);
+      if (d.getUTCDay() !== s.day_of_week) continue;
+      const dateStr = d.toISOString().slice(0, 10);
+      if (resolvedDates.has(dateStr)) continue;
+      results.push({
+        date: dateStr,
+        dayOfWeek: s.day_of_week,
+        timeOfDay: s.time_of_day,
+        label: s.label,
+        scheduleId: s.id,
+      });
+    }
+  }
+  results.sort((a, b) => a.date.localeCompare(b.date));
+  return results;
+}

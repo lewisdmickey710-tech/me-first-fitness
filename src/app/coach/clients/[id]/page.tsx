@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { advancePhase, markPaymentPaid, setRequestStatus } from "@/app/coach/actions";
+import {
+  advancePhase,
+  logSessionOccurrence,
+  markPaymentPaid,
+  setRequestStatus,
+} from "@/app/coach/actions";
 import {
   Badge,
   Button,
@@ -10,13 +15,20 @@ import {
   EmptyState,
   Heart,
   PhaseBanner,
+  Select,
   Sparkline,
+  Textarea,
 } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
-import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
+import {
+  formatSchedule,
+  nextSessionFromSchedules,
+  upcomingOccurrences,
+} from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
+import { computeCancellationRisk } from "@/lib/risk";
 import type {
   Activity,
   CareProfile,
@@ -25,8 +37,10 @@ import type {
   ClientPhaseHistory,
   ClientSchedule,
   Measurement,
+  OccurrenceStatus,
   Payment,
   ServiceCheckin,
+  SessionOccurrence,
   SessionRequest,
   TrainingSession,
 } from "@/lib/types";
@@ -34,12 +48,26 @@ import type {
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "sessions", label: "Sessions" },
+  { id: "attendance", label: "Attendance" },
   { id: "checkins", label: "Check-ins" },
   { id: "measurements", label: "Measurements" },
   { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
 ] as const;
+
+const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
+  completed: "Completed",
+  rescheduled: "Rescheduled",
+  cancelled: "Cancelled",
+  late_cancelled: "Late cancel",
+};
+
+function occurrenceBadgeTone(status: OccurrenceStatus) {
+  if (status === "completed") return "green" as const;
+  if (status === "rescheduled") return "gold" as const;
+  return "pink" as const; // cancelled, late_cancelled
+}
 
 type TabId = (typeof TABS)[number]["id"];
 
@@ -77,6 +105,7 @@ export default async function ClientDetailPage({
     { data: serviceCheckins },
     { data: schedules },
     { data: payments },
+    { data: occurrences },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -140,6 +169,13 @@ export default async function ClientDetailPage({
       .order("due_date", { ascending: true }) as unknown as Promise<{
       data: Payment[] | null;
     }>,
+    supabase
+      .from("session_occurrences")
+      .select("*")
+      .eq("client_id", id)
+      .order("occurrence_date", { ascending: false }) as unknown as Promise<{
+      data: SessionOccurrence[] | null;
+    }>,
   ]);
 
   const pendingCount = (requests ?? []).filter(
@@ -189,10 +225,20 @@ export default async function ClientDetailPage({
           latestServiceCheckin={serviceCheckins?.[0] ?? null}
           schedules={schedules ?? []}
           payments={payments ?? []}
+          occurrences={occurrences ?? []}
+          checkins={checkins ?? []}
+          activities={activities ?? []}
         />
       )}
       {tab === "sessions" && (
         <SessionsTab clientId={id} sessions={sessions ?? []} />
+      )}
+      {tab === "attendance" && (
+        <AttendanceTab
+          clientId={id}
+          schedules={schedules ?? []}
+          occurrences={occurrences ?? []}
+        />
       )}
       {tab === "checkins" && (
         <CheckinsTab clientId={id} checkins={checkins ?? []} />
@@ -225,6 +271,9 @@ function Overview({
   latestServiceCheckin,
   schedules,
   payments,
+  occurrences,
+  checkins,
+  activities,
 }: {
   client: Client;
   currentPhase: ClientPhaseHistory | null;
@@ -235,6 +284,9 @@ function Overview({
   latestServiceCheckin: ServiceCheckin | null;
   schedules: ClientSchedule[];
   payments: Payment[];
+  occurrences: SessionOccurrence[];
+  checkins: Checkin[];
+  activities: Activity[];
 }) {
   const allotted = client.sessions_allotted;
   const nextSession = nextSessionFromSchedules(schedules);
@@ -256,8 +308,40 @@ function Overview({
   const latestMeasurement = measurements[0] ?? null;
   const previousMeasurement = measurements[1] ?? null;
 
+  const lastTrackedDate = [...checkins.map((c) => c.date), ...activities.map((a) => a.date)]
+    .sort()
+    .at(-1);
+  const daysSinceLastCheckinOrActivity = lastTrackedDate
+    ? Math.floor(
+        (new Date(today).getTime() - new Date(lastTrackedDate).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+
+  const risk = computeCancellationRisk({
+    recentOccurrenceStatuses: occurrences.map((o) => o.status),
+    daysSinceLastCheckinOrActivity,
+    hasOverduePayment: unpaid.some((p) => p.due_date < today),
+    consistencyPct,
+    latestServiceCheckinSatisfaction: latestServiceCheckin?.satisfaction ?? null,
+  });
+
   return (
     <div className="space-y-4">
+      {risk.isHighRisk ? (
+        <Card className="border-pink/40 bg-pink/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            High cancellation risk
+          </p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-gray">
+            {risk.reasons.map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       {currentPhase ? (
         <Card>
           <div className="flex items-center justify-between">
@@ -509,6 +593,126 @@ function SessionsTab({
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function AttendanceTab({
+  clientId,
+  schedules,
+  occurrences,
+}: {
+  clientId: string;
+  schedules: ClientSchedule[];
+  occurrences: SessionOccurrence[];
+}) {
+  const resolvedDates = new Set(occurrences.map((o) => o.occurrence_date));
+  const upcoming = upcomingOccurrences(schedules, resolvedDates, 14);
+
+  const counts = occurrences.reduce(
+    (acc, o) => {
+      acc[o.status] = (acc[o.status] ?? 0) + 1;
+      return acc;
+    },
+    {} as Record<OccurrenceStatus, number>
+  );
+  const total = occurrences.length;
+  const cancelledOrLate = (counts.cancelled ?? 0) + (counts.late_cancelled ?? 0);
+  const cancellationRatePct =
+    total > 0 ? Math.round((cancelledOrLate / total) * 100) : null;
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <p className="text-sm font-medium text-gray">
+          Cancellation rate (all recorded)
+        </p>
+        {cancellationRatePct !== null ? (
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            {cancellationRatePct}%
+            <span className="text-base font-normal text-gray">
+              {" "}
+              — {counts.completed ?? 0} completed · {counts.cancelled ?? 0}{" "}
+              cancelled · {counts.late_cancelled ?? 0} late cancel ·{" "}
+              {counts.rescheduled ?? 0} rescheduled
+            </span>
+          </p>
+        ) : (
+          <p className="mt-1 text-sm text-gray">Nothing recorded yet.</p>
+        )}
+      </Card>
+
+      {upcoming.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray">Upcoming — mark outcome</p>
+          {upcoming.map((occ) => (
+            <Card key={`${occ.scheduleId}-${occ.date}`}>
+              <p className="font-medium text-ink">
+                {occ.date} · {formatSchedule(occ.dayOfWeek, occ.timeOfDay)}
+                {occ.label ? ` · ${occ.label}` : ""}
+              </p>
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  formData.set("occurrence_date", occ.date);
+                  formData.set("client_schedule_id", occ.scheduleId);
+                  await logSessionOccurrence(clientId, formData);
+                }}
+                className="mt-2 space-y-2"
+              >
+                <div className="flex flex-wrap items-end gap-2">
+                  <Select name="status" defaultValue="" className="w-40" required>
+                    <option value="" disabled>
+                      Mark as…
+                    </option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="late_cancelled">Late cancel (&lt;12h)</option>
+                    <option value="rescheduled">Rescheduled</option>
+                    <option value="completed">Completed</option>
+                  </Select>
+                  <Button type="submit" variant="secondary">
+                    Save
+                  </Button>
+                </div>
+                <Textarea
+                  name="notes"
+                  rows={1}
+                  placeholder="Reason, or reschedule details (optional)"
+                />
+              </form>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-gray">History</p>
+        {occurrences.length === 0 ? (
+          <EmptyState
+            title="Nothing recorded yet"
+            body="Logged sessions are recorded here automatically. Use the upcoming list above to mark cancellations or reschedules."
+          />
+        ) : (
+          occurrences.map((o) => (
+            <Card key={o.id} className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-ink">{o.occurrence_date}</p>
+                {o.rescheduled_to_date ? (
+                  <p className="text-sm text-gray">
+                    Rescheduled to {o.rescheduled_to_date}
+                  </p>
+                ) : null}
+                {o.notes ? (
+                  <p className="text-sm text-gray">{o.notes}</p>
+                ) : null}
+              </div>
+              <Badge tone={occurrenceBadgeTone(o.status)}>
+                {OCCURRENCE_STATUS_LABEL[o.status]}
+              </Badge>
+            </Card>
+          ))
+        )}
+      </div>
     </div>
   );
 }

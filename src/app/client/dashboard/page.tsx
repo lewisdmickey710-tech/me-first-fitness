@@ -8,7 +8,9 @@ import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
   CareProfile,
+  ClientDocumentAcknowledgment,
   ClientSchedule,
+  LegalDocument,
   Payment,
   SessionRequest,
   TrainingSession,
@@ -36,6 +38,8 @@ export default async function ClientDashboard() {
     { data: recentServiceCheckins },
     { data: schedules },
     { data: payments },
+    { data: documents },
+    { data: acks },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -77,6 +81,15 @@ export default async function ClientDashboard() {
       .order("due_date", { ascending: true }) as unknown as Promise<{
       data: Payment[] | null;
     }>,
+    supabase.from("legal_documents").select("*") as unknown as Promise<{
+      data: LegalDocument[] | null;
+    }>,
+    supabase
+      .from("client_document_acknowledgments")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{
+      data: ClientDocumentAcknowledgment[] | null;
+    }>,
   ]);
 
   const needsServiceCheckin =
@@ -86,6 +99,13 @@ export default async function ClientDashboard() {
   const nextSession = nextSessionFromSchedules(schedules ?? []);
   const nextDue = payments?.[0] ?? null;
   const today = toDateString(new Date());
+
+  const ackedKeys = new Set(
+    (acks ?? []).map((a) => `${a.document_id}:${a.document_version}`)
+  );
+  const unacknowledgedCount = (documents ?? []).filter(
+    (d) => !ackedKeys.has(`${d.id}:${d.version}`)
+  ).length;
 
   const { count: sessionsUsed } = await supabase
     .from("sessions")
@@ -178,6 +198,23 @@ export default async function ClientDashboard() {
         </Card>
       ) : null}
 
+      {unacknowledgedCount > 0 ? (
+        <Card className="border-gold/50 bg-gold/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            {unacknowledgedCount} document
+            {unacknowledgedCount > 1 ? "s" : ""} need
+            {unacknowledgedCount > 1 ? "" : "s"} your review
+          </p>
+          <Link
+            href="/client/documents"
+            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            Review now
+          </Link>
+        </Card>
+      ) : null}
+
       {(requests?.length ?? 0) > 0 ? (
         <Card>
           <p className="text-sm font-medium text-gray">
@@ -205,6 +242,7 @@ export default async function ClientDashboard() {
         <QuickAction href="/client/request" label="Request time" />
         <QuickAction href="/client/service-checkin" label="Service check-in" />
         <QuickAction href="/client/guide" label="Wellness guide" />
+        <QuickAction href="/client/documents" label="Documents" />
       </div>
 
       <div>

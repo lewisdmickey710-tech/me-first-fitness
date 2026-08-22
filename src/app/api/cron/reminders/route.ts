@@ -1,12 +1,20 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPaymentReminderEmail, sendSessionReminderEmail } from "@/lib/email";
+import {
+  sendInactivityNudgeEmail,
+  sendPaymentReminderEmail,
+  sendSessionReminderEmail,
+} from "@/lib/email";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDay } from "@/lib/schedule";
+import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 
 export const dynamic = "force-dynamic";
 
 const PAYMENT_LOOKAHEAD_DAYS = 3;
 const PAYMENT_RESEND_COOLDOWN_DAYS = 7;
+// Re-check (and re-nudge) no more than once per this many days, so a
+// client who stays quiet doesn't get emailed daily forever.
+const INACTIVITY_NUDGE_COOLDOWN_DAYS = INACTIVITY_DAYS_THRESHOLD;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -33,8 +41,17 @@ export async function GET(request: Request) {
     resendCooldownCutoff.getUTCDate() - PAYMENT_RESEND_COOLDOWN_DAYS
   );
 
+  const inactivityCutoff = new Date(now);
+  inactivityCutoff.setUTCDate(inactivityCutoff.getUTCDate() - INACTIVITY_DAYS_THRESHOLD);
+  const inactivityCutoffStr = toDateString(inactivityCutoff);
+  const nudgeCooldownCutoff = new Date(now);
+  nudgeCooldownCutoff.setUTCDate(
+    nudgeCooldownCutoff.getUTCDate() - INACTIVITY_NUDGE_COOLDOWN_DAYS
+  );
+
   let sessionReminders = 0;
   let paymentReminders = 0;
+  let inactivityNudges = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -129,5 +146,67 @@ export async function GET(request: Request) {
     }
   }
 
-  return Response.json({ ok: true, sessionReminders, paymentReminders, errors });
+  // ---- Inactivity nudges: no self-logged check-in/activity in a while ----
+  const { data: clients } = await supabase
+    .from("clients")
+    .select("id, name, user_id, last_inactivity_nudge_sent_at")
+    .not("user_id", "is", null);
+
+  const activeClients = (clients ?? []).filter(
+    (c) =>
+      !c.last_inactivity_nudge_sent_at ||
+      c.last_inactivity_nudge_sent_at < nudgeCooldownCutoff.toISOString()
+  );
+
+  if (activeClients.length > 0) {
+    const activeClientIds = activeClients.map((c) => c.id);
+    const [{ data: recentCheckins }, { data: recentActivities }] = await Promise.all([
+      supabase
+        .from("checkins")
+        .select("client_id, date")
+        .in("client_id", activeClientIds)
+        .gte("date", inactivityCutoffStr),
+      supabase
+        .from("activities")
+        .select("client_id, date")
+        .in("client_id", activeClientIds)
+        .gte("date", inactivityCutoffStr),
+    ]);
+    const trackedRecentlyIds = new Set(
+      [...(recentCheckins ?? []), ...(recentActivities ?? [])].map(
+        (r) => r.client_id
+      )
+    );
+
+    for (const client of activeClients) {
+      if (trackedRecentlyIds.has(client.id)) continue;
+      if (!client.user_id) continue;
+
+      const { data: userResult, error: userError } =
+        await supabase.auth.admin.getUserById(client.user_id);
+      if (userError || !userResult?.user?.email) {
+        errors.push(`No email for client ${client.name}`);
+        continue;
+      }
+
+      try {
+        await sendInactivityNudgeEmail(userResult.user.email, client.name);
+        await supabase
+          .from("clients")
+          .update({ last_inactivity_nudge_sent_at: new Date().toISOString() })
+          .eq("id", client.id);
+        inactivityNudges++;
+      } catch (e) {
+        errors.push(`Inactivity email failed for ${client.name}: ${e}`);
+      }
+    }
+  }
+
+  return Response.json({
+    ok: true,
+    sessionReminders,
+    paymentReminders,
+    inactivityNudges,
+    errors,
+  });
 }

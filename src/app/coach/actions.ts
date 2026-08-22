@@ -144,8 +144,52 @@ export async function logSession(clientId: string, formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // A logged session means that date's occurrence was attended -- record
+  // it as completed (overwriting any prior status for that date, since an
+  // actual logged session is the strongest signal available).
+  await supabase.from("session_occurrences").upsert(
+    { client_id: clientId, occurrence_date: date, status: "completed" },
+    { onConflict: "client_id,occurrence_date" }
+  );
+
   revalidatePath(`/coach/clients/${clientId}`);
   redirect(`/coach/clients/${clientId}?tab=sessions`);
+}
+
+export async function logSessionOccurrence(
+  clientId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const occurrence_date = String(formData.get("occurrence_date") ?? "");
+  const status = String(formData.get("status") ?? "");
+  const client_schedule_id = String(formData.get("client_schedule_id") ?? "") || null;
+  const rescheduled_to_date = String(formData.get("rescheduled_to_date") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!occurrence_date || !status) {
+    throw new Error("Date and status are required.");
+  }
+  if (!["completed", "rescheduled", "cancelled", "late_cancelled"].includes(status)) {
+    throw new Error("Invalid status.");
+  }
+
+  const { error } = await supabase.from("session_occurrences").upsert(
+    {
+      client_id: clientId,
+      client_schedule_id,
+      occurrence_date,
+      status,
+      rescheduled_to_date,
+      notes,
+    },
+    { onConflict: "client_id,occurrence_date" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
 }
 
 const MEASUREMENT_FIELDS = [
@@ -299,5 +343,32 @@ export async function markPaymentPaid(paymentId: string, clientId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function updateLegalDocument(
+  documentId: string,
+  currentVersion: number,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const title = String(formData.get("title") ?? "").trim();
+  const body = String(formData.get("body") ?? "").trim();
+
+  if (!title || !body) {
+    throw new Error("Title and body are required.");
+  }
+
+  // Bumping the version means every client's existing acknowledgment (tied
+  // to the version they signed) no longer covers this text -- they'll be
+  // asked to review and re-acknowledge next time they visit.
+  const { error } = await supabase
+    .from("legal_documents")
+    .update({ title, body, version: currentVersion + 1, updated_at: new Date().toISOString() })
+    .eq("id", documentId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/documents");
 }
 
