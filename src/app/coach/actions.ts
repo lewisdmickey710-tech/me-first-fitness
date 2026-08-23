@@ -274,42 +274,28 @@ export async function setClientProgramOverride(
   revalidatePath(`/coach/clients/${clientId}/log-session`);
 }
 
-// Swaps the effective order of two exercises within a client's day --
-// only ever called with two adjacent exercises (the "move up"/"move
-// down" buttons), so this is always a simple pairwise swap of whatever
-// position each currently effectively sits at.
-export async function reorderClientProgramExercise(
+// Persists a full drag-and-drop reorder of one client's program day --
+// called directly from the client-side drag component (not a <form>), so
+// this takes the new order as a plain array rather than FormData. Every
+// exercise in the day gets an explicit position_override (its index in
+// the new order), which is simpler and less error-prone than trying to
+// diff against whatever positions were previously set.
+export async function reorderClientProgramDay(
   clientId: string,
-  formData: FormData
+  pdeIdsInOrder: string[]
 ) {
   const supabase = await createClient();
 
-  const pdeIdA = String(formData.get("pde_id_a") ?? "");
-  const posA = Number(formData.get("pos_a") ?? "");
-  const pdeIdB = String(formData.get("pde_id_b") ?? "");
-  const posB = Number(formData.get("pos_b") ?? "");
+  const rows = pdeIdsInOrder.map((program_day_exercise_id, index) => ({
+    client_id: clientId,
+    program_day_exercise_id,
+    position_override: index,
+    edited_by: "coach" as const,
+  }));
 
-  if (!pdeIdA || !pdeIdB || Number.isNaN(posA) || Number.isNaN(posB)) {
-    throw new Error("Missing exercises to reorder.");
-  }
-
-  const { error } = await supabase.from("client_program_overrides").upsert(
-    [
-      {
-        client_id: clientId,
-        program_day_exercise_id: pdeIdA,
-        position_override: posB,
-        edited_by: "coach",
-      },
-      {
-        client_id: clientId,
-        program_day_exercise_id: pdeIdB,
-        position_override: posA,
-        edited_by: "coach",
-      },
-    ],
-    { onConflict: "client_id,program_day_exercise_id" }
-  );
+  const { error } = await supabase
+    .from("client_program_overrides")
+    .upsert(rows, { onConflict: "client_id,program_day_exercise_id" });
 
   if (error) throw new Error(error.message);
 

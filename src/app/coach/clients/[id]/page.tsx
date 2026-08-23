@@ -13,13 +13,12 @@ import {
   logSessionOccurrence,
   markMilestoneAchieved,
   markPaymentPaid,
-  reorderClientProgramExercise,
   setClientDocumentAssignment,
-  setClientProgramOverride,
   setRequestStatus,
   unmarkMilestoneAchieved,
   updateClientProfile,
 } from "@/app/coach/actions";
+import { ProgramDayEditor } from "./ProgramDayEditor";
 import {
   Badge,
   Button,
@@ -1388,143 +1387,47 @@ function ProgramTab({
     <div className="space-y-4">
       <p className="text-sm text-gray">
         {phaseInfo(currentPhase.phase).name} — this client&apos;s program.
-        Swapping, changing sets/reps, or removing a movement here only
-        affects this client; the shared template everyone else on their
-        track follows is unchanged.
+        Drag by the handle to reorder, or swap/change sets-reps/remove a
+        movement — all of it only affects this client; the shared template
+        everyone else on their track follows is unchanged.
       </p>
-      {programDays.map((day) => (
-        <Card key={day.id}>
-          <p className="font-medium text-ink">
-            Day {day.day_number}: {day.day_label}
-          </p>
-          <div className="mt-3 space-y-3">
-            {(() => {
-              const ordered = day.program_day_exercises
-                .slice()
-                .map((pde) => ({
-                  pde,
-                  effectivePosition:
-                    overrideByPdeId.get(pde.id)?.position_override ?? pde.position,
-                }))
-                .sort((a, b) => a.effectivePosition - b.effectivePosition);
+      {programDays.map((day) => {
+        const ordered = day.program_day_exercises
+          .slice()
+          .sort(
+            (a, b) =>
+              (overrideByPdeId.get(a.id)?.position_override ?? a.position) -
+              (overrideByPdeId.get(b.id)?.position_override ?? b.position)
+          )
+          .map((pde) => {
+            const override = overrideByPdeId.get(pde.id);
+            return {
+              pdeId: pde.id,
+              name: pde.exercises?.name ?? "(deleted exercise)",
+              sets: pde.sets,
+              reps: pde.reps,
+              substituteExerciseId: override?.substitute_exercise_id ?? null,
+              setsOverride: override?.sets_override ?? null,
+              repsOverride: override?.reps_override ?? null,
+              removed: override?.removed ?? false,
+            };
+          });
 
-              return ordered.map(({ pde, effectivePosition }, i) => {
-                const override = overrideByPdeId.get(pde.id);
-                const boundSave = setClientProgramOverride.bind(null, clientId);
-                const prev = ordered[i - 1];
-                const next = ordered[i + 1];
-                const boundReorder = reorderClientProgramExercise.bind(null, clientId);
-                return (
-                  <div
-                    key={pde.id}
-                    className={`space-y-2 rounded-xl border p-3 ${
-                      override?.removed
-                        ? "border-pink/40 bg-pink/5"
-                        : "border-grayLt"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium text-ink">
-                        {pde.exercises?.name ?? "(deleted exercise)"}
-                        {override?.removed ? (
-                          <span className="ml-2 text-xs font-normal text-pink">
-                            removed for this client
-                          </span>
-                        ) : null}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <form action={boundReorder}>
-                          <input type="hidden" name="pde_id_a" value={pde.id} />
-                          <input type="hidden" name="pos_a" value={effectivePosition} />
-                          <input type="hidden" name="pde_id_b" value={prev?.pde.id ?? ""} />
-                          <input
-                            type="hidden"
-                            name="pos_b"
-                            value={prev?.effectivePosition ?? ""}
-                          />
-                          <button
-                            type="submit"
-                            disabled={!prev}
-                            className="rounded-lg border border-grayLt px-2 py-1 text-xs text-ink disabled:opacity-30"
-                          >
-                            ↑
-                          </button>
-                        </form>
-                        <form action={boundReorder}>
-                          <input type="hidden" name="pde_id_a" value={pde.id} />
-                          <input type="hidden" name="pos_a" value={effectivePosition} />
-                          <input type="hidden" name="pde_id_b" value={next?.pde.id ?? ""} />
-                          <input
-                            type="hidden"
-                            name="pos_b"
-                            value={next?.effectivePosition ?? ""}
-                          />
-                          <button
-                            type="submit"
-                            disabled={!next}
-                            className="rounded-lg border border-grayLt px-2 py-1 text-xs text-ink disabled:opacity-30"
-                          >
-                            ↓
-                          </button>
-                        </form>
-                      </div>
-                    </div>
-                    <p className="text-right text-xs text-gray">
-                      prescribed {pde.sets}×{pde.reps}
-                    </p>
-
-                    <form action={boundSave} className="space-y-2">
-                    <input
-                      type="hidden"
-                      name="program_day_exercise_id"
-                      value={pde.id}
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Select
-                        name="substitute_exercise_id"
-                        defaultValue={override?.substitute_exercise_id ?? ""}
-                      >
-                        <option value="">— No swap (use prescribed) —</option>
-                        {exerciseOptions.map((ex) => (
-                          <option key={ex.id} value={ex.id}>
-                            {ex.name}
-                          </option>
-                        ))}
-                      </Select>
-                      <label className="flex items-center gap-2 rounded-xl border border-grayLt px-3 py-2 text-sm text-ink">
-                        <input
-                          type="checkbox"
-                          name="removed"
-                          defaultChecked={override?.removed ?? false}
-                          className="h-4 w-4 rounded border-grayLt text-rose"
-                        />
-                        Remove for this client
-                      </label>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        name="sets_override"
-                        placeholder="Sets (override)"
-                        defaultValue={override?.sets_override ?? ""}
-                      />
-                      <Input
-                        name="reps_override"
-                        placeholder="Reps (override)"
-                        defaultValue={override?.reps_override ?? ""}
-                      />
-                    </div>
-
-                    <Button type="submit" variant="secondary">
-                      Save
-                    </Button>
-                    </form>
-                  </div>
-                );
-              });
-            })()}
-          </div>
-        </Card>
-      ))}
+        return (
+          <Card key={day.id}>
+            <p className="font-medium text-ink">
+              Day {day.day_number}: {day.day_label}
+            </p>
+            <div className="mt-3">
+              <ProgramDayEditor
+                clientId={clientId}
+                exercises={ordered}
+                exerciseOptions={exerciseOptions}
+              />
+            </div>
+          </Card>
+        );
+      })}
     </div>
   );
 }
