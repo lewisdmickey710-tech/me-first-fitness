@@ -22,11 +22,10 @@ export async function sendClientLoginLink(email: string) {
   });
   if (error) throw new Error(error.message);
 
-  // verifyOtp's own docs mark 'magiclink' as a deprecated verification
-  // type -- 'email' is the current one for verifying an emailed OTP/link,
-  // and it accepts the exact same hashed_token a 'magiclink' request
-  // produces. Hardcoded here rather than using verification_type, which
-  // would echo back the now-deprecated 'magiclink'.
-  const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${data.properties.hashed_token}&type=email&next=/`;
+  // Supabase's own action_link format is `type={verification_type}` --
+  // the hashed_token is only valid for verification against the exact
+  // type it was generated with ('magiclink' here), so that has to be
+  // echoed back verbatim rather than substituted for anything else.
+  const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${data.properties.hashed_token}&type=${data.properties.verification_type}&next=/`;
   await sendClientLoginLinkEmail(trimmed, actionLink);
 }

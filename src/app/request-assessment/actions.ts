@@ -43,27 +43,40 @@ export async function submitAssessmentRequest(formData: FormData) {
     if (linkError) throw new Error(linkError.message);
 
     const userId = linkData.user.id;
-    // verifyOtp's own docs mark 'magiclink' as a deprecated verification
-    // type -- 'email' is the current one for verifying an emailed OTP/link,
-    // and it accepts the exact same hashed_token a 'magiclink' request
-    // produces. Hardcoded here rather than using verification_type, which
-    // would echo back the now-deprecated 'magiclink'.
-    const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${linkData.properties.hashed_token}&type=email&next=/`;
+    // Supabase's own action_link format is `type={verification_type}` --
+    // the hashed_token is only valid for verification against the exact
+    // type it was generated with ('magiclink' here), so that has to be
+    // echoed back verbatim rather than substituted for anything else.
+    const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${linkData.properties.hashed_token}&type=${linkData.properties.verification_type}&next=/`;
     await sendLeadInviteEmail(email, name, actionLink);
 
-    // Only set role to 'lead' for a brand-new profile -- never downgrade an
-    // existing coach/client account that happens to reuse this email.
+    // The on-signup DB trigger always creates a profiles row defaulting
+    // to role 'client' before this ever runs (it fires the instant
+    // generateLink creates the auth.users row), so a brand-new lead's
+    // profile is never actually missing here -- checking for that never
+    // promoted anyone to 'lead'. Promote instead unless this email
+    // belongs to the coach or an already-linked client (never downgrade
+    // a real account that happens to reuse this email) or is already a
+    // lead.
     const { data: existingProfile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", userId)
       .maybeSingle();
 
-    if (!existingProfile) {
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .insert({ id: userId, role: "lead" });
-      if (profileError) throw new Error(profileError.message);
+    if (existingProfile?.role !== "coach" && existingProfile?.role !== "lead") {
+      const { data: linkedClient } = await supabase
+        .from("clients")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (!linkedClient) {
+        const { error: profileError } = existingProfile
+          ? await supabase.from("profiles").update({ role: "lead" }).eq("id", userId)
+          : await supabase.from("profiles").insert({ id: userId, role: "lead" });
+        if (profileError) throw new Error(profileError.message);
+      }
     }
 
     const { data: existingLead } = await supabase
