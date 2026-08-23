@@ -66,10 +66,7 @@ export type SessionType =
   | "assessment";
 
 export interface BodyMapMarker {
-  id: string;
-  view: "front" | "back";
-  x: number;
-  y: number;
+  regionId: number;
   level: number;
   label: string;
 }

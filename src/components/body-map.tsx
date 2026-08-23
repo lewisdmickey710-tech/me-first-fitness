@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { BodyMapMarker } from "@/lib/types";
 
 const LEVEL_FILL: Record<number, string> = {
@@ -8,37 +8,197 @@ const LEVEL_FILL: Record<number, string> = {
   2: "#E8B84B", // gold
   3: "#E75480", // pink
 };
+const DEFAULT_FILL = "#EDEDED";
 
-// Markers are stored as 0-100 percentages of the rendered box (independent
-// of the SVG's own coordinate system) so saved data stays valid no matter
-// how the silhouette artwork changes -- these just scale a percentage into
-// actual viewBox units for drawing.
 const VIEW_W = 200;
 const VIEW_H = 400;
 
-// Standing figure, arms out and legs apart (same pose used on standard
-// clinical body-pain charts) so every limb is fully visible to tap on.
-// Same outline for front and back -- it's a silhouette, not a detailed
-// drawing, so there's nothing view-specific to draw differently.
-function BodySilhouette() {
-  return (
-    <>
-      <circle cx="100" cy="32" r="24" />
-      <rect x="88" y="54" width="24" height="14" />
-      <polygon points="68,68 132,68 122,200 78,200" />
-      <polygon points="64,74 26,140 10,225 24,232 46,150 72,110" />
-      <polygon points="136,74 174,140 190,225 176,232 154,150 128,110" />
-      <polygon points="78,200 99,200 85,390 35,390" />
-      <polygon points="122,200 101,200 115,390 165,390" />
-    </>
-  );
-}
+// Fixed, numbered body regions (like a standard clinical body-pain chart)
+// instead of freeform tap-anywhere points. Front and back share the same
+// standing-figure outline, so the same 22 shapes are reused for both views
+// -- front gets ids 1-22, back gets ids 23-44 (front/back offset below).
+type RegionShape = {
+  key: string;
+  path?: string;
+  points?: string;
+  labelPos: [number, number];
+};
 
-function distancePct(
-  a: { x: number; y: number },
-  b: { x: number; y: number }
-): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+const SHAPES: RegionShape[] = [
+  { key: "head_L", path: "M100,8 A24,24 0 0,0 100,56 Z", labelPos: [88, 32] },
+  { key: "head_R", path: "M100,8 A24,24 0 0,1 100,56 Z", labelPos: [112, 32] },
+  { key: "neck", points: "88,54 112,54 112,68 88,68", labelPos: [100, 61] },
+  {
+    key: "chest_L",
+    points: "68,68 100,68 100,110 71.2,110",
+    labelPos: [84.8, 89],
+  },
+  {
+    key: "chest_R",
+    points: "132,68 100,68 100,110 128.8,110",
+    labelPos: [115.2, 89],
+  },
+  {
+    key: "upperarm_L",
+    points: "55.1,71 25.8,142.3 42.2,149.7 76.9,81",
+    labelPos: [50, 111],
+  },
+  {
+    key: "upperarm_R",
+    points: "144.9,71 174.2,142.3 157.8,149.7 123.1,81",
+    labelPos: [150, 111],
+  },
+  {
+    key: "band2_L",
+    points: "71.2,110 100,110 100,150 74.2,150",
+    labelPos: [86.3, 130],
+  },
+  {
+    key: "band2_R",
+    points: "128.8,110 100,110 100,150 125.8,150",
+    labelPos: [113.7, 130],
+  },
+  {
+    key: "forearm_L",
+    points: "26.2,144.2 14.2,204.6 25.8,207.4 41.8,147.8",
+    labelPos: [27, 176],
+  },
+  {
+    key: "forearm_R",
+    points: "173.8,144.2 185.8,204.6 174.2,207.4 158.2,147.8",
+    labelPos: [173, 176],
+  },
+  {
+    key: "band3_L",
+    points: "74.2,150 100,150 100,190 77.2,190",
+    labelPos: [87.8, 170],
+  },
+  {
+    key: "band3_R",
+    points: "125.8,150 100,150 100,190 122.8,190",
+    labelPos: [112.2, 170],
+  },
+  {
+    key: "hand_L",
+    points: "14.3,204.2 3.4,229.4 20.6,234.6 25.7,207.8",
+    labelPos: [16, 219],
+  },
+  {
+    key: "hand_R",
+    points: "185.7,204.2 196.6,229.4 179.4,234.6 174.3,207.8",
+    labelPos: [184, 219],
+  },
+  {
+    key: "band4",
+    points: "77.2,190 122.8,190 122,200 78,200",
+    labelPos: [100, 195],
+  },
+  {
+    key: "thigh_L",
+    points: "78,200 99,200 90,290 63,290",
+    labelPos: [82.5, 245],
+  },
+  {
+    key: "thigh_R",
+    points: "122,200 101,200 110,290 137,290",
+    labelPos: [117.5, 245],
+  },
+  {
+    key: "shin_L",
+    points: "63,290 90,290 78,345 52,345",
+    labelPos: [70.8, 317.5],
+  },
+  {
+    key: "shin_R",
+    points: "137,290 110,290 122,345 148,345",
+    labelPos: [129.2, 317.5],
+  },
+  {
+    key: "foot_L",
+    points: "52,345 78,345 68,380 40,380",
+    labelPos: [59.5, 362.5],
+  },
+  {
+    key: "foot_R",
+    points: "148,345 122,345 132,380 160,380",
+    labelPos: [140.5, 362.5],
+  },
+];
+
+const FRONT_NAMES: string[] = [
+  "Head (left)",
+  "Head (right)",
+  "Neck",
+  "Chest (left)",
+  "Chest (right)",
+  "Upper arm (left)",
+  "Upper arm (right)",
+  "Upper abdomen (left)",
+  "Upper abdomen (right)",
+  "Forearm (left)",
+  "Forearm (right)",
+  "Lower abdomen (left)",
+  "Lower abdomen (right)",
+  "Hand (left)",
+  "Hand (right)",
+  "Groin / pelvis",
+  "Thigh (left)",
+  "Thigh (right)",
+  "Shin (left)",
+  "Shin (right)",
+  "Foot (left)",
+  "Foot (right)",
+];
+
+const BACK_NAMES: string[] = [
+  "Head, back (left)",
+  "Head, back (right)",
+  "Neck, back",
+  "Shoulder (left)",
+  "Shoulder (right)",
+  "Upper arm, back (left)",
+  "Upper arm, back (right)",
+  "Upper back (left)",
+  "Upper back (right)",
+  "Forearm, back (left)",
+  "Forearm, back (right)",
+  "Lower back (left)",
+  "Lower back (right)",
+  "Hand, back (left)",
+  "Hand, back (right)",
+  "Tailbone / low back",
+  "Thigh, back (left)",
+  "Thigh, back (right)",
+  "Calf (left)",
+  "Calf (right)",
+  "Heel (left)",
+  "Heel (right)",
+];
+
+type Region = {
+  id: number;
+  view: "front" | "back";
+  name: string;
+  shape: RegionShape;
+};
+
+const REGIONS: Region[] = [
+  ...SHAPES.map((shape, i) => ({
+    id: i + 1,
+    view: "front" as const,
+    name: FRONT_NAMES[i],
+    shape,
+  })),
+  ...SHAPES.map((shape, i) => ({
+    id: i + 1 + SHAPES.length,
+    view: "back" as const,
+    name: BACK_NAMES[i],
+    shape,
+  })),
+];
+
+function regionName(id: number): string {
+  return REGIONS.find((r) => r.id === id)?.name ?? `Region ${id}`;
 }
 
 export function BodyMapInput({
@@ -52,50 +212,43 @@ export function BodyMapInput({
 }) {
   const [markers, setMarkers] = useState<BodyMapMarker[]>(defaultValue ?? []);
   const [view, setView] = useState<"front" | "back">("front");
-  const svgRef = useRef<SVGSVGElement>(null);
 
-  const visibleMarkers = markers.filter((m) => m.view === view);
+  const visibleRegions = REGIONS.filter((r) => r.view === view);
+  const visibleMarkers = markers.filter((m) =>
+    visibleRegions.some((r) => r.id === m.regionId)
+  );
 
-  function handleClick(e: React.MouseEvent<SVGSVGElement>) {
-    if (readOnly || !svgRef.current) return;
-    const rect = svgRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100;
-
-    const near = visibleMarkers.find((m) => distancePct(m, { x, y }) < 5);
-    if (near) {
-      cycleMarker(near.id);
-    } else {
-      setMarkers((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), view, x, y, level: 1, label: "" },
-      ]);
-    }
+  function cycleRegion(regionId: number) {
+    if (readOnly) return;
+    setMarkers((prev) => {
+      const existing = prev.find((m) => m.regionId === regionId);
+      if (!existing) {
+        return [...prev, { regionId, level: 1, label: "" }];
+      }
+      if (existing.level >= 3) {
+        return prev.filter((m) => m.regionId !== regionId);
+      }
+      return prev.map((m) =>
+        m.regionId === regionId ? { ...m, level: m.level + 1 } : m
+      );
+    });
   }
 
-  function cycleMarker(id: string) {
+  function updateLabel(regionId: number, label: string) {
     setMarkers((prev) =>
-      prev
-        .map((m) =>
-          m.id === id ? { ...m, level: m.level + 1 } : m
-        )
-        .filter((m) => m.id !== id || m.level <= 3)
+      prev.map((m) => (m.regionId === regionId ? { ...m, label } : m))
     );
   }
 
-  function updateLabel(id: string, label: string) {
-    setMarkers((prev) => prev.map((m) => (m.id === id ? { ...m, label } : m)));
-  }
-
-  function removeMarker(id: string) {
-    setMarkers((prev) => prev.filter((m) => m.id !== id));
+  function removeMarker(regionId: number) {
+    setMarkers((prev) => prev.filter((m) => m.regionId !== regionId));
   }
 
   return (
     <div className="space-y-3">
       {!readOnly ? (
         <p className="text-xs text-gray">
-          Tap the diagram to drop a point — taps cycle it through{" "}
+          Tap a numbered region to mark it — taps cycle it through{" "}
           <span className="font-medium text-teal">teal</span> →{" "}
           <span className="font-medium text-gold">gold</span> →{" "}
           <span className="font-medium text-pink">pink</span> → gone. Add a
@@ -116,63 +269,87 @@ export function BodyMapInput({
             }`}
           >
             {v === "front" ? "Front" : "Back"}
-            {markers.some((m) => m.view === v) ? " •" : ""}
+            {markers.some((m) =>
+              REGIONS.find((r) => r.id === m.regionId)?.view === v
+            )
+              ? " •"
+              : ""}
           </button>
         ))}
       </div>
 
       <svg
-        ref={svgRef}
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        onClick={handleClick}
-        className={`mx-auto h-80 w-40 fill-grayLt/70 ${readOnly ? "" : "cursor-crosshair"}`}
+        className="mx-auto h-80 w-40 stroke-ink/70"
+        strokeWidth={1}
       >
-        <BodySilhouette />
-        {visibleMarkers.map((m) => (
-          <circle
-            key={m.id}
-            cx={(m.x / 100) * VIEW_W}
-            cy={(m.y / 100) * VIEW_H}
-            r={5}
-            fill={LEVEL_FILL[m.level] ?? LEVEL_FILL[1]}
-            stroke="white"
-            strokeWidth={1.5}
-          />
+        {visibleRegions.map((r) => {
+          const marker = visibleMarkers.find((m) => m.regionId === r.id);
+          const fill = marker ? LEVEL_FILL[marker.level] ?? DEFAULT_FILL : DEFAULT_FILL;
+          const shared = {
+            key: r.id,
+            fill,
+            onClick: () => cycleRegion(r.id),
+            className: readOnly ? "" : "cursor-pointer",
+          };
+          return r.shape.path ? (
+            <path {...shared} d={r.shape.path} />
+          ) : (
+            <polygon {...shared} points={r.shape.points} />
+          );
+        })}
+        {visibleRegions.map((r) => (
+          <text
+            key={`label-${r.id}`}
+            x={r.shape.labelPos[0]}
+            y={r.shape.labelPos[1]}
+            fontSize={7}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            className="pointer-events-none fill-ink/60 stroke-none"
+          >
+            {r.id}
+          </text>
         ))}
       </svg>
 
       {visibleMarkers.length > 0 ? (
         <div className="space-y-1.5">
-          {visibleMarkers.map((m) => (
-            <div key={m.id} className="flex items-center gap-2">
-              <span
-                className="h-3 w-3 shrink-0 rounded-full"
-                style={{ backgroundColor: LEVEL_FILL[m.level] }}
-              />
-              {readOnly ? (
-                <span className="text-sm text-ink">
-                  {m.label || "(no label)"}
+          {visibleMarkers
+            .sort((a, b) => a.regionId - b.regionId)
+            .map((m) => (
+              <div key={m.regionId} className="flex items-center gap-2">
+                <span
+                  className="h-3 w-3 shrink-0 rounded-full"
+                  style={{ backgroundColor: LEVEL_FILL[m.level] }}
+                />
+                <span className="w-36 shrink-0 text-xs text-gray">
+                  #{m.regionId} {regionName(m.regionId)}
                 </span>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    value={m.label}
-                    onChange={(e) => updateLabel(m.id, e.target.value)}
-                    placeholder="e.g. tight, pain, no feeling"
-                    className="w-full rounded-lg border border-grayLt bg-white px-2 py-1 text-sm text-ink focus:border-rose focus:outline-none focus:ring-1 focus:ring-rose"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeMarker(m.id)}
-                    className="shrink-0 text-xs text-gray hover:text-pink"
-                  >
-                    ✕
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
+                {readOnly ? (
+                  <span className="text-sm text-ink">
+                    {m.label || "(no label)"}
+                  </span>
+                ) : (
+                  <>
+                    <input
+                      type="text"
+                      value={m.label}
+                      onChange={(e) => updateLabel(m.regionId, e.target.value)}
+                      placeholder="e.g. tight, pain, no feeling"
+                      className="w-full rounded-lg border border-grayLt bg-white px-2 py-1 text-sm text-ink focus:border-rose focus:outline-none focus:ring-1 focus:ring-rose"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeMarker(m.regionId)}
+                      className="shrink-0 text-xs text-gray hover:text-pink"
+                    >
+                      ✕
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
         </div>
       ) : null}
 
