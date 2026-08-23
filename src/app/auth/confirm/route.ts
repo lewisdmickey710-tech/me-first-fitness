@@ -22,6 +22,7 @@ export async function GET(request: Request) {
     if (!error) {
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error(`verifyOtp failed (type=${type}):`, error.status, error.code, error.message);
     return NextResponse.redirect(
       `${origin}/login?error=${encodeURIComponent(error.message)}`
     );
