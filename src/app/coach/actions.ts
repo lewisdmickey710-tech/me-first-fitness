@@ -571,6 +571,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       primary_goal: textOrNull("primary_goal"),
       secondary_goal: textOrNull("secondary_goal"),
       key_health_notes: textOrNull("key_health_notes"),
+      symptom_tracker_enabled: formData.get("symptom_tracker_enabled") === "on",
     })
     .eq("id", clientId);
 

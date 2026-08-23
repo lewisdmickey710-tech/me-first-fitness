@@ -82,8 +82,9 @@ const TABS = [
   { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
-  { id: "wellness", label: "Wellness" },
-  { id: "milestones", label: "Milestones" },
+  { id: "habits", label: "Habits" },
+  { id: "nutrition", label: "Nutrition" },
+  { id: "symptoms", label: "Symptoms" },
 ] as const;
 
 const SESSION_TYPE_LABEL: Record<SessionType, string> = {
@@ -313,7 +314,9 @@ export default async function ClientDetailPage({
       />
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">
-        {TABS.map((t) => (
+        {TABS.filter(
+          (t) => t.id !== "symptoms" || client.symptom_tracker_enabled
+        ).map((t) => (
           <Link
             key={t.id}
             href={`/coach/clients/${id}?tab=${t.id}`}
@@ -356,6 +359,7 @@ export default async function ClientDetailPage({
           assignments={assignments ?? []}
           minorConsent={minorConsent}
           careProfiles={careProfiles ?? []}
+          milestones={milestones ?? []}
         />
       )}
       {tab === "sessions" && (
@@ -385,16 +389,14 @@ export default async function ClientDetailPage({
       {tab === "payments" && (
         <PaymentsTab clientId={id} payments={payments ?? []} />
       )}
-      {tab === "wellness" && (
-        <WellnessTab
-          habits={habits ?? []}
-          habitLogs={habitLogs ?? []}
-          symptomLogs={symptomLogs ?? []}
-          nutritionLogs={nutritionLogs ?? []}
-        />
+      {tab === "habits" && (
+        <HabitsTab habits={habits ?? []} habitLogs={habitLogs ?? []} />
       )}
-      {tab === "milestones" && (
-        <MilestonesTab clientId={id} milestones={milestones ?? []} />
+      {tab === "nutrition" && (
+        <NutritionTab nutritionLogs={nutritionLogs ?? []} />
+      )}
+      {tab === "symptoms" && client.symptom_tracker_enabled && (
+        <SymptomsTab symptomLogs={symptomLogs ?? []} />
       )}
     </div>
   );
@@ -753,6 +755,7 @@ function ProfileTab({
   assignments,
   minorConsent,
   careProfiles,
+  milestones,
 }: {
   client: Client;
   intake: ClientIntake | null;
@@ -760,6 +763,7 @@ function ProfileTab({
   assignments: ClientDocumentAssignment[];
   minorConsent: ClientMinorConsent | null;
   careProfiles: CareProfile[];
+  milestones: ClientMilestone[];
 }) {
   const assignedDocIds = new Set(assignments.map((a) => a.document_id));
   return (
@@ -919,9 +923,20 @@ function ProfileTab({
             />
           </div>
 
+          <Checkbox
+            name="symptom_tracker_enabled"
+            label="Enable the optional symptom tracker for this client"
+            defaultChecked={client.symptom_tracker_enabled}
+          />
+
           <Button type="submit">Save</Button>
         </form>
       </Card>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray">Milestones</p>
+        <MilestonesSection clientId={client.id} milestones={milestones} />
+      </div>
 
       <div>
         <p className="mb-2 text-sm font-medium text-gray">
@@ -1530,16 +1545,12 @@ const WELLNESS_LEVEL_CLASS: Record<number, string> = {
   3: "border-pink bg-pink",
 };
 
-function WellnessTab({
+function HabitsTab({
   habits,
   habitLogs,
-  symptomLogs,
-  nutritionLogs,
 }: {
   habits: ClientHabit[];
   habitLogs: ClientHabitLog[];
-  symptomLogs: ClientSymptomLog[];
-  nutritionLogs: ClientNutritionLog[];
 }) {
   const now = nowInBusinessTz();
   const last7Days: string[] = [];
@@ -1554,134 +1565,144 @@ function WellnessTab({
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-sm font-medium text-gray">Habits (last 7 days)</p>
-        <p className="mt-1 text-xs text-gray">
-          Client-set colors — <span className="text-teal">teal</span>,{" "}
-          <span className="text-gold">gold</span>,{" "}
-          <span className="text-pink">pink</span> — whatever level they
-          assigned that day for that habit.
-        </p>
-        {habits.length === 0 ? (
-          <EmptyState
-            title="No habits tracked"
-            body="This client hasn't set up any personal habit tracking yet — entirely optional on their end."
-          />
-        ) : (
-          <Card className="mt-2 space-y-3">
-            <div className="grid grid-cols-[1fr_repeat(7,1.75rem)] items-center gap-x-1 gap-y-2 text-xs text-gray">
-              <div />
-              {last7Days.map((d) => (
-                <div key={d} className="text-center">
-                  {d.slice(5)}
-                </div>
-              ))}
-              {habits.map((h) => (
-                <Fragment key={h.id}>
-                  <span className="truncate text-sm text-ink">{h.name}</span>
-                  {last7Days.map((d) => {
-                    const level = levelByHabitAndDate.get(`${h.id}:${d}`);
-                    return (
-                      <div key={`${h.id}-${d}`} className="flex justify-center">
-                        <span
-                          className={`inline-block h-4 w-4 rounded-full border ${
-                            level ? WELLNESS_LEVEL_CLASS[level] : "border-grayLt bg-white"
-                          }`}
-                        />
-                      </div>
-                    );
-                  })}
-                </Fragment>
-              ))}
-            </div>
-          </Card>
-        )}
-      </div>
-
-      <div>
-        <p className="text-sm font-medium text-gray">
-          Symptom log (shared with you)
-        </p>
-        <p className="mt-1 text-xs text-gray">
-          Clients keep this mainly for their own doctor/PT visits — you only
-          see an entry if they choose to share it.
-        </p>
-        {symptomLogs.length === 0 ? (
-          <EmptyState
-            title="Nothing shared yet"
-            body="No shared symptom entries from this client."
-          />
-        ) : (
-          <div className="mt-2 space-y-2">
-            {symptomLogs.map((s) => (
-              <Card key={s.id}>
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">
-                    {s.symptom}
-                    {s.severity ? (
-                      <span className="ml-2 text-sm text-gray">
-                        severity {s.severity}/5
-                      </span>
-                    ) : null}
-                  </p>
-                  <p className="text-sm text-gray">{s.log_date}</p>
-                </div>
-                {s.notes ? (
-                  <p className="mt-1 text-sm text-ink">{s.notes}</p>
-                ) : null}
-              </Card>
+    <div>
+      <p className="text-sm font-medium text-gray">Habits (last 7 days)</p>
+      <p className="mt-1 text-xs text-gray">
+        Client-set colors — <span className="text-teal">teal</span>,{" "}
+        <span className="text-gold">gold</span>,{" "}
+        <span className="text-pink">pink</span> — whatever level they
+        assigned that day for that habit.
+      </p>
+      {habits.length === 0 ? (
+        <EmptyState
+          title="No habits tracked"
+          body="This client hasn't set up any personal habit tracking yet — entirely optional on their end."
+        />
+      ) : (
+        <Card className="mt-2 space-y-3">
+          <div className="grid grid-cols-[1fr_repeat(7,1.75rem)] items-center gap-x-1 gap-y-2 text-xs text-gray">
+            <div />
+            {last7Days.map((d) => (
+              <div key={d} className="text-center">
+                {d.slice(5)}
+              </div>
+            ))}
+            {habits.map((h) => (
+              <Fragment key={h.id}>
+                <span className="truncate text-sm text-ink">{h.name}</span>
+                {last7Days.map((d) => {
+                  const level = levelByHabitAndDate.get(`${h.id}:${d}`);
+                  return (
+                    <div key={`${h.id}-${d}`} className="flex justify-center">
+                      <span
+                        className={`inline-block h-4 w-4 rounded-full border ${
+                          level ? WELLNESS_LEVEL_CLASS[level] : "border-grayLt bg-white"
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
+              </Fragment>
             ))}
           </div>
-        )}
-      </div>
-
-      <div>
-        <p className="text-sm font-medium text-gray">Nutrition log</p>
-        {nutritionLogs.length === 0 ? (
-          <EmptyState
-            title="No nutrition entries yet"
-            body="This client hasn't logged any meals in their tracker yet."
-          />
-        ) : (
-          <div className="mt-2 space-y-2">
-            {nutritionLogs.map((n) => (
-              <Card key={n.id}>
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">
-                    {n.log_date}
-                    {n.meal_label ? ` · ${n.meal_label}` : ""}
-                  </p>
-                </div>
-                {n.description ? (
-                  <p className="mt-1 text-sm text-ink">{n.description}</p>
-                ) : null}
-                <p className="mt-1 text-xs text-gray">
-                  {[
-                    n.hunger_before ? `hunger ${n.hunger_before}/10` : null,
-                    n.fullness_after ? `fullness ${n.fullness_after}/10` : null,
-                    n.satisfaction ? `satisfaction ${n.satisfaction}/5` : null,
-                    n.calories ? `${n.calories} cal` : null,
-                    n.protein_g ? `${n.protein_g}g protein` : null,
-                    n.carbs_g ? `${n.carbs_g}g carbs` : null,
-                    n.fat_g ? `${n.fat_g}g fat` : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {n.notes ? (
-                  <p className="mt-1 text-sm text-gray">{n.notes}</p>
-                ) : null}
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
+        </Card>
+      )}
     </div>
   );
 }
 
-function MilestonesTab({
+function SymptomsTab({ symptomLogs }: { symptomLogs: ClientSymptomLog[] }) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray">
+        Symptom log (shared with you)
+      </p>
+      <p className="mt-1 text-xs text-gray">
+        Clients keep this mainly for their own doctor/PT visits — you only
+        see an entry if they choose to share it.
+      </p>
+      {symptomLogs.length === 0 ? (
+        <EmptyState
+          title="Nothing shared yet"
+          body="No shared symptom entries from this client."
+        />
+      ) : (
+        <div className="mt-2 space-y-2">
+          {symptomLogs.map((s) => (
+            <Card key={s.id}>
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">
+                  {s.symptom}
+                  {s.severity ? (
+                    <span className="ml-2 text-sm text-gray">
+                      severity {s.severity}/5
+                    </span>
+                  ) : null}
+                </p>
+                <p className="text-sm text-gray">{s.log_date}</p>
+              </div>
+              {s.notes ? (
+                <p className="mt-1 text-sm text-ink">{s.notes}</p>
+              ) : null}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NutritionTab({
+  nutritionLogs,
+}: {
+  nutritionLogs: ClientNutritionLog[];
+}) {
+  return (
+    <div>
+      <p className="text-sm font-medium text-gray">Nutrition log</p>
+      {nutritionLogs.length === 0 ? (
+        <EmptyState
+          title="No nutrition entries yet"
+          body="This client hasn't logged any meals in their tracker yet."
+        />
+      ) : (
+        <div className="mt-2 space-y-2">
+          {nutritionLogs.map((n) => (
+            <Card key={n.id}>
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">
+                  {n.log_date}
+                  {n.meal_label ? ` · ${n.meal_label}` : ""}
+                </p>
+              </div>
+              {n.description ? (
+                <p className="mt-1 text-sm text-ink">{n.description}</p>
+              ) : null}
+              <p className="mt-1 text-xs text-gray">
+                {[
+                  n.hunger_before ? `hunger ${n.hunger_before}/10` : null,
+                  n.fullness_after ? `fullness ${n.fullness_after}/10` : null,
+                  n.satisfaction ? `satisfaction ${n.satisfaction}/5` : null,
+                  n.calories ? `${n.calories} cal` : null,
+                  n.protein_g ? `${n.protein_g}g protein` : null,
+                  n.carbs_g ? `${n.carbs_g}g carbs` : null,
+                  n.fat_g ? `${n.fat_g}g fat` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              {n.notes ? (
+                <p className="mt-1 text-sm text-gray">{n.notes}</p>
+              ) : null}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MilestonesSection({
   clientId,
   milestones,
 }: {

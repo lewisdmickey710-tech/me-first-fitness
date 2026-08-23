@@ -653,7 +653,7 @@ export async function addHabit(name: string) {
     .insert({ client_id: me.id, name: trimmed });
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/habits");
 }
 
 export async function deleteHabit(habitId: string) {
@@ -668,7 +668,7 @@ export async function deleteHabit(habitId: string) {
     .eq("client_id", me.id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/habits");
 }
 
 // Cycles a day-box through empty -> level 1 (teal) -> level 2 (gold) ->
@@ -706,7 +706,7 @@ export async function cycleHabitLog(habitId: string, logDate: string) {
     if (error) throw new Error(error.message);
   }
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/habits");
 }
 
 export async function addSymptomLog(formData: FormData) {
@@ -732,7 +732,7 @@ export async function addSymptomLog(formData: FormData) {
   });
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/symptoms");
 }
 
 export async function deleteSymptomLog(logId: string) {
@@ -747,7 +747,7 @@ export async function deleteSymptomLog(logId: string) {
     .eq("client_id", me.id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/symptoms");
 }
 
 export async function addNutritionLog(formData: FormData) {
@@ -783,7 +783,7 @@ export async function addNutritionLog(formData: FormData) {
   });
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/nutrition");
 }
 
 export async function deleteNutritionLog(logId: string) {
@@ -798,5 +798,5 @@ export async function deleteNutritionLog(logId: string) {
     .eq("client_id", me.id);
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/tracker");
+  revalidatePath("/client/nutrition");
 }

@@ -94,13 +94,29 @@ export async function updateSession(request: NextRequest) {
     if (role === "lead" && path.startsWith("/lead") && path !== "/lead/profile") {
       const { data: lead } = await supabase
         .from("leads")
-        .select("profile_completed_at")
+        .select("id, profile_completed_at")
         .eq("user_id", user.id)
         .maybeSingle();
       if (lead && !lead.profile_completed_at) {
         const url = request.nextUrl.clone();
         url.pathname = "/lead/profile";
         return NextResponse.redirect(url);
+      }
+
+      // Same reasoning as the client-side intake gate below: the free
+      // assessment is meant to start from the pre-assessment questionnaire
+      // already filled out, not something asked about after the fact.
+      if (lead?.profile_completed_at && path !== "/lead/intake") {
+        const { data: leadIntake } = await supabase
+          .from("lead_intake")
+          .select("submitted_at")
+          .eq("lead_id", lead.id)
+          .maybeSingle();
+        if (!leadIntake?.submitted_at) {
+          const url = request.nextUrl.clone();
+          url.pathname = "/lead/intake";
+          return NextResponse.redirect(url);
+        }
       }
     }
 

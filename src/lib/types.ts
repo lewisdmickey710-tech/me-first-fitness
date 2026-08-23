@@ -38,6 +38,7 @@ export interface Client {
   last_document_nudge_sent_at: string | null;
   last_service_checkin_nudge_sent_at: string | null;
   archived_at: string | null;
+  symptom_tracker_enabled: boolean;
 }
 
 export interface SessionEntry {
