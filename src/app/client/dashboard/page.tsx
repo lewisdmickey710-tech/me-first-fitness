@@ -10,6 +10,7 @@ import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
   ClientIntake,
+  ClientMilestone,
   ClientMinorConsent,
   ClientSchedule,
   LegalDocument,
@@ -136,6 +137,17 @@ export default async function ClientDashboard() {
     .select("id", { count: "exact", head: true })
     .eq("client_id", me.id);
 
+  const { data: milestones } = (await supabase
+    .from("client_milestones")
+    .select("*")
+    .eq("client_id", me.id)) as { data: ClientMilestone[] | null };
+
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const recentlyAchieved = (milestones ?? [])
+    .filter((m) => m.achieved_at && new Date(m.achieved_at) >= fourteenDaysAgo)
+    .sort((a, b) => (b.achieved_at ?? "").localeCompare(a.achieved_at ?? ""));
+
   const allotted = me.sessions_allotted;
 
   return (
@@ -160,11 +172,31 @@ export default async function ClientDashboard() {
         </p>
       ) : null}
 
+      {recentlyAchieved.length > 0 ? (
+        <Card className="border-gold/40 bg-gold/5">
+          <p className="font-medium text-ink">
+            🎉 You hit {recentlyAchieved.length > 1 ? "milestones" : "a milestone"}!
+          </p>
+          <ul className="mt-1 text-sm text-ink">
+            {recentlyAchieved.map((m) => (
+              <li key={m.id}>{m.title}</li>
+            ))}
+          </ul>
+          <Link
+            href="/client/milestones"
+            className="mt-2 inline-block text-sm text-rose hover:underline"
+          >
+            View your milestones →
+          </Link>
+        </Card>
+      ) : null}
+
       <div className="grid grid-cols-3 gap-3">
         <QuickAction href="/client/program" label="My program" />
         <QuickAction href="/client/schedule" label="My schedule" />
         <QuickAction href="/client/checkin" label="Log check-in" />
         <QuickAction href="/client/tracker" label="My tracker" />
+        <QuickAction href="/client/milestones" label="Milestones" />
         <QuickAction href="/client/guide" label="Wellness guide" />
         <QuickAction href="/client/documents" label="Documents" />
       </div>

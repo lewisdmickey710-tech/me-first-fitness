@@ -143,3 +143,27 @@ export async function sendDocumentsPendingEmail(to: string, clientName: string) 
     `),
   });
 }
+
+export async function sendMilestoneAchievedEmail(
+  to: string,
+  clientName: string,
+  milestoneTitle: string,
+  achievedNote: string | null
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping milestone email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `🎉 You hit a milestone — ${milestoneTitle}`,
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p><strong>${milestoneTitle}</strong> — done. I'm genuinely proud of you, and I wanted you to hear it directly from me, not just see a checkmark in the app.</p>
+      ${achievedNote ? `<p>${achievedNote}</p>` : ""}
+      <p>Log in to see it marked on your milestones — and let's keep going.</p>
+      <p>— Mickey</p>
+    `),
+  });
+}

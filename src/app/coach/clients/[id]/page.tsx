@@ -5,12 +5,16 @@ import { createClient } from "@/lib/supabase/server";
 import { CareProfilePicker } from "@/app/coach/roster/new/CareProfilePicker";
 import {
   addClientNote,
+  addMilestone,
   advancePhase,
   deleteClientNote,
+  deleteMilestone,
   logSessionOccurrence,
+  markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
   setRequestStatus,
+  unmarkMilestoneAchieved,
   updateClientProfile,
 } from "@/app/coach/actions";
 import {
@@ -49,6 +53,7 @@ import type {
   ClientHabit,
   ClientHabitLog,
   ClientIntake,
+  ClientMilestone,
   ClientMinorConsent,
   ClientNote,
   ClientNutritionLog,
@@ -77,6 +82,7 @@ const TABS = [
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
   { id: "wellness", label: "Wellness" },
+  { id: "milestones", label: "Milestones" },
 ] as const;
 
 const SESSION_TYPE_LABEL: Record<SessionType, string> = {
@@ -282,6 +288,12 @@ export default async function ClientDetailPage({
     .eq("client_id", id)
     .order("created_at", { ascending: false })) as { data: ClientNote[] | null };
 
+  const { data: milestones } = (await supabase
+    .from("client_milestones")
+    .select("*")
+    .eq("client_id", id)
+    .order("created_at", { ascending: false })) as { data: ClientMilestone[] | null };
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -379,6 +391,9 @@ export default async function ClientDetailPage({
           symptomLogs={symptomLogs ?? []}
           nutritionLogs={nutritionLogs ?? []}
         />
+      )}
+      {tab === "milestones" && (
+        <MilestonesTab clientId={id} milestones={milestones ?? []} />
       )}
     </div>
   );
@@ -1642,6 +1657,134 @@ function WellnessTab({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function MilestonesTab({
+  clientId,
+  milestones,
+}: {
+  clientId: string;
+  milestones: ClientMilestone[];
+}) {
+  const boundAddMilestone = addMilestone.bind(null, clientId);
+  const upcoming = milestones.filter((m) => !m.achieved_at);
+  const achieved = milestones.filter((m) => m.achieved_at);
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <p className="mb-2 text-sm font-medium text-ink">Add a milestone</p>
+        <form action={boundAddMilestone} className="space-y-3">
+          <Input name="title" required placeholder="e.g. First pain-free squat" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs text-gray">
+                Target date (optional)
+              </label>
+              <Input name="target_date" type="date" />
+            </div>
+          </div>
+          <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
+          <Button type="submit" variant="secondary">
+            Add milestone
+          </Button>
+        </form>
+      </Card>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-gray">
+          To look forward to
+        </p>
+        {upcoming.length === 0 ? (
+          <EmptyState
+            title="No milestones set"
+            body="Give them something concrete to look forward to and celebrate hitting."
+          />
+        ) : (
+          <div className="space-y-2">
+            {upcoming.map((m) => (
+              <Card key={m.id}>
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-ink">{m.title}</p>
+                    {m.target_date ? (
+                      <p className="text-sm text-gray">Target: {m.target_date}</p>
+                    ) : null}
+                    {m.notes ? (
+                      <p className="mt-1 text-sm text-gray">{m.notes}</p>
+                    ) : null}
+                  </div>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteMilestone(clientId, m.id);
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="shrink-0 text-xs text-gray hover:text-pink"
+                    >
+                      Remove
+                    </button>
+                  </form>
+                </div>
+                <form
+                  action={markMilestoneAchieved.bind(null, clientId, m.id)}
+                  className="mt-3 flex gap-2 border-t border-grayLt pt-3"
+                >
+                  <Input
+                    name="achieved_note"
+                    placeholder="A note to send along with it (optional)"
+                    className="flex-1"
+                  />
+                  <Button type="submit">🎉 Mark achieved</Button>
+                </form>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {achieved.length > 0 ? (
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray">Celebrated 🎉</p>
+          <div className="space-y-2">
+            {achieved.map((m) => (
+              <Card key={m.id} className="border-gold/40 bg-gold/5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-ink">{m.title}</p>
+                    <p className="text-sm text-gray">
+                      Achieved{" "}
+                      {m.achieved_at
+                        ? new Date(m.achieved_at).toLocaleDateString()
+                        : ""}
+                    </p>
+                    {m.achieved_note ? (
+                      <p className="mt-1 text-sm text-ink">{m.achieved_note}</p>
+                    ) : null}
+                  </div>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await unmarkMilestoneAchieved(clientId, m.id);
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="shrink-0 text-xs text-gray hover:text-ink"
+                    >
+                      Undo
+                    </button>
+                  </form>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

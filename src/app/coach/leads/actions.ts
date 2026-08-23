@@ -163,6 +163,20 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
       .from("client_intake")
       .insert({ ...intakeFields, client_id: client.id });
     if (intakeError) throw new Error(intakeError.message);
+
+    // Same intake answers, but the Profile tab's primary/secondary goal
+    // fields are separate free-text columns nothing ever copied into --
+    // give the new client a starting point instead of leaving them blank.
+    const goalUpdate: Record<string, string> = {};
+    if (leadIntake.goal_change_description) {
+      goalUpdate.primary_goal = leadIntake.goal_change_description;
+    }
+    if (leadIntake.goal_success_3_months) {
+      goalUpdate.secondary_goal = leadIntake.goal_success_3_months;
+    }
+    if (Object.keys(goalUpdate).length > 0) {
+      await supabase.from("clients").update(goalUpdate).eq("id", client.id);
+    }
   }
 
   // Flip the linked login from lead to client -- profiles has no coach-write

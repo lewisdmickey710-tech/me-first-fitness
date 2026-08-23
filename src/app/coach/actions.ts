@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { nextPhase, getCurrentPhase } from "@/lib/phase";
+import { sendMilestoneAchievedEmail } from "@/lib/email";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
@@ -637,6 +639,91 @@ export async function addHabitForClient(clientId: string, name: string) {
   const { error } = await supabase
     .from("client_habits")
     .insert({ client_id: clientId, name: trimmed });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function addMilestone(clientId: string, formData: FormData) {
+  const title = String(formData.get("title") ?? "").trim();
+  if (!title) throw new Error("Title is required.");
+  const targetDate = String(formData.get("target_date") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("client_milestones").insert({
+    client_id: clientId,
+    title,
+    target_date: targetDate,
+    notes,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function deleteMilestone(clientId: string, milestoneId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_milestones")
+    .delete()
+    .eq("id", milestoneId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function markMilestoneAchieved(
+  clientId: string,
+  milestoneId: string,
+  formData: FormData
+) {
+  const achievedNote = String(formData.get("achieved_note") ?? "").trim() || null;
+  const supabase = await createClient();
+
+  const { data: milestone, error } = await supabase
+    .from("client_milestones")
+    .update({ achieved_at: new Date().toISOString(), achieved_note: achievedNote })
+    .eq("id", milestoneId)
+    .select("title")
+    .single();
+  if (error) throw new Error(error.message);
+
+  // Best-effort -- a missing/unreachable login email shouldn't block marking
+  // the milestone itself as achieved.
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name, user_id")
+      .eq("id", clientId)
+      .single();
+    if (client?.user_id) {
+      const admin = createAdminClient();
+      const { data: userResult } = await admin.auth.admin.getUserById(client.user_id);
+      if (userResult?.user?.email) {
+        await sendMilestoneAchievedEmail(
+          userResult.user.email,
+          client.name,
+          milestone.title,
+          achievedNote
+        );
+      }
+    }
+  } catch (emailError) {
+    console.error("Failed to send milestone email", emailError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/client/milestones");
+  revalidatePath("/client/dashboard");
+}
+
+export async function unmarkMilestoneAchieved(clientId: string, milestoneId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_milestones")
+    .update({ achieved_at: null, achieved_note: null })
+    .eq("id", milestoneId);
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);

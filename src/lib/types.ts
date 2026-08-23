@@ -93,6 +93,17 @@ export interface ClientNote {
   created_at: string;
 }
 
+export interface ClientMilestone {
+  id: string;
+  client_id: string;
+  title: string;
+  notes: string | null;
+  target_date: string | null;
+  achieved_at: string | null;
+  achieved_note: string | null;
+  created_at: string;
+}
+
 export interface Checkin {
   id: string;
   client_id: string;

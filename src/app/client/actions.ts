@@ -356,6 +356,32 @@ export async function submitClientIntake(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
+  // The Profile tab's primary/secondary goal fields are separate free-text
+  // fields the coach fills in by hand -- nothing ever copied the intake's
+  // own goal answers into them, so they stayed blank even after a client
+  // filled out a full intake. Backfill only what's still empty, so this
+  // never overwrites something the coach already wrote.
+  const goalChangeDescription = textOrNull(formData, "goal_change_description");
+  const goalSuccess3Months = textOrNull(formData, "goal_success_3_months");
+  if (goalChangeDescription || goalSuccess3Months) {
+    const { data: currentClient } = await supabase
+      .from("clients")
+      .select("primary_goal, secondary_goal")
+      .eq("id", me.id)
+      .single();
+
+    const goalUpdate: Record<string, string> = {};
+    if (!currentClient?.primary_goal && goalChangeDescription) {
+      goalUpdate.primary_goal = goalChangeDescription;
+    }
+    if (!currentClient?.secondary_goal && goalSuccess3Months) {
+      goalUpdate.secondary_goal = goalSuccess3Months;
+    }
+    if (Object.keys(goalUpdate).length > 0) {
+      await supabase.from("clients").update(goalUpdate).eq("id", me.id);
+    }
+  }
+
   revalidatePath("/client/dashboard");
   redirect("/client/dashboard");
 }
