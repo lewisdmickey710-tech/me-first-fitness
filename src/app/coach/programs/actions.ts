@@ -32,16 +32,10 @@ export async function saveProgramDay(
 
   const programDayId = day.id;
 
-  const { error: delError } = await supabase
-    .from("program_day_exercises")
-    .delete()
-    .eq("program_day_id", programDayId);
-
-  if (delError) throw new Error(delError.message);
-
   const exerciseIds = formData.getAll("exercise_id") as string[];
   const setsList = formData.getAll("sets") as string[];
   const repsList = formData.getAll("reps") as string[];
+  const tempoList = formData.getAll("tempo") as string[];
   const supersetList = formData.getAll("superset_group") as string[];
 
   const rows = exerciseIds
@@ -51,16 +45,34 @@ export async function saveProgramDay(
       position: i,
       sets: setsList[i]?.trim() || null,
       reps: repsList[i]?.trim() || null,
+      tempo: tempoList[i]?.trim() || null,
       superset_group: supersetList[i]?.trim() || null,
     }))
     .filter((r) => r.exercise_id);
 
+  // Upsert by (day, slot) instead of delete-then-reinsert, so a slot that
+  // still holds an exercise keeps its id across saves -- and with it, any
+  // client_program_overrides pointed at that id. Only slots that are now
+  // blank or beyond the new row count get deleted (which correctly cascades
+  // any override for a slot that no longer exists).
   if (rows.length > 0) {
-    const { error: insError } = await supabase
+    const { error: upsertError } = await supabase
       .from("program_day_exercises")
-      .insert(rows);
-    if (insError) throw new Error(insError.message);
+      .upsert(rows, { onConflict: "program_day_id,position" });
+    if (upsertError) throw new Error(upsertError.message);
   }
+
+  const filledPositions = rows.map((r) => r.position);
+  let staleQuery = supabase
+    .from("program_day_exercises")
+    .delete()
+    .eq("program_day_id", programDayId);
+  staleQuery =
+    filledPositions.length > 0
+      ? staleQuery.not("position", "in", `(${filledPositions.join(",")})`)
+      : staleQuery;
+  const { error: delError } = await staleQuery;
+  if (delError) throw new Error(delError.message);
 
   revalidatePath(`/coach/programs/${careProfileId}`);
 }

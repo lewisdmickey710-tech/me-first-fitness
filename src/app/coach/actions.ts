@@ -252,6 +252,7 @@ export async function setClientProgramOverride(
     String(formData.get("substitute_exercise_id") ?? "").trim() || null;
   const sets_override = String(formData.get("sets_override") ?? "").trim() || null;
   const reps_override = String(formData.get("reps_override") ?? "").trim() || null;
+  const tempo_override = String(formData.get("tempo_override") ?? "").trim() || null;
   const removed = formData.get("removed") === "on";
 
   const { error } = await supabase.from("client_program_overrides").upsert(
@@ -261,6 +262,7 @@ export async function setClientProgramOverride(
       substitute_exercise_id,
       sets_override,
       reps_override,
+      tempo_override,
       removed,
       edited_by: "coach",
       active: true,

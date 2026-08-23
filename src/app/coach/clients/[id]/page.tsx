@@ -116,6 +116,7 @@ interface ProgramDayWithExercisesRow {
     position: number;
     sets: string | null;
     reps: string | null;
+    tempo: string | null;
     superset_group: string | null;
     exercise_id: string;
     exercises: { id: string; name: string } | null;
@@ -274,7 +275,7 @@ export default async function ClientDetailPage({
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, superset_group, exercise_id, exercises(id, name))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name))"
           )
           .eq("care_profile_id", client.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -1406,9 +1407,11 @@ function ProgramTab({
               name: pde.exercises?.name ?? "(deleted exercise)",
               sets: pde.sets,
               reps: pde.reps,
+              tempo: pde.tempo,
               substituteExerciseId: override?.substitute_exercise_id ?? null,
               setsOverride: override?.sets_override ?? null,
               repsOverride: override?.reps_override ?? null,
+              tempoOverride: override?.tempo_override ?? null,
               removed: override?.removed ?? false,
             };
           });

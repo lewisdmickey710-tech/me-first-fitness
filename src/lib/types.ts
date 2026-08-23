@@ -208,6 +208,7 @@ export interface ProgramDayExercise {
   superset_group: string | null;
   sets: string | null;
   reps: string | null;
+  tempo: string | null;
   created_at: string;
 }
 
@@ -229,6 +230,7 @@ export interface ClientProgramOverride {
   substitute_exercise_id: string | null;
   sets_override: string | null;
   reps_override: string | null;
+  tempo_override: string | null;
   removed: boolean;
   position_override: number | null;
   edited_by: "coach" | "client";

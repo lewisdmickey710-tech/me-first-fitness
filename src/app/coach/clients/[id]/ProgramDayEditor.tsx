@@ -26,9 +26,11 @@ export interface ProgramExerciseRow {
   name: string;
   sets: string | null;
   reps: string | null;
+  tempo: string | null;
   substituteExerciseId: string | null;
   setsOverride: string | null;
   repsOverride: string | null;
+  tempoOverride: string | null;
   removed: boolean;
 }
 
@@ -133,6 +135,7 @@ function SortableExerciseCard({
           </p>
           <p className="whitespace-nowrap text-xs text-gray">
             prescribed {exercise.sets}×{exercise.reps}
+            {exercise.tempo ? ` @ ${exercise.tempo}` : ""}
           </p>
         </div>
 
@@ -160,7 +163,7 @@ function SortableExerciseCard({
               Remove for this client
             </label>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <Input
               name="sets_override"
               placeholder="Sets (override)"
@@ -170,6 +173,11 @@ function SortableExerciseCard({
               name="reps_override"
               placeholder="Reps (override)"
               defaultValue={exercise.repsOverride ?? ""}
+            />
+            <Input
+              name="tempo_override"
+              placeholder="Tempo (override)"
+              defaultValue={exercise.tempoOverride ?? ""}
             />
           </div>
           <Button type="submit" variant="secondary">

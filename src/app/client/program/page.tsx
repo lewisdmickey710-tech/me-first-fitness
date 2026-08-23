@@ -30,6 +30,7 @@ interface ProgramDayJoinRow {
     position: number;
     sets: string | null;
     reps: string | null;
+    tempo: string | null;
     superset_group: string | null;
     exercise_id: string;
     exercises: {
@@ -62,7 +63,7 @@ export default async function ClientProgramPage() {
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id))"
           )
           .eq("care_profile_id", me.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -80,7 +81,7 @@ export default async function ClientProgramPage() {
     ? await supabase
         .from("client_program_overrides")
         .select(
-          "program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed, position_override"
+          "program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, tempo_override, removed, position_override"
         )
         .eq("client_id", me.id)
         .eq("active", true)
@@ -91,6 +92,7 @@ export default async function ClientProgramPage() {
           substitute_exercise_id: string | null;
           sets_override: string | null;
           reps_override: string | null;
+          tempo_override: string | null;
           removed: boolean;
           position_override: number | null;
         }[],
@@ -176,6 +178,7 @@ export default async function ClientProgramPage() {
                     const effective = substitute ?? base;
                     const effectiveSets = override?.sets_override || pde.sets;
                     const effectiveReps = override?.reps_override || pde.reps;
+                    const effectiveTempo = override?.tempo_override || pde.tempo;
                     const regress = base?.regress_to_id
                       ? extraById.get(base.regress_to_id)
                       : null;
@@ -201,6 +204,7 @@ export default async function ClientProgramPage() {
                           </div>
                           <p className="whitespace-nowrap text-sm text-gray">
                             {effectiveSets}×{effectiveReps}
+                            {effectiveTempo ? ` @ ${effectiveTempo}` : ""}
                             {pde.superset_group
                               ? ` · ${pde.superset_group}`
                               : ""}

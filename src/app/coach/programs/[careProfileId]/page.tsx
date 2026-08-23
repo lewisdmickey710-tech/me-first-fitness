@@ -168,10 +168,12 @@ export default async function CareProfileProgramPage({
 
                 <div className="space-y-2">
                   {rows.map((row, i) => (
-                    <div key={i} className="grid grid-cols-12 gap-2">
+                    <div
+                      key={i}
+                      className="space-y-1.5 rounded-xl border border-grayLt p-2"
+                    >
                       <Select
                         name="exercise_id"
-                        className="col-span-6"
                         defaultValue={row?.exercise_id ?? ""}
                       >
                         <option value="">— Exercise —</option>
@@ -181,32 +183,42 @@ export default async function CareProfileProgramPage({
                           </option>
                         ))}
                       </Select>
-                      <Input
-                        name="sets"
-                        placeholder="Sets"
-                        className="col-span-2"
-                        defaultValue={row?.sets ?? ""}
-                      />
-                      <Input
-                        name="reps"
-                        placeholder="Reps"
-                        className="col-span-2"
-                        defaultValue={row?.reps ?? ""}
-                      />
-                      <Input
-                        name="superset_group"
-                        placeholder="A/B"
-                        className="col-span-2"
-                        defaultValue={row?.superset_group ?? ""}
-                        title="For phases 2 & 4: mark paired exercises the same number with A/B, e.g. 1A and 1B"
-                      />
+                      <div className="grid grid-cols-12 gap-2">
+                        <Input
+                          name="sets"
+                          placeholder="Sets"
+                          className="col-span-3"
+                          defaultValue={row?.sets ?? ""}
+                        />
+                        <Input
+                          name="reps"
+                          placeholder="Reps"
+                          className="col-span-3"
+                          defaultValue={row?.reps ?? ""}
+                        />
+                        <Input
+                          name="tempo"
+                          placeholder="Tempo"
+                          className="col-span-3"
+                          defaultValue={row?.tempo ?? ""}
+                          title="e.g. 3-1-1-0 (eccentric-pause-concentric-pause)"
+                        />
+                        <Input
+                          name="superset_group"
+                          placeholder="A/B"
+                          className="col-span-3"
+                          defaultValue={row?.superset_group ?? ""}
+                          title="For phases 2 & 4: mark paired exercises the same number with A/B, e.g. 1A and 1B"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-gray">
-                  For superset phases (2 &amp; 4), give paired rows the same
-                  A/B tag — e.g. &quot;1A&quot; and &quot;1B&quot; — so they
-                  read as a pair. Leave a row blank to skip it.
+                  Tempo is optional (e.g. &quot;3-1-1-0&quot;). For superset
+                  phases (2 &amp; 4), give paired rows the same A/B tag — e.g.
+                  &quot;1A&quot; and &quot;1B&quot; — so they read as a pair.
+                  Leave a row blank to skip it.
                 </p>
 
                 <Button type="submit">Save Day {dayNumber}</Button>
