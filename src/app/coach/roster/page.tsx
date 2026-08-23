@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { unarchiveClient } from "@/app/coach/actions";
+import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import { computeCancellationRisk } from "@/lib/risk";
@@ -9,13 +10,26 @@ import type { Client, OccurrenceStatus } from "@/lib/types";
 
 type ClientRow = Client & { care_profiles: { name: string } | null };
 
-export default async function RosterPage() {
+export default async function RosterPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ archived?: string }>;
+}) {
+  const { archived: archivedParam } = await searchParams;
+  const showArchived = archivedParam === "1";
+
   const supabase = await createClient();
 
-  const { data: clients } = (await supabase
+  let clientsQuery = supabase
     .from("clients")
     .select("*, care_profiles(name)")
-    .order("name")) as { data: ClientRow[] | null };
+    .order("name");
+  clientsQuery = showArchived
+    ? clientsQuery.not("archived_at", "is", null)
+    : clientsQuery.is("archived_at", null);
+  const { data: clients } = (await clientsQuery) as unknown as {
+    data: ClientRow[] | null;
+  };
 
   const clientIds = (clients ?? []).map((c) => c.id);
 
@@ -193,15 +207,33 @@ export default async function RosterPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Your roster
+          {showArchived ? "Archived clients" : "Your roster"}
         </h1>
-        <Link
-          href="/coach/roster/new"
-          className="rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-        >
-          + Add client
-        </Link>
+        {showArchived ? (
+          <Link
+            href="/coach/roster"
+            className="text-sm text-gray hover:text-ink"
+          >
+            ← Back to roster
+          </Link>
+        ) : (
+          <Link
+            href="/coach/roster/new"
+            className="rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            + Add client
+          </Link>
+        )}
       </div>
+
+      {!showArchived ? (
+        <Link
+          href="/coach/roster?archived=1"
+          className="inline-block text-sm text-gray hover:text-ink"
+        >
+          View archived clients →
+        </Link>
+      ) : null}
 
       {pendingSignupCount > 0 ? (
         <Card className="border-rose/50 bg-rose/5">
@@ -234,9 +266,44 @@ export default async function RosterPage() {
 
       {!clients || clients.length === 0 ? (
         <EmptyState
-          title="No clients yet"
-          body="Add your first client to start building their program."
+          title={showArchived ? "No archived clients" : "No clients yet"}
+          body={
+            showArchived
+              ? "Clients you archive show up here, with all their history intact."
+              : "Add your first client to start building their program."
+          }
         />
+      ) : showArchived ? (
+        <div className="space-y-3">
+          {clients.map((client) => (
+            <Card key={client.id} className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-ink">{client.name}</p>
+                <p className="mt-0.5 text-sm text-gray">
+                  {client.care_profiles?.name ?? "No care profile set"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/coach/clients/${client.id}`}
+                  className="text-sm text-gray hover:text-ink"
+                >
+                  View
+                </Link>
+                <form
+                  action={async () => {
+                    "use server";
+                    await unarchiveClient(client.id);
+                  }}
+                >
+                  <Button type="submit" variant="secondary">
+                    Restore
+                  </Button>
+                </form>
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : (
         <div className="space-y-3">
           {clients.map((client) => {

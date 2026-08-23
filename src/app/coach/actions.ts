@@ -607,6 +607,29 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+export async function archiveClient(clientId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/roster");
+  redirect("/coach/roster");
+}
+
+export async function unarchiveClient(clientId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({ archived_at: null })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/roster");
+}
+
 export async function addClientNote(clientId: string, formData: FormData) {
   const supabase = await createClient();
   const note = String(formData.get("note") ?? "").trim();

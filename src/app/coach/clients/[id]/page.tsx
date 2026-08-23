@@ -7,6 +7,7 @@ import {
   addClientNote,
   addMilestone,
   advancePhase,
+  archiveClient,
   deleteClientNote,
   deleteMilestone,
   logSessionOccurrence,
@@ -982,6 +983,25 @@ function ProfileTab({
           </Card>
         </div>
       ) : null}
+
+      <Card className="space-y-2 border-pink/40">
+        <p className="font-medium text-pink">Danger zone</p>
+        <p className="text-sm text-gray">
+          Archiving removes {client.name} from your active roster. Nothing
+          is deleted — all their history stays intact, and you can restore
+          them anytime from the archived list.
+        </p>
+        <form
+          action={async () => {
+            "use server";
+            await archiveClient(client.id);
+          }}
+        >
+          <Button type="submit" variant="danger">
+            Archive this client
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }
