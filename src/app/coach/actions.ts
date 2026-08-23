@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nextPhase, getCurrentPhase } from "@/lib/phase";
-import type { RequestStatus, SessionEntry } from "@/lib/types";
+import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
   const supabase = await createClient();
@@ -160,6 +160,24 @@ export async function logSession(clientId: string, formData: FormData) {
   const date = String(formData.get("date") ?? "");
   const ratingRaw = String(formData.get("rating") ?? "");
   const day_notes = String(formData.get("day_notes") ?? "").trim();
+  const sessionTypeRaw = String(formData.get("session_type") ?? "freestyle");
+  const session_type = (
+    ["program", "freestyle", "conversation", "recovery", "assessment"].includes(
+      sessionTypeRaw
+    )
+      ? sessionTypeRaw
+      : "freestyle"
+  ) as SessionType;
+  const bodyMapRaw = String(formData.get("body_map") ?? "");
+  let body_map: BodyMapMarker[] | null = null;
+  if (bodyMapRaw) {
+    try {
+      const parsed = JSON.parse(bodyMapRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) body_map = parsed;
+    } catch {
+      // ignore malformed body map JSON rather than blocking the session save
+    }
+  }
 
   const exercises = formData.getAll("exercise") as string[];
   const sets = formData.getAll("sets") as string[];
@@ -187,6 +205,8 @@ export async function logSession(clientId: string, formData: FormData) {
     rating: ratingRaw ? Number(ratingRaw) : null,
     day_notes: day_notes || null,
     logged_by: "coach",
+    session_type,
+    body_map,
   });
 
   if (error) throw new Error(error.message);
@@ -581,6 +601,43 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       if (phaseError) throw new Error(phaseError.message);
     }
   }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function addClientNote(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) return;
+
+  const { error } = await supabase
+    .from("client_notes")
+    .insert({ client_id: clientId, note });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function deleteClientNote(clientId: string, noteId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_notes")
+    .delete()
+    .eq("id", noteId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function addHabitForClient(clientId: string, name: string) {
+  const trimmed = name.trim();
+  if (!trimmed) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_habits")
+    .insert({ client_id: clientId, name: trimmed });
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
 }

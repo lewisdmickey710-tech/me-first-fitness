@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CareProfilePicker } from "@/app/coach/roster/new/CareProfilePicker";
 import {
+  addClientNote,
   advancePhase,
+  deleteClientNote,
   logSessionOccurrence,
   markPaymentPaid,
   setClientDocumentAssignment,
@@ -16,6 +18,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Collapsible,
   DeltaField,
   EmptyState,
   Heart,
@@ -25,6 +28,7 @@ import {
   Sparkline,
   Textarea,
 } from "@/components/ui";
+import { BodyMapInput } from "@/components/body-map";
 import { phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
@@ -46,6 +50,7 @@ import type {
   ClientHabitLog,
   ClientIntake,
   ClientMinorConsent,
+  ClientNote,
   ClientNutritionLog,
   ClientPhaseHistory,
   ClientSchedule,
@@ -57,6 +62,7 @@ import type {
   ServiceCheckin,
   SessionOccurrence,
   SessionRequest,
+  SessionType,
   TrainingSession,
 } from "@/lib/types";
 
@@ -72,6 +78,14 @@ const TABS = [
   { id: "payments", label: "Payments" },
   { id: "wellness", label: "Wellness" },
 ] as const;
+
+const SESSION_TYPE_LABEL: Record<SessionType, string> = {
+  program: "Program day",
+  freestyle: "Freestyle",
+  conversation: "Conversation",
+  recovery: "Recovery",
+  assessment: "Assessment",
+};
 
 const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
   scheduled: "Scheduled",
@@ -262,6 +276,12 @@ export default async function ClientDetailPage({
         .limit(20) as unknown as Promise<{ data: ClientNutritionLog[] | null }>,
     ]);
 
+  const { data: clientNotes } = (await supabase
+    .from("client_notes")
+    .select("*")
+    .eq("client_id", id)
+    .order("created_at", { ascending: false })) as { data: ClientNote[] | null };
+
   const pendingCount = (requests ?? []).filter(
     (r) => r.status === "pending"
   ).length;
@@ -312,6 +332,7 @@ export default async function ClientDetailPage({
           occurrences={occurrences ?? []}
           checkins={checkins ?? []}
           activities={activities ?? []}
+          notes={clientNotes ?? []}
         />
       )}
       {tab === "profile" && (
@@ -376,6 +397,7 @@ function Overview({
   occurrences,
   checkins,
   activities,
+  notes,
 }: {
   client: Client;
   currentPhase: ClientPhaseHistory | null;
@@ -389,6 +411,7 @@ function Overview({
   occurrences: SessionOccurrence[];
   checkins: Checkin[];
   activities: Activity[];
+  notes: ClientNote[];
 }) {
   const allotted = client.sessions_allotted;
   const nextSession = nextSessionForClient(schedules, occurrences);
@@ -430,8 +453,62 @@ function Overview({
     latestServiceCheckinSatisfaction: latestServiceCheckin?.satisfaction ?? null,
   });
 
+  const boundAddNote = addClientNote.bind(null, client.id);
+
   return (
     <div className="space-y-4">
+      <Card className="space-y-3">
+        <p className="text-sm font-medium text-gray">
+          Notes{" "}
+          <span className="font-normal text-gray/70">
+            (running log — separate from per-session notes)
+          </span>
+        </p>
+        <form action={boundAddNote} className="flex gap-2">
+          <Textarea
+            name="note"
+            rows={2}
+            placeholder="Anything worth remembering — injuries, preferences, progress..."
+            className="flex-1"
+          />
+          <Button type="submit" variant="secondary" className="self-end">
+            Add
+          </Button>
+        </form>
+        {notes.length > 0 ? (
+          <Collapsible label={`${notes.length} note${notes.length > 1 ? "s" : ""}`}>
+            <div className="space-y-2">
+              {notes.map((n) => (
+                <div
+                  key={n.id}
+                  className="flex items-start justify-between gap-2 rounded-lg bg-cream px-3 py-2"
+                >
+                  <div>
+                    <p className="text-sm text-ink">{n.note}</p>
+                    <p className="mt-0.5 text-xs text-gray">
+                      {new Date(n.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteClientNote(client.id, n.id);
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      className="shrink-0 text-xs text-gray hover:text-pink"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                </div>
+              ))}
+            </div>
+          </Collapsible>
+        ) : null}
+      </Card>
+
       {risk.isHighRisk ? (
         <Card className="border-pink/40 bg-pink/5">
           <p className="text-sm font-medium text-ink">
@@ -1184,8 +1261,13 @@ async function SessionsTab({
           {sessions.map((s) => (
             <Card key={s.id}>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-ink">{s.day_label}</p>
+                  {s.session_type && s.session_type !== "freestyle" ? (
+                    <Badge tone="gray">
+                      {SESSION_TYPE_LABEL[s.session_type]}
+                    </Badge>
+                  ) : null}
                   {s.logged_by === "client" ? (
                     <Badge tone="teal">logged by client</Badge>
                   ) : null}
@@ -1196,7 +1278,8 @@ async function SessionsTab({
                 <ul className="mt-2 space-y-1 text-sm text-gray">
                   {s.entries.map((e, i) => (
                     <li key={i}>
-                      {e.exercise} — {e.sets}x{e.reps}
+                      {e.exercise}
+                      {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
                       {e.weight ? ` @ ${e.weight}` : ""}
                       {e.substitute_exercise_id ? " (swapped)" : ""}
                       {e.notes ? (
@@ -1223,6 +1306,11 @@ async function SessionsTab({
               ) : null}
               {s.day_notes ? (
                 <p className="mt-1 text-sm text-ink">{s.day_notes}</p>
+              ) : null}
+              {s.body_map && s.body_map.length > 0 ? (
+                <Collapsible label="View body map" className="mt-2">
+                  <BodyMapInput defaultValue={s.body_map} readOnly />
+                </Collapsible>
               ) : null}
             </Card>
           ))}

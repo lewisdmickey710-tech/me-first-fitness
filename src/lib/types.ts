@@ -56,6 +56,22 @@ export interface SessionEntry {
   media_path?: string | null;
 }
 
+export type SessionType =
+  | "program"
+  | "freestyle"
+  | "conversation"
+  | "recovery"
+  | "assessment";
+
+export interface BodyMapMarker {
+  id: string;
+  view: "front" | "back";
+  x: number;
+  y: number;
+  level: number;
+  label: string;
+}
+
 export interface TrainingSession {
   id: string;
   client_id: string;
@@ -65,6 +81,15 @@ export interface TrainingSession {
   rating: number | null;
   day_notes: string | null;
   logged_by: "coach" | "client";
+  session_type: SessionType;
+  body_map: BodyMapMarker[] | null;
+  created_at: string;
+}
+
+export interface ClientNote {
+  id: string;
+  client_id: string;
+  note: string;
   created_at: string;
 }
 
