@@ -140,6 +140,17 @@ export default function ClientFaqPage() {
           programming, and nutrition support over video. A standalone
           written program (no sessions at all) is also available.
         </Q>
+        <Q q="What equipment do I need for a virtual session?">
+          Depends entirely on what that session is for. Prop your phone
+          up somewhere Mickey can see you clearly — at home or at your
+          own gym — with whatever the session calls for. A check-in or
+          form-coaching conversation needs nothing special, but if
+          you&apos;re working a movement like a heavy deadlift,
+          you&apos;ll need to be somewhere with weight heavy enough to
+          actually show it.
+          Ask ahead of time if you&apos;re not sure what a given session
+          needs.
+        </Q>
         <Q q="Do you work with injuries, chronic conditions, or older adults?">
           Yes — programs are built around your actual health history and
           current limitations, not a generic template. Always tell
