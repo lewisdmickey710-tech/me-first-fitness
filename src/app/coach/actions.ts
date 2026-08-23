@@ -199,6 +199,10 @@ export async function logSession(clientId: string, formData: FormData) {
     throw new Error("Day label and date are required.");
   }
 
+  const paymentMadeRaw = String(formData.get("payment_made") ?? "");
+  const payment_made =
+    paymentMadeRaw === "paid" ? true : paymentMadeRaw === "unpaid" ? false : null;
+
   const { error } = await supabase.from("sessions").insert({
     client_id: clientId,
     day_label,
@@ -209,6 +213,7 @@ export async function logSession(clientId: string, formData: FormData) {
     logged_by: "coach",
     session_type,
     body_map,
+    payment_made,
   });
 
   if (error) throw new Error(error.message);

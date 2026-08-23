@@ -6,6 +6,7 @@ import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import { computeCancellationRisk } from "@/lib/risk";
 import { toDateString } from "@/lib/timezone";
+import { monthlyPaymentStatus, payAsYouGoStatus } from "@/lib/payment-status";
 import type { Client, OccurrenceStatus } from "@/lib/types";
 
 type ClientRow = Client & { care_profiles: { name: string } | null };
@@ -72,7 +73,6 @@ export default async function RosterPage({
           .from("payments")
           .select("client_id, due_date, paid_on")
           .in("client_id", clientIds)
-          .is("paid_on", null)
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
       ? supabase
@@ -82,7 +82,11 @@ export default async function RosterPage({
           .order("occurrence_date", { ascending: false })
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
-      ? supabase.from("sessions").select("client_id, date").in("client_id", clientIds)
+      ? supabase
+          .from("sessions")
+          .select("client_id, date, payment_made")
+          .in("client_id", clientIds)
+          .order("date", { ascending: false })
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
       ? supabase
@@ -128,9 +132,29 @@ export default async function RosterPage({
 
   const overdueByClient = new Set(
     (paymentRows ?? [])
-      .filter((p) => p.due_date < today)
+      .filter((p) => !p.paid_on && p.due_date < today)
       .map((p) => p.client_id)
   );
+
+  const paymentsByClient = new Map<
+    string,
+    { due_date: string; paid_on: string | null }[]
+  >();
+  for (const p of paymentRows ?? []) {
+    paymentsByClient.set(p.client_id, [
+      ...(paymentsByClient.get(p.client_id) ?? []),
+      { due_date: p.due_date, paid_on: p.paid_on },
+    ]);
+  }
+
+  // sessionRows is ordered by date desc, so the first row seen per client
+  // is their most recent session.
+  const mostRecentPaymentMadeByClient = new Map<string, boolean | null>();
+  for (const row of sessionRows ?? []) {
+    if (!mostRecentPaymentMadeByClient.has(row.client_id)) {
+      mostRecentPaymentMadeByClient.set(row.client_id, row.payment_made ?? null);
+    }
+  }
 
   const occurrencesByClient = new Map<string, OccurrenceStatus[]>();
   for (const row of occurrenceRows ?? []) {
@@ -314,6 +338,12 @@ export default async function RosterPage({
               (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
                 !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []));
             const highRisk = riskByClient.get(client.id) ?? false;
+            const paymentStatus =
+              client.payment_schedule === "pay_as_you_go"
+                ? payAsYouGoStatus(mostRecentPaymentMadeByClient.get(client.id))
+                : client.payment_schedule === "monthly"
+                  ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
+                  : null;
             return (
               <Link key={client.id} href={`/coach/clients/${client.id}`}>
                 <Card className="flex items-center justify-between transition hover:border-rose/40">
@@ -334,6 +364,9 @@ export default async function RosterPage({
                       <Badge tone="pink">
                         {pending} pending request{pending > 1 ? "s" : ""}
                       </Badge>
+                    ) : null}
+                    {paymentStatus ? (
+                      <Badge tone={paymentStatus.tone}>{paymentStatus.label}</Badge>
                     ) : null}
                     <span
                       className="rounded-full px-2.5 py-0.5 text-xs font-medium text-white"

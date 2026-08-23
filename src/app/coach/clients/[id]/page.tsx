@@ -45,6 +45,7 @@ import {
 } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
+import { payAsYouGoStatus } from "@/lib/payment-status";
 import type {
   Activity,
   CareProfile,
@@ -436,6 +437,10 @@ function Overview({
   const today = toDateString(new Date());
   const unpaid = payments.filter((p) => !p.paid_on);
   const nextDue = unpaid.sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
+  const payAsYouGo =
+    client.payment_schedule === "pay_as_you_go"
+      ? payAsYouGoStatus(allSessions[0]?.payment_made)
+      : null;
 
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
@@ -614,6 +619,19 @@ function Overview({
             <span className="text-base font-normal text-gray">
               {" "}
               — {nextDue.description}, due {nextDue.due_date}
+            </span>
+          </p>
+        </Card>
+      ) : null}
+
+      {payAsYouGo ? (
+        <Card className={payAsYouGo.tone === "pink" ? "border-pink/40 bg-pink/5" : ""}>
+          <p className="text-sm font-medium text-gray">Payment status</p>
+          <p className="mt-1 flex items-center gap-2">
+            <Badge tone={payAsYouGo.tone}>{payAsYouGo.label}</Badge>
+            <span className="text-sm text-gray">
+              Based on the most recent logged session — set it each time from
+              Log Session.
             </span>
           </p>
         </Card>
@@ -1326,6 +1344,11 @@ async function SessionsTab({
                   ) : null}
                   {s.logged_by === "client" ? (
                     <Badge tone="teal">logged by client</Badge>
+                  ) : null}
+                  {s.payment_made === true ? (
+                    <Badge tone="teal">paid</Badge>
+                  ) : s.payment_made === false ? (
+                    <Badge tone="pink">not paid</Badge>
                   ) : null}
                 </div>
                 <p className="text-sm text-gray">{s.date}</p>
