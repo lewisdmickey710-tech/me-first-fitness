@@ -648,6 +648,21 @@ export async function linkExistingClientToAccount(
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Rejects a pending signup that isn't a real client -- test accounts,
+// someone who signed up by mistake, etc. Deletes the actual login (auth
+// user), which cascades to their profiles row, so it stops showing up on
+// Signups entirely rather than just being hidden. Doesn't touch any
+// `clients` row, since a pending signup by definition has none yet.
+export async function rejectSignup(userId: string) {
+  const admin = createAdminClient();
+
+  const { error } = await admin.auth.admin.deleteUser(userId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/signups");
+}
+
 export async function updateClientProfile(clientId: string, formData: FormData) {
   const supabase = await createClient();
 

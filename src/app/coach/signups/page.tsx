@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   addClientForAccount,
   linkExistingClientToAccount,
+  rejectSignup,
 } from "@/app/coach/actions";
 import {
   Button,
@@ -72,11 +73,23 @@ export default async function CoachSignupsPage() {
         <div className="space-y-4">
           {pendingAccounts.map((account) => (
             <Card key={account.userId} className="space-y-3">
-              <div>
-                <p className="font-medium text-ink">{account.email}</p>
-                <p className="text-sm text-gray">
-                  Signed up {account.createdAt.slice(0, 10)}
-                </p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-ink">{account.email}</p>
+                  <p className="text-sm text-gray">
+                    Signed up {account.createdAt.slice(0, 10)}
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    "use server";
+                    await rejectSignup(account.userId);
+                  }}
+                >
+                  <Button type="submit" variant="danger">
+                    Reject
+                  </Button>
+                </form>
               </div>
 
               <Collapsible label="+ Add as a new client">
