@@ -152,6 +152,25 @@ export interface CareProfile {
   created_at: string;
 }
 
+export type MuscleGroup =
+  | "Glutes"
+  | "Hamstrings"
+  | "Quads"
+  | "Calves"
+  | "Adductors"
+  | "Abductors"
+  | "Back"
+  | "Chest"
+  | "Shoulders"
+  | "Biceps"
+  | "Triceps"
+  | "Core"
+  | "Full Body"
+  | "Balance/Mobility";
+
+export type MovementType = "compound" | "accessory" | "mobility";
+export type Laterality = "bilateral" | "unilateral";
+
 export interface Exercise {
   id: string;
   name: string;
@@ -159,6 +178,9 @@ export interface Exercise {
   coach_cues: string | null;
   regress_to_id: string | null;
   progress_to_id: string | null;
+  primary_muscle_group: MuscleGroup | null;
+  movement_type: MovementType | null;
+  laterality: Laterality | null;
   created_at: string;
 }
 

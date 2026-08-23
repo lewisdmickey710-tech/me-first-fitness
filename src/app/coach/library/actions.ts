@@ -24,6 +24,9 @@ export async function addExercise(formData: FormData) {
     coach_cues: cleanText(formData.get("coach_cues")),
     regress_to_id: regress_to_id || null,
     progress_to_id: progress_to_id || null,
+    primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
+    movement_type: cleanText(formData.get("movement_type")),
+    laterality: cleanText(formData.get("laterality")),
   });
 
   if (error) throw new Error(error.message);
@@ -49,6 +52,9 @@ export async function updateExercise(exerciseId: string, formData: FormData) {
       coach_cues: cleanText(formData.get("coach_cues")),
       regress_to_id: regress_to_id || null,
       progress_to_id: progress_to_id || null,
+      primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
+      movement_type: cleanText(formData.get("movement_type")),
+      laterality: cleanText(formData.get("laterality")),
     })
     .eq("id", exerciseId);
 

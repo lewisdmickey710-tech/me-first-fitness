@@ -6,6 +6,34 @@ export const PHASES = [
   { id: "n/a", name: "N/A", color: "#B9829A" },
 ] as const;
 
+export const MUSCLE_GROUPS = [
+  "Glutes",
+  "Hamstrings",
+  "Quads",
+  "Calves",
+  "Adductors",
+  "Abductors",
+  "Back",
+  "Chest",
+  "Shoulders",
+  "Biceps",
+  "Triceps",
+  "Core",
+  "Full Body",
+  "Balance/Mobility",
+] as const;
+
+export const MOVEMENT_TYPES = [
+  { id: "compound", label: "Compound" },
+  { id: "accessory", label: "Accessory" },
+  { id: "mobility", label: "Mobility" },
+] as const;
+
+export const LATERALITIES = [
+  { id: "bilateral", label: "Two-limb (bilateral)" },
+  { id: "unilateral", label: "Single-limb (unilateral)" },
+] as const;
+
 export const ACTIVITY_TYPES = [
   "Class",
   "Coaching session",

@@ -1,4 +1,5 @@
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { LATERALITIES, MOVEMENT_TYPES, MUSCLE_GROUPS } from "@/lib/constants";
 import type { Exercise } from "@/lib/types";
 
 export function ExerciseForm({
@@ -47,6 +48,51 @@ export function ExerciseForm({
             defaultValue={exercise?.coach_cues ?? ""}
             placeholder="Mechanical notes for in-session coaching — what to watch, common compensations, correction cues, progression triggers."
           />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Muscle group
+            </label>
+            <Select
+              name="primary_muscle_group"
+              defaultValue={exercise?.primary_muscle_group ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              {MUSCLE_GROUPS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Movement type
+            </label>
+            <Select name="movement_type" defaultValue={exercise?.movement_type ?? ""}>
+              <option value="">— Choose one —</option>
+              {MOVEMENT_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Laterality
+            </label>
+            <Select name="laterality" defaultValue={exercise?.laterality ?? ""}>
+              <option value="">— Choose one —</option>
+              {LATERALITIES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

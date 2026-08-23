@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Card, Collapsible, EmptyState, Heart } from "@/components/ui";
+import { Heart } from "@/components/ui";
+import { LibraryFilterList } from "./LibraryFilterList";
 import type { Exercise } from "@/lib/types";
 
 export default async function LibraryPage() {
@@ -10,8 +11,6 @@ export default async function LibraryPage() {
     .from("exercises")
     .select("*")
     .order("name")) as { data: Exercise[] | null };
-
-  const byId = new Map((exercises ?? []).map((e) => [e.id, e]));
 
   return (
     <div className="space-y-6">
@@ -34,67 +33,7 @@ export default async function LibraryPage() {
         stay collapsed until tapped, so the list stays easy to scan.
       </p>
 
-      {!exercises || exercises.length === 0 ? (
-        <EmptyState
-          title="No exercises yet"
-          body="Add your first movement to start building out the library."
-        />
-      ) : (
-        <div className="space-y-3">
-          {exercises.map((ex) => (
-            <Card key={ex.id}>
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-medium text-ink">{ex.name}</p>
-                <Link
-                  href={`/coach/library/${ex.id}`}
-                  className="shrink-0 text-sm text-gray hover:text-ink"
-                >
-                  Edit
-                </Link>
-              </div>
-
-              <div className="mt-2 space-y-2">
-                {ex.client_description ? (
-                  <Collapsible label="Client description">
-                    <p className="whitespace-pre-wrap text-sm text-ink">
-                      {ex.client_description}
-                    </p>
-                  </Collapsible>
-                ) : null}
-
-                {ex.coach_cues ? (
-                  <Collapsible label="Coach cues">
-                    <p className="whitespace-pre-wrap text-sm text-ink">
-                      {ex.coach_cues}
-                    </p>
-                  </Collapsible>
-                ) : null}
-              </div>
-
-              {(ex.regress_to_id || ex.progress_to_id) && (
-                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray">
-                  {ex.regress_to_id ? (
-                    <span>
-                      Regress to:{" "}
-                      <span className="text-ink">
-                        {byId.get(ex.regress_to_id)?.name ?? "—"}
-                      </span>
-                    </span>
-                  ) : null}
-                  {ex.progress_to_id ? (
-                    <span>
-                      Progress to:{" "}
-                      <span className="text-ink">
-                        {byId.get(ex.progress_to_id)?.name ?? "—"}
-                      </span>
-                    </span>
-                  ) : null}
-                </div>
-              )}
-            </Card>
-          ))}
-        </div>
-      )}
+      <LibraryFilterList exercises={exercises ?? []} />
     </div>
   );
 }
