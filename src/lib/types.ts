@@ -95,6 +95,14 @@ export interface ClientNote {
   created_at: string;
 }
 
+export interface BusinessSettings {
+  id: true;
+  cash_app_cashtag: string | null;
+  zelle_info: string | null;
+  cash_note: string | null;
+  updated_at: string;
+}
+
 export interface ClientMilestone {
   id: string;
   client_id: string;

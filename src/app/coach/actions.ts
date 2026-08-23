@@ -375,6 +375,31 @@ export async function removeClientSchedule(
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+export async function updatePaymentMethods(formData: FormData) {
+  const supabase = await createClient();
+
+  const textOrNull = (name: string) => {
+    const v = String(formData.get(name) ?? "").trim();
+    return v || null;
+  };
+
+  const { error } = await supabase
+    .from("business_settings")
+    .update({
+      cash_app_cashtag: textOrNull("cash_app_cashtag"),
+      zelle_info: textOrNull("zelle_info"),
+      cash_note: textOrNull("cash_note"),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/settings");
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/schedule");
+}
+
 export async function addPayment(clientId: string, formData: FormData) {
   const supabase = await createClient();
 

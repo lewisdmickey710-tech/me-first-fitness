@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
 import { Badge, Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
+import { PaymentMethods } from "@/components/payment-methods";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
-import type { ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
+import type { BusinessSettings, ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
 
 const STATUS_LABEL: Record<string, string> = {
   completed: "Completed",
@@ -69,6 +70,11 @@ export default async function ClientSchedulePage({
 
   if (frozen) {
     const fee = unpaidFees![0];
+    const { data: businessSettings } = (await supabase
+      .from("business_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle()) as { data: BusinessSettings | null };
     return (
       <div className="space-y-6">
         <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
@@ -82,10 +88,11 @@ export default async function ClientSchedulePage({
           <p className="font-medium text-pink">Sessions paused</p>
           <p className="text-sm text-ink">
             A ${fee.amount} late cancellation fee is outstanding. Your
-            upcoming sessions are paused until it&apos;s paid — reach out to
-            Mickey to settle it (Cash, Cash App, or Zelle), and your schedule
-            will pick back up right away.
+            upcoming sessions are paused until it&apos;s paid — send it
+            using one of the methods below, and your schedule will pick
+            back up right away.
           </p>
+          <PaymentMethods settings={businessSettings} />
         </Card>
       </div>
     );

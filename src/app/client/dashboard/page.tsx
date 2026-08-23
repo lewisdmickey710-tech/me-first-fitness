@@ -2,10 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
+import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
+  BusinessSettings,
   CareProfile,
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
@@ -87,6 +89,12 @@ export default async function ClientDashboard() {
       data: ClientDocumentAcknowledgment[] | null;
     }>,
   ]);
+
+  const { data: businessSettings } = (await supabase
+    .from("business_settings")
+    .select("*")
+    .eq("id", true)
+    .maybeSingle()) as { data: BusinessSettings | null };
 
   const [{ data: clientIntake }, { data: docAssignments }, { data: minorConsent }] =
     await Promise.all([
@@ -211,9 +219,10 @@ export default async function ClientDashboard() {
           <p className="font-medium text-pink">Sessions paused</p>
           <p className="text-sm text-ink">
             A late cancellation fee is outstanding — your upcoming sessions
-            are paused until it&apos;s paid. Reach out to Mickey to settle
-            it, then your schedule picks back up right away.
+            are paused until it&apos;s paid. Send it using one of the
+            methods below, then your schedule picks back up right away.
           </p>
+          <PaymentMethods settings={businessSettings} />
         </Card>
       ) : nextSession ? (
         <Card>
@@ -243,6 +252,7 @@ export default async function ClientDashboard() {
               — {nextDue.description}, due {nextDue.due_date}
             </span>
           </p>
+          <PaymentMethods settings={businessSettings} />
         </Card>
       ) : null}
 
