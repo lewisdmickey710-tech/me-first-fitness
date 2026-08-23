@@ -58,6 +58,7 @@ export default async function RosterPage({
     { data: satisfactionRows },
     { data: documentAckRows },
     { data: minorConsentRows },
+    { data: allLinkedClientRows },
   ] = await Promise.all([
     supabase
       .from("requests")
@@ -122,6 +123,11 @@ export default async function RosterPage({
           .select("client_id, signed_at")
           .in("client_id", clientIds)
       : Promise.resolve({ data: [] }),
+    // Unfiltered by archived_at on purpose -- an archived client can still
+    // have a linked login, and the "pending signup" count below needs to
+    // know that regardless of which roster view (active/archived) is
+    // currently showing, or it phantom-counts them as still unlinked.
+    supabase.from("clients").select("user_id").not("user_id", "is", null),
   ]);
 
   const pendingRequestsByClient = new Map<
@@ -278,7 +284,7 @@ export default async function RosterPage({
   }
 
   const linkedUserIds = new Set(
-    (clients ?? []).filter((c) => c.user_id).map((c) => c.user_id)
+    (allLinkedClientRows ?? []).map((c) => c.user_id)
   );
   const pendingSignupCount = (clientProfileRows ?? []).filter(
     (p) => !linkedUserIds.has(p.id)
