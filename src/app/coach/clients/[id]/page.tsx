@@ -1097,6 +1097,21 @@ function ProfileTab({
         )}
       </div>
 
+      <Card className="space-y-2">
+        <p className="font-medium text-ink">Export their data</p>
+        <p className="text-sm text-gray">
+          A full text export of everything tracked for {client.name} —
+          worth pulling before archiving someone, or any time they ask
+          for a copy of their own records.
+        </p>
+        <a
+          href={`/api/coach/clients/${client.id}/export`}
+          className="inline-block rounded-xl border border-grayLt bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
+        >
+          Download {client.name}&apos;s data
+        </a>
+      </Card>
+
       <Card className="space-y-2 border-pink/40">
         <p className="font-medium text-pink">Danger zone</p>
         <p className="text-sm text-gray">

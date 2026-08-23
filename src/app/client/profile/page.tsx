@@ -151,6 +151,24 @@ export default async function ClientProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {!isFirstTime ? (
+        <Card className="space-y-2">
+          <p className="font-medium text-ink">Your data</p>
+          <p className="text-sm text-gray">
+            Download everything tracked here for you — sessions, check-ins,
+            measurements, documents you&apos;ve signed, all of it — for
+            your own records any time, including if you ever stop
+            training with Mickey.
+          </p>
+          <a
+            href="/api/client/export"
+            className="inline-block rounded-xl border border-grayLt bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
+          >
+            Download my data
+          </a>
+        </Card>
+      ) : null}
     </div>
   );
 }
