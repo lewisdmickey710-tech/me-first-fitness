@@ -16,6 +16,7 @@ import {
   markPaymentPaid,
   setClientDocumentAssignment,
   setRequestStatus,
+  touchClientViewed,
   unmarkMilestoneAchieved,
   updateClientProfile,
 } from "@/app/coach/actions";
@@ -160,6 +161,8 @@ export default async function ClientDetailPage({
   };
 
   if (!client) notFound();
+
+  await touchClientViewed(id);
 
   const [
     { data: sessions },
@@ -443,6 +446,7 @@ export default async function ClientDetailPage({
           programDays={programDays ?? []}
           overrides={programOverrides ?? []}
           exerciseOptions={exerciseOptions ?? []}
+          recentSessions={sessions ?? []}
         />
       )}
       {tab === "sessions" && (
@@ -1452,14 +1456,23 @@ function ProgramTab({
   programDays,
   overrides,
   exerciseOptions,
+  recentSessions,
 }: {
   clientId: string;
   currentPhase: ClientPhaseHistory | null;
   programDays: ProgramDayWithExercisesRow[];
   overrides: ClientProgramOverride[];
   exerciseOptions: { id: string; name: string }[];
+  recentSessions: TrainingSession[];
 }) {
   const overrideByPdeId = new Map(overrides.map((o) => [o.program_day_exercise_id, o]));
+
+  const sevenDaysAgo = toDateString(
+    new Date(nowInBusinessTz().getTime() - 6 * 24 * 60 * 60 * 1000)
+  );
+  const completedDayLabels = new Set(
+    recentSessions.filter((s) => s.date >= sevenDaysAgo).map((s) => s.day_label)
+  );
 
   if (!currentPhase) {
     return (
@@ -1511,10 +1524,18 @@ function ProgramTab({
             };
           });
 
+        const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+        const isCompleted = completedDayLabels.has(dayLabel);
         return (
           <Card key={day.id}>
             <p className="font-medium text-ink">
-              Day {day.day_number}: {day.day_label}
+              {dayLabel}
+              {isCompleted ? (
+                <span className="text-teal" aria-label="Completed">
+                  {" "}
+                  ✓
+                </span>
+              ) : null}
             </p>
             <div className="mt-3">
               <ProgramDayEditor

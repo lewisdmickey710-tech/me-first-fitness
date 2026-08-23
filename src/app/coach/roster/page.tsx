@@ -92,14 +92,14 @@ export default async function RosterPage({
     clientIds.length > 0
       ? supabase
           .from("session_occurrences")
-          .select("client_id, status, occurrence_date")
+          .select("client_id, status, occurrence_date, created_at")
           .in("client_id", clientIds)
           .order("occurrence_date", { ascending: false })
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
       ? supabase
           .from("sessions")
-          .select("client_id, date, payment_status")
+          .select("client_id, date, payment_status, logged_by")
           .in("client_id", clientIds)
           .order("date", { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -157,8 +157,15 @@ export default async function RosterPage({
 
   const today = toDateString(new Date());
 
+  const clientLoggedSessionDates = (sessionRows ?? []).filter(
+    (r) => r.logged_by === "client"
+  );
   const lastTrackedByClient = new Map<string, string>();
-  for (const row of [...(checkinRows ?? []), ...(activityRows ?? [])]) {
+  for (const row of [
+    ...(checkinRows ?? []),
+    ...(activityRows ?? []),
+    ...clientLoggedSessionDates,
+  ]) {
     const prev = lastTrackedByClient.get(row.client_id);
     if (!prev || row.date > prev) lastTrackedByClient.set(row.client_id, row.date);
   }
@@ -210,16 +217,25 @@ export default async function RosterPage({
     new Date(new Date(today).getTime() + 7 * 24 * 60 * 60 * 1000)
   );
 
-  const recentCancelledByClient = new Map<string, string>();
-  const recentLateCancelledByClient = new Map<string, string>();
+  // Value is {date, at}: `date` is the session's own date (for the flag's
+  // text), `at` is when the cancellation was actually recorded (used to
+  // tell whether the coach has viewed this client since it happened).
+  const recentCancelledByClient = new Map<string, { date: string; at: string }>();
+  const recentLateCancelledByClient = new Map<string, { date: string; at: string }>();
   for (const row of occurrenceRows ?? []) {
     if (row.occurrence_date < recentWindowStart || row.occurrence_date > recentWindowEnd) {
       continue;
     }
     if (row.status === "cancelled") {
-      recentCancelledByClient.set(row.client_id, row.occurrence_date);
+      recentCancelledByClient.set(row.client_id, {
+        date: row.occurrence_date,
+        at: row.created_at,
+      });
     } else if (row.status === "late_cancelled") {
-      recentLateCancelledByClient.set(row.client_id, row.occurrence_date);
+      recentLateCancelledByClient.set(row.client_id, {
+        date: row.occurrence_date,
+        at: row.created_at,
+      });
     }
   }
 
@@ -229,14 +245,18 @@ export default async function RosterPage({
       .map((p) => p.client_id)
   );
 
-  const recentDocumentByClient = new Set([
-    ...(documentAckRows ?? [])
-      .filter((r) => r.acknowledged_at && r.acknowledged_at.slice(0, 10) >= recentWindowStart)
-      .map((r) => r.client_id),
+  // Latest acknowledged/signed timestamp per client, within the window.
+  const recentDocumentAtByClient = new Map<string, string>();
+  for (const r of [
+    ...(documentAckRows ?? []).map((r) => ({ client_id: r.client_id, at: r.acknowledged_at })),
     ...(minorConsentRows ?? [])
-      .filter((r) => r.signed_at && r.signed_at.slice(0, 10) >= recentWindowStart)
-      .map((r) => r.client_id),
-  ]);
+      .filter((r) => r.signed_at)
+      .map((r) => ({ client_id: r.client_id, at: r.signed_at as string })),
+  ]) {
+    if (r.at.slice(0, 10) < recentWindowStart) continue;
+    const prev = recentDocumentAtByClient.get(r.client_id);
+    if (!prev || r.at > prev) recentDocumentAtByClient.set(r.client_id, r.at);
+  }
 
   const sessionCountByClient = new Map<string, number>();
   const fourWeeksAgo = new Date();
@@ -426,6 +446,14 @@ export default async function RosterPage({
                   ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
                   : null;
 
+            // Purely informational events (a cancellation, a signed
+            // document) only show up while the coach hasn't opened this
+            // client's profile since they happened -- opening it counts
+            // as "seen." Flags that still need an action from her (a
+            // pending request, an unpaid fee, high risk) show regardless.
+            const notYetSeen = (at: string) =>
+              !client.last_viewed_at || client.last_viewed_at < at;
+
             const flags: string[] = [];
             if (newRequests > 0) {
               flags.push(
@@ -442,11 +470,36 @@ export default async function RosterPage({
             if (highRisk) flags.push("High risk");
             if (paymentStatus) flags.push(paymentStatus.label);
             if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
-            const lateCancelDate = recentLateCancelledByClient.get(client.id);
-            if (lateCancelDate) flags.push(`Late cancellation (${shortDate(lateCancelDate)})`);
-            const cancelDate = recentCancelledByClient.get(client.id);
-            if (cancelDate) flags.push(`Cancelled ${shortDate(cancelDate)} session`);
-            if (recentDocumentByClient.has(client.id)) flags.push("Completed document");
+
+            const lastTracked = lastTrackedByClient.get(client.id);
+            const daysSinceActivity = lastTracked
+              ? Math.floor(
+                  (new Date(today).getTime() - new Date(lastTracked).getTime()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              : Math.floor(
+                  (new Date(today).getTime() - new Date(client.created_at).getTime()) /
+                    (1000 * 60 * 60 * 24)
+                );
+            const clientEstablished =
+              new Date(today).getTime() - new Date(client.created_at).getTime() >
+              3 * 24 * 60 * 60 * 1000;
+            if (clientEstablished && daysSinceActivity > 3) {
+              flags.push(`Inactive ${daysSinceActivity}+ days`);
+            }
+
+            const lateCancel = recentLateCancelledByClient.get(client.id);
+            if (lateCancel && notYetSeen(lateCancel.at)) {
+              flags.push(`Late cancellation (${shortDate(lateCancel.date)})`);
+            }
+            const cancel = recentCancelledByClient.get(client.id);
+            if (cancel && notYetSeen(cancel.at)) {
+              flags.push(`Cancelled ${shortDate(cancel.date)} session`);
+            }
+            const documentAt = recentDocumentAtByClient.get(client.id);
+            if (documentAt && notYetSeen(documentAt)) {
+              flags.push("Completed document");
+            }
             if (needsWindow) flags.push("Needs monthly check-in");
 
             return (

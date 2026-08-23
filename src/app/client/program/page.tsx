@@ -123,6 +123,15 @@ export default async function ClientProgramPage() {
   const extraById = new Map((extraExercises ?? []).map((e) => [e.id, e]));
 
   const today = toDateString(new Date());
+  const sevenDaysAgo = toDateString(
+    new Date(new Date(today).getTime() - 6 * 24 * 60 * 60 * 1000)
+  );
+  const { data: recentSessions } = await supabase
+    .from("sessions")
+    .select("day_label, date")
+    .eq("client_id", me.id)
+    .gte("date", sevenDaysAgo);
+  const completedDayLabels = new Set((recentSessions ?? []).map((s) => s.day_label));
 
   return (
     <div className="space-y-6">
@@ -158,11 +167,57 @@ export default async function ClientProgramPage() {
                   (overrideByPdeId.get(b.id)?.position_override ?? b.position)
               );
             const logFormId = `log-day-${day.id}`;
+            const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+            const isCompleted = completedDayLabels.has(dayLabel);
 
             return (
               <Card key={day.id}>
-                <Collapsible label={`Day ${day.day_number}: ${day.day_label}`}>
-                <p className="text-xs text-gray">
+                <Collapsible
+                  label={
+                    <>
+                      {dayLabel}
+                      {isCompleted ? (
+                        <span className="text-teal" aria-label="Completed">
+                          {" "}
+                          ✓
+                        </span>
+                      ) : null}
+                    </>
+                  }
+                >
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink">
+                      Date
+                    </label>
+                    <Input
+                      form={logFormId}
+                      name="date"
+                      type="date"
+                      required
+                      defaultValue={today}
+                    />
+                  </div>
+
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-ink">
+                      Before you start — how was your day outside the gym?
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input form={logFormId} name="sleep" placeholder="Sleep — e.g. 7 hrs" />
+                      <Input form={logFormId} name="water" placeholder="Water — e.g. 64 oz" />
+                      <Input
+                        form={logFormId}
+                        name="food"
+                        placeholder="Food — on track / off track"
+                      />
+                      <Input form={logFormId} name="energy" placeholder="Energy — e.g. Good" />
+                      <Input form={logFormId} name="mood" placeholder="Mood — e.g. Steady" />
+                    </div>
+                  </div>
+                </div>
+
+                <p className="mt-3 text-xs text-gray">
                   Enter what you used and how it felt as you go, then log
                   the whole day at the bottom.
                 </p>
@@ -307,26 +362,6 @@ export default async function ClientProgramPage() {
                   }}
                   className="mt-4 space-y-4 border-t border-grayLt pt-4"
                 >
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-ink">
-                      Date
-                    </label>
-                    <Input name="date" type="date" required defaultValue={today} />
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-medium text-ink">
-                      How was your day outside the gym?
-                    </p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input name="sleep" placeholder="Sleep — e.g. 7 hrs" />
-                      <Input name="water" placeholder="Water — e.g. 64 oz" />
-                      <Input name="food" placeholder="Food — on track / off track" />
-                      <Input name="energy" placeholder="Energy — e.g. Good" />
-                      <Input name="mood" placeholder="Mood — e.g. Steady" />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
                       Anything else about how this session felt?

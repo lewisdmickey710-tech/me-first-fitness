@@ -880,6 +880,20 @@ export async function unmarkMilestoneAchieved(clientId: string, milestoneId: str
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Best-effort bookkeeping so the Motherboard knows the coach has actually
+// seen this client's latest activity -- never blocks the page if it fails.
+export async function touchClientViewed(clientId: string) {
+  try {
+    const supabase = await createClient();
+    await supabase
+      .from("clients")
+      .update({ last_viewed_at: new Date().toISOString() })
+      .eq("id", clientId);
+  } catch (err) {
+    console.error("Failed to record client view", err);
+  }
+}
+
 // ---- Availability & coach-initiated cancellations ----
 
 async function clientLoginEmail(userId: string | null): Promise<string | null> {

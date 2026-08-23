@@ -10,7 +10,7 @@ export function Collapsible({
   children,
   className = "",
 }: {
-  label: string;
+  label: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
