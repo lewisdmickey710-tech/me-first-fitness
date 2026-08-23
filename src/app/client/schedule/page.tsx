@@ -285,12 +285,27 @@ export default async function ClientSchedulePage({
                 {selectedCell.status === "scheduled"
                   ? "Scheduled"
                   : STATUS_LABEL[selectedCell.status]}
+                {(selectedCell.status === "cancelled" ||
+                  selectedCell.status === "late_cancelled") &&
+                selectedOccurrence?.cancelled_by
+                  ? selectedOccurrence.cancelled_by === "coach"
+                    ? " — Mickey cancelled"
+                    : " — you cancelled"
+                  : ""}
               </Badge>
             ) : null}
           </div>
 
           {selectedCell.status === null ? (
             <p className="text-sm text-gray">Nothing on the schedule this day.</p>
+          ) : null}
+
+          {selectedCell.status === "cancelled" &&
+          selectedOccurrence?.cancelled_by === "coach" ? (
+            <p className="text-sm text-gray">
+              Mickey cancelled this one — no fee, and you&apos;ve got a free
+              reschedule whenever works for you.
+            </p>
           ) : null}
 
           {selectedOccurrence?.status === "rescheduled" &&

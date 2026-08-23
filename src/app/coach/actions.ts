@@ -5,7 +5,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { nextPhase, getCurrentPhase } from "@/lib/phase";
-import { sendMilestoneAchievedEmail } from "@/lib/email";
+import {
+  sendMilestoneAchievedEmail,
+  sendCoachCancelledSessionEmail,
+  sendDayBlockedEmail,
+} from "@/lib/email";
+import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
@@ -873,4 +878,190 @@ export async function unmarkMilestoneAchieved(clientId: string, milestoneId: str
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// ---- Availability & coach-initiated cancellations ----
+
+async function clientLoginEmail(userId: string | null): Promise<string | null> {
+  if (!userId) return null;
+  const admin = createAdminClient();
+  const { data } = await admin.auth.admin.getUserById(userId);
+  return data?.user?.email ?? null;
+}
+
+export async function addCoachAvailability(formData: FormData) {
+  const supabase = await createClient();
+
+  const day_of_week = Number(formData.get("day_of_week") ?? "");
+  const start_time = String(formData.get("start_time") ?? "").trim();
+  const end_time = String(formData.get("end_time") ?? "").trim();
+
+  if (
+    Number.isNaN(day_of_week) ||
+    day_of_week < 0 ||
+    day_of_week > 6 ||
+    !start_time ||
+    !end_time
+  ) {
+    throw new Error("Day, start time, and end time are required.");
+  }
+  if (end_time <= start_time) {
+    throw new Error("End time must be after start time.");
+  }
+
+  const { error } = await supabase
+    .from("coach_availability")
+    .insert({ day_of_week, start_time, end_time });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/availability");
+}
+
+export async function removeCoachAvailability(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("coach_availability").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/availability");
+}
+
+export async function blockDate(formData: FormData) {
+  const supabase = await createClient();
+
+  const blocked_date = String(formData.get("blocked_date") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "").trim() || null;
+  if (!blocked_date) throw new Error("Date is required.");
+
+  const { error: blockError } = await supabase
+    .from("coach_blocked_dates")
+    .upsert({ blocked_date, reason }, { onConflict: "blocked_date" });
+  if (blockError) throw new Error(blockError.message);
+
+  // Auto-cancel whichever clients had a session that day -- anyone whose
+  // recurring weekly time falls on this weekday (and isn't already
+  // resolved for this exact date) plus anyone with a one-off confirmed
+  // ("scheduled") occurrence on this exact date.
+  const dayOfWeek = new Date(`${blocked_date}T00:00:00Z`).getUTCDay();
+
+  const [{ data: schedules }, { data: dateOccurrences }] = await Promise.all([
+    supabase
+      .from("client_schedules")
+      .select("client_id")
+      .eq("day_of_week", dayOfWeek)
+      .eq("active", true),
+    supabase
+      .from("session_occurrences")
+      .select("client_id, status")
+      .eq("occurrence_date", blocked_date),
+  ]);
+
+  const occurrenceStatusByClient = new Map(
+    (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
+  );
+
+  const affectedIds = new Set<string>();
+  for (const s of schedules ?? []) {
+    const existingStatus = occurrenceStatusByClient.get(s.client_id);
+    if (existingStatus && existingStatus !== "scheduled") continue;
+    affectedIds.add(s.client_id);
+  }
+  for (const [clientId, status] of occurrenceStatusByClient) {
+    if (status === "scheduled") affectedIds.add(clientId);
+  }
+
+  if (affectedIds.size > 0) {
+    const { data: affectedClients } = await supabase
+      .from("clients")
+      .select("id, name, user_id")
+      .in("id", [...affectedIds]);
+
+    const dayName = DAY_NAMES[dayOfWeek];
+    for (const client of affectedClients ?? []) {
+      const { error: cancelError } = await supabase.from("session_occurrences").upsert(
+        {
+          client_id: client.id,
+          occurrence_date: blocked_date,
+          status: "cancelled",
+          cancelled_by: "coach",
+          notes: reason
+            ? `Coach blocked this day: ${reason}`
+            : "Coach blocked this day.",
+        },
+        { onConflict: "client_id,occurrence_date" }
+      );
+      if (cancelError) throw new Error(cancelError.message);
+
+      try {
+        const email = await clientLoginEmail(client.user_id);
+        if (email) {
+          await sendDayBlockedEmail(
+            email,
+            client.name,
+            `${dayName}, ${blocked_date}`,
+            reason
+          );
+        }
+      } catch (emailError) {
+        console.error("Failed to send day-blocked email", emailError);
+      }
+    }
+  }
+
+  revalidatePath("/coach/availability");
+  revalidatePath("/coach/schedule");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
+}
+
+export async function unblockDate(id: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("coach_blocked_dates").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/availability");
+}
+
+// Mirrors the client's own "Cancel" button on /client/schedule, but from
+// the coach's side: no late-cancellation fee logic (never applies when
+// it's the coach cancelling), and an immediate email so the client has
+// something in writing before Mickey follows up by text herself.
+export async function coachCancelSession(
+  clientId: string,
+  occurrenceDate: string,
+  clientScheduleId: string | null
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("session_occurrences").upsert(
+    {
+      client_id: clientId,
+      ...(clientScheduleId ? { client_schedule_id: clientScheduleId } : {}),
+      occurrence_date: occurrenceDate,
+      status: "cancelled",
+      cancelled_by: "coach",
+    },
+    { onConflict: "client_id,occurrence_date" }
+  );
+  if (error) throw new Error(error.message);
+
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name, user_id")
+      .eq("id", clientId)
+      .single();
+    if (client) {
+      const email = await clientLoginEmail(client.user_id);
+      if (email) {
+        await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+      }
+    }
+  } catch (emailError) {
+    console.error("Failed to send coach-cancelled session email", emailError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
 }

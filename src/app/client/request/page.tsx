@@ -5,9 +5,9 @@ import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 export default async function RequestTimePage({
   searchParams,
 }: {
-  searchParams: Promise<{ reschedule_from?: string }>;
+  searchParams: Promise<{ reschedule_from?: string; error?: string }>;
 }) {
-  const { reschedule_from: rescheduleFrom } = await searchParams;
+  const { reschedule_from: rescheduleFrom, error } = await searchParams;
 
   return (
     <div className="space-y-6">
@@ -23,6 +23,13 @@ export default async function RequestTimePage({
         Propose a time that works for you — your coach will confirm or
         suggest another.
       </p>
+
+      {error ? (
+        <div className="rounded-xl border border-pink/40 bg-pink/5 px-4 py-3 text-sm text-ink">
+          <p className="font-medium">That didn&apos;t go through</p>
+          <p className="mt-1 text-gray">{error}</p>
+        </div>
+      ) : null}
 
       <Card>
         <form action={submitRequest} className="space-y-4">

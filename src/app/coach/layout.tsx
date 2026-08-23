@@ -12,6 +12,7 @@ export default function CoachLayout({
         links={[
           { href: "/coach/roster", label: "Roster" },
           { href: "/coach/schedule", label: "Schedule" },
+          { href: "/coach/availability", label: "Availability" },
           { href: "/coach/signups", label: "Signups" },
           { href: "/coach/leads", label: "Leads" },
           { href: "/coach/library", label: "Library" },

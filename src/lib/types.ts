@@ -347,6 +347,22 @@ export interface SessionOccurrence {
   rescheduled_to_date: string | null;
   notes: string | null;
   reminder_sent_at: string | null;
+  cancelled_by: "coach" | "client" | null;
+  created_at: string;
+}
+
+export interface CoachAvailability {
+  id: string;
+  day_of_week: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  start_time: string;
+  end_time: string;
+  created_at: string;
+}
+
+export interface CoachBlockedDate {
+  id: string;
+  blocked_date: string;
+  reason: string | null;
   created_at: string;
 }
 

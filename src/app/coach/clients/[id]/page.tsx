@@ -8,6 +8,7 @@ import {
   addMilestone,
   advancePhase,
   archiveClient,
+  coachCancelSession,
   deleteClientNote,
   deleteMilestone,
   logSessionOccurrence,
@@ -1629,6 +1630,17 @@ function AttendanceTab({
                   placeholder="Reason, or reschedule details (optional)"
                 />
               </form>
+              <form
+                action={async () => {
+                  "use server";
+                  await coachCancelSession(clientId, occ.date, occ.scheduleId);
+                }}
+                className="mt-2"
+              >
+                <Button type="submit" variant="danger">
+                  I&apos;m unavailable — cancel &amp; email them
+                </Button>
+              </form>
             </Card>
           ))}
         </div>
@@ -1657,6 +1669,12 @@ function AttendanceTab({
               </div>
               <Badge tone={occurrenceBadgeTone(o.status)}>
                 {OCCURRENCE_STATUS_LABEL[o.status]}
+                {(o.status === "cancelled" || o.status === "late_cancelled") &&
+                o.cancelled_by
+                  ? o.cancelled_by === "coach"
+                    ? " (by you)"
+                    : " (by client)"
+                  : ""}
               </Badge>
             </Card>
           ))

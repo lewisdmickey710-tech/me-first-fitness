@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyClient } from "@/lib/current-client";
 import {
   isLateCancellation,
@@ -114,18 +115,102 @@ export async function submitRequest(formData: FormData) {
   const reschedule_from_date =
     String(formData.get("reschedule_from_date") ?? "").trim() || null;
 
-  if (!preferred_date) throw new Error("Preferred date is required.");
+  const backTo = (error: string) => {
+    const params = new URLSearchParams({ error });
+    if (reschedule_from_date) params.set("reschedule_from", reschedule_from_date);
+    return `/client/request?${params.toString()}`;
+  };
 
-  const { error } = await supabase.from("requests").insert({
-    client_id: me.id,
-    preferred_date,
-    preferred_time: preferred_time || null,
-    note: note || null,
-    reschedule_from_date,
-    status: "pending",
-  });
+  if (!preferred_date) {
+    redirect(backTo("Preferred date is required."));
+  }
 
-  if (error) throw new Error(error.message);
+  // Anything below can fail for reasons entirely outside the client's
+  // control (a day Mickey just blocked, a slot someone else just took) --
+  // this should land back on a friendly inline message, never a crash.
+  try {
+    const dayOfWeek = new Date(`${preferred_date}T00:00:00Z`).getUTCDay();
+
+    const { data: blocked } = await supabase
+      .from("coach_blocked_dates")
+      .select("id")
+      .eq("blocked_date", preferred_date)
+      .maybeSingle();
+    if (blocked) {
+      throw new Error(
+        "Mickey isn't available that day — please choose a different date."
+      );
+    }
+
+    const { data: availability } = await supabase
+      .from("coach_availability")
+      .select("start_time, end_time")
+      .eq("day_of_week", dayOfWeek);
+    const { count: anyAvailabilitySet } = await supabase
+      .from("coach_availability")
+      .select("id", { count: "exact", head: true });
+
+    if ((anyAvailabilitySet ?? 0) > 0) {
+      if (!availability || availability.length === 0) {
+        throw new Error(
+          "Mickey isn't available on that day of the week — please choose a different date."
+        );
+      }
+      if (preferred_time) {
+        const withinWindow = availability.some(
+          (a) =>
+            preferred_time >= a.start_time.slice(0, 5) &&
+            preferred_time < a.end_time.slice(0, 5)
+        );
+        if (!withinWindow) {
+          throw new Error(
+            "That time is outside Mickey's available hours that day — please choose a different time."
+          );
+        }
+      }
+    }
+
+    // A recurring or already-confirmed one-off session at the same
+    // day/time belonging to another client isn't visible under this
+    // client's own RLS session, so this narrow cross-client read needs
+    // the service role -- it only checks for an existing conflict, never
+    // exposes another client's details back to the requester.
+    if (preferred_time) {
+      const admin = createAdminClient();
+      const { data: recurringConflict } = await admin
+        .from("client_schedules")
+        .select("id")
+        .eq("day_of_week", dayOfWeek)
+        .eq("time_of_day", preferred_time)
+        .eq("active", true)
+        .limit(1);
+      const { data: oneOffScheduled } = await admin
+        .from("session_occurrences")
+        .select("id, notes")
+        .eq("occurrence_date", preferred_date)
+        .eq("status", "scheduled");
+      const oneOffTimeTaken = (oneOffScheduled ?? []).some((o) =>
+        o.notes?.includes(`Confirmed request — ${preferred_time}`)
+      );
+      if ((recurringConflict && recurringConflict.length > 0) || oneOffTimeTaken) {
+        throw new Error("That time is already taken — please choose a different time.");
+      }
+    }
+
+    const { error } = await supabase.from("requests").insert({
+      client_id: me.id,
+      preferred_date,
+      preferred_time: preferred_time || null,
+      note: note || null,
+      reschedule_from_date,
+      status: "pending",
+    });
+
+    if (error) throw new Error(error.message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong.";
+    redirect(backTo(message));
+  }
 
   revalidatePath("/client/dashboard");
   revalidatePath("/client/schedule");
@@ -156,6 +241,7 @@ export async function cancelMySession(
         ...(clientScheduleId ? { client_schedule_id: clientScheduleId } : {}),
         occurrence_date: occurrenceDate,
         status,
+        cancelled_by: "client",
       },
       { onConflict: "client_id,occurrence_date" }
     )

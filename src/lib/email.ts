@@ -144,6 +144,49 @@ export async function sendDocumentsPendingEmail(to: string, clientName: string) 
   });
 }
 
+export async function sendCoachCancelledSessionEmail(
+  to: string,
+  clientName: string,
+  whenText: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping coach-cancelled session email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "I had to cancel your upcoming session",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>I need to cancel your session on <strong>${whenText}</strong> — I'll follow up by text to get you rescheduled.</p>
+      <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you.</p>
+    `),
+  });
+}
+
+export async function sendDayBlockedEmail(
+  to: string,
+  clientName: string,
+  whenText: string,
+  reason: string | null
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping day-blocked email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "I'm unavailable that day — your session moved",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>I'm unavailable on <strong>${whenText}</strong>${reason ? ` (${reason})` : ""}, so I had to cancel your session that day.</p>
+      <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you. I'll follow up to get you set up on a new time.</p>
+    `),
+  });
+}
+
 export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,
