@@ -8,10 +8,13 @@ import {
   deleteCommunityPost,
   toggleCommunityReaction,
 } from "@/app/client/community/actions";
+import { acknowledgeDocument } from "@/app/client/actions";
 import {
   Badge,
   Button,
   Card,
+  Checkbox,
+  DocumentBody,
   EmptyState,
   Heart,
   Input,
@@ -20,9 +23,11 @@ import {
 } from "@/components/ui";
 import { toDateString } from "@/lib/timezone";
 import type {
+  ClientDocumentAcknowledgment,
   CommunityPost,
   CommunityPostComment,
   CommunityPostReaction,
+  LegalDocument,
 } from "@/lib/types";
 
 const KIND_LABEL: Record<string, string> = {
@@ -52,6 +57,69 @@ export default async function ClientCommunityPage() {
   }
 
   const supabase = await createClient();
+
+  const { data: agreement } = (await supabase
+    .from("legal_documents")
+    .select("*")
+    .eq("key", "community_agreement")
+    .maybeSingle()) as { data: LegalDocument | null };
+
+  const { data: agreementAck } = agreement
+    ? ((await supabase
+        .from("client_document_acknowledgments")
+        .select("*")
+        .eq("client_id", me.id)
+        .eq("document_id", agreement.id)
+        .eq("document_version", agreement.version)
+        .maybeSingle()) as { data: ClientDocumentAcknowledgment | null })
+    : { data: null };
+
+  if (agreement && !agreementAck) {
+    return (
+      <div className="space-y-6">
+        <BackLink href="/client/dashboard" />
+        <h1 className="text-xl font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          Community
+        </h1>
+        <p className="text-sm text-gray">
+          Before you can post or read the community board, take a minute
+          to read and sign this — it explains what other clients can see.
+        </p>
+        <Card className="space-y-3">
+          <p className="font-medium text-ink">{agreement.title}</p>
+          <DocumentBody text={agreement.body} />
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await acknowledgeDocument(
+                agreement.id,
+                agreement.version,
+                agreement.requires_signature,
+                formData
+              );
+            }}
+            className="space-y-3 border-t border-grayLt pt-3"
+          >
+            {agreement.requires_signature ? (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink">
+                  Type your full legal name to sign
+                </label>
+                <Input name="signed_name" required />
+              </div>
+            ) : null}
+            <Checkbox
+              name="agree"
+              required
+              label="I have read and agree to the terms above"
+            />
+            <Button type="submit">Sign & agree</Button>
+          </form>
+        </Card>
+      </div>
+    );
+  }
 
   const [{ data: posts }, { data: comments }, { data: reactions }, { data: allClients }] =
     await Promise.all([

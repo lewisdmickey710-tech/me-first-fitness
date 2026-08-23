@@ -388,7 +388,8 @@ export type LegalDocumentKey =
   | "contract"
   | "onboarding_form"
   | "disclaimer"
-  | "minor_consent";
+  | "minor_consent"
+  | "community_agreement";
 
 export interface LegalDocument {
   id: string;

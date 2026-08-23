@@ -379,6 +379,7 @@ export async function acknowledgeDocument(
 
   revalidatePath("/client/documents");
   revalidatePath("/client/dashboard");
+  revalidatePath("/client/community");
 }
 
 function checked(formData: FormData, name: string): boolean {
