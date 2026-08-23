@@ -21,7 +21,7 @@ export async function submitAssessmentRequest(formData: FormData) {
 
   const { data: inviteData, error: inviteError } =
     await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
     });
 
   let userId: string;
