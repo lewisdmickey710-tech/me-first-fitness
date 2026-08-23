@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { unarchiveClient } from "@/app/coach/actions";
-import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
+import { Button, Card, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import { computeCancellationRisk } from "@/lib/risk";
@@ -10,6 +10,16 @@ import { monthlyPaymentStatus, payAsYouGoStatus } from "@/lib/payment-status";
 import type { Client, OccurrenceStatus } from "@/lib/types";
 
 type ClientRow = Client & { care_profiles: { name: string } | null };
+
+const SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+function shortDate(dateStr: string): string {
+  return SHORT_DATE_FMT.format(new Date(`${dateStr}T00:00:00Z`));
+}
 
 export default async function RosterPage({
   searchParams,
@@ -46,8 +56,13 @@ export default async function RosterPage({
     { data: occurrenceRows },
     { data: sessionRows },
     { data: satisfactionRows },
+    { data: documentAckRows },
+    { data: minorConsentRows },
   ] = await Promise.all([
-    supabase.from("requests").select("client_id").eq("status", "pending"),
+    supabase
+      .from("requests")
+      .select("client_id, reschedule_from_date")
+      .eq("status", "pending"),
     supabase.from("profiles").select("id").eq("role", "client"),
     clientIds.length > 0
       ? supabase
@@ -71,7 +86,7 @@ export default async function RosterPage({
     clientIds.length > 0
       ? supabase
           .from("payments")
-          .select("client_id, due_date, paid_on")
+          .select("client_id, due_date, paid_on, kind")
           .in("client_id", clientIds)
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
@@ -95,14 +110,32 @@ export default async function RosterPage({
           .in("client_id", clientIds)
           .order("date", { ascending: false })
       : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("client_document_acknowledgments")
+          .select("client_id, acknowledged_at")
+          .in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
+    clientIds.length > 0
+      ? supabase
+          .from("client_minor_consent")
+          .select("client_id, signed_at")
+          .in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
-  const pendingByClient = new Map<string, number>();
+  const pendingRequestsByClient = new Map<
+    string,
+    { total: number; reschedules: number }
+  >();
   for (const r of pendingRequests ?? []) {
-    pendingByClient.set(
-      r.client_id,
-      (pendingByClient.get(r.client_id) ?? 0) + 1
-    );
+    const cur = pendingRequestsByClient.get(r.client_id) ?? {
+      total: 0,
+      reschedules: 0,
+    };
+    cur.total += 1;
+    if (r.reschedule_from_date) cur.reschedules += 1;
+    pendingRequestsByClient.set(r.client_id, cur);
   }
 
   const phaseByClient = new Map<string, string>();
@@ -168,6 +201,43 @@ export default async function RosterPage({
     ]);
   }
 
+  // "Recent" flags (a cancellation, a signed document) fade off the board
+  // on their own after a week instead of needing to be dismissed by hand.
+  const recentWindowStart = toDateString(
+    new Date(new Date(today).getTime() - 7 * 24 * 60 * 60 * 1000)
+  );
+  const recentWindowEnd = toDateString(
+    new Date(new Date(today).getTime() + 7 * 24 * 60 * 60 * 1000)
+  );
+
+  const recentCancelledByClient = new Map<string, string>();
+  const recentLateCancelledByClient = new Map<string, string>();
+  for (const row of occurrenceRows ?? []) {
+    if (row.occurrence_date < recentWindowStart || row.occurrence_date > recentWindowEnd) {
+      continue;
+    }
+    if (row.status === "cancelled") {
+      recentCancelledByClient.set(row.client_id, row.occurrence_date);
+    } else if (row.status === "late_cancelled") {
+      recentLateCancelledByClient.set(row.client_id, row.occurrence_date);
+    }
+  }
+
+  const lateCancelFeeDueByClient = new Set(
+    (paymentRows ?? [])
+      .filter((p) => p.kind === "late_cancellation_fee" && !p.paid_on)
+      .map((p) => p.client_id)
+  );
+
+  const recentDocumentByClient = new Set([
+    ...(documentAckRows ?? [])
+      .filter((r) => r.acknowledged_at && r.acknowledged_at.slice(0, 10) >= recentWindowStart)
+      .map((r) => r.client_id),
+    ...(minorConsentRows ?? [])
+      .filter((r) => r.signed_at && r.signed_at.slice(0, 10) >= recentWindowStart)
+      .map((r) => r.client_id),
+  ]);
+
   const sessionCountByClient = new Map<string, number>();
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
@@ -232,16 +302,23 @@ export default async function RosterPage({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-ink">
-          <Heart className="mr-1.5" />
-          {showArchived ? "Archived clients" : "Your roster"}
-        </h1>
+        <div>
+          <h1 className="text-xl font-semibold text-ink">
+            <Heart className="mr-1.5" />
+            {showArchived ? "Archived clients" : "The Motherboard"}
+          </h1>
+          {!showArchived ? (
+            <p className="mt-0.5 text-sm text-gray">
+              Every client, every flag that needs you — one board.
+            </p>
+          ) : null}
+        </div>
         {showArchived ? (
           <Link
             href="/coach/roster"
             className="text-sm text-gray hover:text-ink"
           >
-            ← Back to roster
+            ← Back to Motherboard
           </Link>
         ) : (
           <Link
@@ -335,7 +412,8 @@ export default async function RosterPage({
         <div className="space-y-3">
           {clients.map((client) => {
             const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
-            const pending = pendingByClient.get(client.id) ?? 0;
+            const reqs = pendingRequestsByClient.get(client.id);
+            const newRequests = (reqs?.total ?? 0) - (reqs?.reschedules ?? 0);
             const needsWindow =
               inWindow &&
               (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
@@ -347,37 +425,59 @@ export default async function RosterPage({
                 : client.payment_schedule === "monthly"
                   ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
                   : null;
+
+            const flags: string[] = [];
+            if (newRequests > 0) {
+              flags.push(
+                newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`
+              );
+            }
+            if ((reqs?.reschedules ?? 0) > 0) {
+              flags.push(
+                reqs!.reschedules === 1
+                  ? "Requested reschedule"
+                  : `Requested reschedule (${reqs!.reschedules})`
+              );
+            }
+            if (highRisk) flags.push("High risk");
+            if (paymentStatus) flags.push(paymentStatus.label);
+            if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
+            const lateCancelDate = recentLateCancelledByClient.get(client.id);
+            if (lateCancelDate) flags.push(`Late cancellation (${shortDate(lateCancelDate)})`);
+            const cancelDate = recentCancelledByClient.get(client.id);
+            if (cancelDate) flags.push(`Cancelled ${shortDate(cancelDate)} session`);
+            if (recentDocumentByClient.has(client.id)) flags.push("Completed document");
+            if (needsWindow) flags.push("Needs monthly check-in");
+
             return (
               <Link key={client.id} href={`/coach/clients/${client.id}`}>
-                <Card className="flex items-center justify-between transition hover:border-rose/40">
-                  <div>
-                    <p className="font-medium text-ink">{client.name}</p>
-                    <p className="mt-0.5 text-sm text-gray">
-                      {client.care_profiles?.name ?? "No care profile set"}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {highRisk ? (
-                      <Badge tone="pink">high cancellation risk</Badge>
-                    ) : null}
-                    {needsWindow ? (
-                      <Badge tone="gold">needs monthly check-in</Badge>
-                    ) : null}
-                    {pending > 0 ? (
-                      <Badge tone="pink">
-                        {pending} pending request{pending > 1 ? "s" : ""}
-                      </Badge>
-                    ) : null}
-                    {paymentStatus ? (
-                      <Badge tone={paymentStatus.tone}>{paymentStatus.label}</Badge>
-                    ) : null}
+                <Card className="transition hover:border-rose/40">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-ink">{client.name}</p>
+                      <p className="mt-0.5 text-sm text-gray">
+                        {client.care_profiles?.name ?? "No care profile set"}
+                      </p>
+                    </div>
                     <span
-                      className="rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+                      className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
                       style={{ backgroundColor: phase.color }}
                     >
                       {phase.name}
                     </span>
                   </div>
+                  {flags.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                      {flags.map((f) => (
+                        <span
+                          key={f}
+                          className="text-sm font-medium text-rose before:mr-1 before:content-['•']"
+                        >
+                          {f}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </Card>
               </Link>
             );

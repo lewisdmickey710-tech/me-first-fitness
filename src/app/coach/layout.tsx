@@ -8,9 +8,9 @@ export default function CoachLayout({
   return (
     <div className="min-h-screen">
       <TopNav
-        title="MeFirstFitness Coach"
+        title="B.O.S."
         links={[
-          { href: "/coach/roster", label: "Roster" },
+          { href: "/coach/roster", label: "Motherboard" },
           { href: "/coach/schedule", label: "Schedule" },
           { href: "/coach/availability", label: "Availability" },
           { href: "/coach/signups", label: "Signups" },
