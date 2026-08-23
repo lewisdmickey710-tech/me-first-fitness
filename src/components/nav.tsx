@@ -6,9 +6,11 @@ import { Heart } from "@/components/ui";
 export function TopNav({
   title,
   links,
+  faqHref,
 }: {
   title: string;
   links?: { href: string; label: string }[];
+  faqHref?: string;
 }) {
   return (
     <header className="border-b border-grayLt bg-white">
@@ -30,7 +32,14 @@ export function TopNav({
             ))}
           </nav>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-3">
+          {faqHref ? (
+            <a href={faqHref} className="text-sm text-gray hover:text-ink">
+              FAQ
+            </a>
+          ) : null}
+          <SignOutButton />
+        </div>
       </div>
     </header>
   );

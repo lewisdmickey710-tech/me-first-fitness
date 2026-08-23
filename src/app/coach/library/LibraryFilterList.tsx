@@ -30,69 +30,82 @@ export function LibraryFilterList({ exercises }: { exercises: Exercise[] }) {
 
   return (
     <div className="space-y-4">
-      <Card className="space-y-3">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name..."
-          className="w-full rounded-xl border border-grayLt bg-white px-3 py-2 text-sm text-ink placeholder:text-gray/60 focus:border-rose focus:outline-none focus:ring-1 focus:ring-rose"
-        />
-        <div className="grid grid-cols-3 gap-2">
-          <Select
-            value={muscleGroup}
-            onChange={(e) => setMuscleGroup(e.target.value)}
-          >
-            <option value="">All muscle groups</option>
-            {MUSCLE_GROUPS.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={movementType}
-            onChange={(e) => setMovementType(e.target.value)}
-          >
-            <option value="">Compound or accessory</option>
-            {MOVEMENT_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            value={laterality}
-            onChange={(e) => setLaterality(e.target.value)}
-          >
-            <option value="">Single or two-limb</option>
-            {LATERALITIES.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-        {(query || muscleGroup || movementType || laterality) ? (
+      <div className="sticky top-9 z-10 -mx-4 bg-bg px-4 pb-2 pt-1">
+        <Card className="space-y-3">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name..."
+            className="w-full rounded-xl border border-grayLt bg-white px-3 py-2 text-sm text-ink placeholder:text-gray/60 focus:border-rose focus:outline-none focus:ring-1 focus:ring-rose"
+          />
+          <div className="grid grid-cols-3 gap-2">
+            <Select
+              value={muscleGroup}
+              onChange={(e) => setMuscleGroup(e.target.value)}
+            >
+              <option value="">All muscle groups</option>
+              {MUSCLE_GROUPS.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={movementType}
+              onChange={(e) => setMovementType(e.target.value)}
+            >
+              <option value="">Compound or accessory</option>
+              {MOVEMENT_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={laterality}
+              onChange={(e) => setLaterality(e.target.value)}
+            >
+              <option value="">Single or two-limb</option>
+              {LATERALITIES.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.label}
+                </option>
+              ))}
+            </Select>
+          </div>
           <div className="flex items-center justify-between text-xs text-gray">
             <span>
-              {filtered.length} of {exercises.length} exercises
+              {query || muscleGroup || movementType || laterality
+                ? `${filtered.length} of ${exercises.length} exercises`
+                : `${exercises.length} exercises`}
             </span>
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("");
-                setMuscleGroup("");
-                setMovementType("");
-                setLaterality("");
-              }}
-              className="text-rose hover:underline"
-            >
-              Clear filters
-            </button>
+            <div className="flex items-center gap-3">
+              {query || muscleGroup || movementType || laterality ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery("");
+                    setMuscleGroup("");
+                    setMovementType("");
+                    setLaterality("");
+                  }}
+                  className="text-rose hover:underline"
+                >
+                  Clear filters
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="text-gray hover:text-ink"
+              >
+                ↑ Top
+              </button>
+            </div>
           </div>
-        ) : null}
-      </Card>
+        </Card>
+      </div>
 
       {filtered.length === 0 ? (
         <EmptyState
