@@ -229,6 +229,7 @@ export interface ClientProgramOverride {
   substitute_exercise_id: string | null;
   sets_override: string | null;
   reps_override: string | null;
+  removed: boolean;
   edited_by: "coach" | "client";
   active: boolean;
   created_at: string;

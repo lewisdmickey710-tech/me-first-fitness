@@ -79,14 +79,22 @@ export default async function ClientProgramPage() {
   const { data: overrides } = allPdeIds.length
     ? await supabase
         .from("client_program_overrides")
-        .select("program_day_exercise_id, substitute_exercise_id")
+        .select("program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed")
         .eq("client_id", me.id)
         .eq("active", true)
         .in("program_day_exercise_id", allPdeIds)
-    : { data: [] as { program_day_exercise_id: string; substitute_exercise_id: string | null }[] };
+    : {
+        data: [] as {
+          program_day_exercise_id: string;
+          substitute_exercise_id: string | null;
+          sets_override: string | null;
+          reps_override: string | null;
+          removed: boolean;
+        }[],
+      };
 
   const overrideByPdeId = new Map(
-    (overrides ?? []).map((o) => [o.program_day_exercise_id, o.substitute_exercise_id])
+    (overrides ?? []).map((o) => [o.program_day_exercise_id, o])
   );
 
   // regress_to/progress_to/substitute exercises aren't included in the
@@ -97,7 +105,7 @@ export default async function ClientProgramPage() {
     for (const pde of day.program_day_exercises) {
       if (pde.exercises?.regress_to_id) extraIds.add(pde.exercises.regress_to_id);
       if (pde.exercises?.progress_to_id) extraIds.add(pde.exercises.progress_to_id);
-      const sub = overrideByPdeId.get(pde.id);
+      const sub = overrideByPdeId.get(pde.id)?.substitute_exercise_id;
       if (sub) extraIds.add(sub);
     }
   }
@@ -137,6 +145,7 @@ export default async function ClientProgramPage() {
         <div className="space-y-4">
           {programDays.map((day) => {
             const sortedExercises = day.program_day_exercises
+              .filter((pde) => !overrideByPdeId.get(pde.id)?.removed)
               .slice()
               .sort((a, b) => a.position - b.position);
             const logFormId = `log-day-${day.id}`;
@@ -152,11 +161,14 @@ export default async function ClientProgramPage() {
                 <div className="mt-3 space-y-4">
                   {sortedExercises.map((pde) => {
                     const base = pde.exercises;
-                    const substituteId = overrideByPdeId.get(pde.id) ?? null;
+                    const override = overrideByPdeId.get(pde.id) ?? null;
+                    const substituteId = override?.substitute_exercise_id ?? null;
                     const substitute = substituteId
                       ? extraById.get(substituteId)
                       : null;
                     const effective = substitute ?? base;
+                    const effectiveSets = override?.sets_override || pde.sets;
+                    const effectiveReps = override?.reps_override || pde.reps;
                     const regress = base?.regress_to_id
                       ? extraById.get(base.regress_to_id)
                       : null;
@@ -181,7 +193,7 @@ export default async function ClientProgramPage() {
                             ) : null}
                           </div>
                           <p className="whitespace-nowrap text-sm text-gray">
-                            {pde.sets}×{pde.reps}
+                            {effectiveSets}×{effectiveReps}
                             {pde.superset_group
                               ? ` · ${pde.superset_group}`
                               : ""}

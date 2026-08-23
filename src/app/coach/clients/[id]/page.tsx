@@ -14,6 +14,7 @@ import {
   markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
+  setClientProgramOverride,
   setRequestStatus,
   unmarkMilestoneAchieved,
   updateClientProfile,
@@ -60,6 +61,7 @@ import type {
   ClientNote,
   ClientNutritionLog,
   ClientPhaseHistory,
+  ClientProgramOverride,
   ClientSchedule,
   ClientSymptomLog,
   LegalDocument,
@@ -76,6 +78,7 @@ import type {
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "profile", label: "Profile" },
+  { id: "program", label: "Program" },
   { id: "sessions", label: "Sessions" },
   { id: "attendance", label: "Attendance" },
   { id: "checkins", label: "Check-ins" },
@@ -103,6 +106,21 @@ const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
   cancelled: "Cancelled",
   late_cancelled: "Late cancel",
 };
+
+interface ProgramDayWithExercisesRow {
+  id: string;
+  day_number: number;
+  day_label: string;
+  program_day_exercises: {
+    id: string;
+    position: number;
+    sets: string | null;
+    reps: string | null;
+    superset_group: string | null;
+    exercise_id: string;
+    exercises: { id: string; name: string } | null;
+  }[];
+}
 
 function occurrenceBadgeTone(status: OccurrenceStatus) {
   if (status === "scheduled") return "teal" as const;
@@ -251,6 +269,40 @@ export default async function ClientDetailPage({
     .select("*")
     .order("name")) as { data: CareProfile[] | null };
 
+  const { data: programDays } =
+    client.care_profile_id && currentPhase
+      ? ((await supabase
+          .from("program_days")
+          .select(
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, superset_group, exercise_id, exercises(id, name))"
+          )
+          .eq("care_profile_id", client.care_profile_id)
+          .eq("phase", currentPhase.phase)
+          .order("day_number")) as unknown as {
+          data: ProgramDayWithExercisesRow[] | null;
+        })
+      : { data: null };
+
+  const programPdeIds = (programDays ?? []).flatMap((d) =>
+    d.program_day_exercises.map((pde) => pde.id)
+  );
+  const { data: programOverrides } = programPdeIds.length
+    ? ((await supabase
+        .from("client_program_overrides")
+        .select("*")
+        .eq("client_id", id)
+        .eq("active", true)
+        .in("program_day_exercise_id", programPdeIds)) as unknown as {
+        data: ClientProgramOverride[] | null;
+      })
+    : { data: [] as ClientProgramOverride[] };
+
+  const { data: exerciseOptions } = client.care_profile_id
+    ? ((await supabase.from("exercises").select("id, name").order("name")) as unknown as {
+        data: { id: string; name: string }[] | null;
+      })
+    : { data: [] as { id: string; name: string }[] };
+
   const sevenDaysAgo = toDateString(
     new Date(nowInBusinessTz().getTime() - 6 * 86400000)
   );
@@ -361,6 +413,15 @@ export default async function ClientDetailPage({
           minorConsent={minorConsent}
           careProfiles={careProfiles ?? []}
           milestones={milestones ?? []}
+        />
+      )}
+      {tab === "program" && (
+        <ProgramTab
+          clientId={id}
+          currentPhase={currentPhase}
+          programDays={programDays ?? []}
+          overrides={programOverrides ?? []}
+          exerciseOptions={exerciseOptions ?? []}
         />
       )}
       {tab === "sessions" && (
@@ -1286,6 +1347,136 @@ function ClientIntakeSummary({ intake }: { intake: ClientIntake }) {
         />
       ) : null}
     </Card>
+  );
+}
+
+function ProgramTab({
+  clientId,
+  currentPhase,
+  programDays,
+  overrides,
+  exerciseOptions,
+}: {
+  clientId: string;
+  currentPhase: ClientPhaseHistory | null;
+  programDays: ProgramDayWithExercisesRow[];
+  overrides: ClientProgramOverride[];
+  exerciseOptions: { id: string; name: string }[];
+}) {
+  const overrideByPdeId = new Map(overrides.map((o) => [o.program_day_exercise_id, o]));
+
+  if (!currentPhase) {
+    return (
+      <EmptyState
+        title="No active phase"
+        body="This client isn't on a care profile with phase tracking yet, so there's no program to show here."
+      />
+    );
+  }
+
+  if (programDays.length === 0) {
+    return (
+      <EmptyState
+        title="No program days set up"
+        body={`No program has been built for ${phaseInfo(currentPhase.phase).name} on this client's track yet. Build it from Programs in the main nav -- that shared template applies to everyone on this care profile.`}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray">
+        {phaseInfo(currentPhase.phase).name} — this client&apos;s program.
+        Swapping, changing sets/reps, or removing a movement here only
+        affects this client; the shared template everyone else on their
+        track follows is unchanged.
+      </p>
+      {programDays.map((day) => (
+        <Card key={day.id}>
+          <p className="font-medium text-ink">
+            Day {day.day_number}: {day.day_label}
+          </p>
+          <div className="mt-3 space-y-3">
+            {day.program_day_exercises
+              .slice()
+              .sort((a, b) => a.position - b.position)
+              .map((pde) => {
+                const override = overrideByPdeId.get(pde.id);
+                const boundSave = setClientProgramOverride.bind(null, clientId);
+                return (
+                  <form
+                    key={pde.id}
+                    action={boundSave}
+                    className={`space-y-2 rounded-xl border p-3 ${
+                      override?.removed
+                        ? "border-pink/40 bg-pink/5"
+                        : "border-grayLt"
+                    }`}
+                  >
+                    <input
+                      type="hidden"
+                      name="program_day_exercise_id"
+                      value={pde.id}
+                    />
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-ink">
+                        {pde.exercises?.name ?? "(deleted exercise)"}
+                        {override?.removed ? (
+                          <span className="ml-2 text-xs font-normal text-pink">
+                            removed for this client
+                          </span>
+                        ) : null}
+                      </p>
+                      <p className="whitespace-nowrap text-xs text-gray">
+                        prescribed {pde.sets}×{pde.reps}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <Select
+                        name="substitute_exercise_id"
+                        defaultValue={override?.substitute_exercise_id ?? ""}
+                      >
+                        <option value="">— No swap (use prescribed) —</option>
+                        {exerciseOptions.map((ex) => (
+                          <option key={ex.id} value={ex.id}>
+                            {ex.name}
+                          </option>
+                        ))}
+                      </Select>
+                      <label className="flex items-center gap-2 rounded-xl border border-grayLt px-3 py-2 text-sm text-ink">
+                        <input
+                          type="checkbox"
+                          name="removed"
+                          defaultChecked={override?.removed ?? false}
+                          className="h-4 w-4 rounded border-grayLt text-rose"
+                        />
+                        Remove for this client
+                      </label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        name="sets_override"
+                        placeholder="Sets (override)"
+                        defaultValue={override?.sets_override ?? ""}
+                      />
+                      <Input
+                        name="reps_override"
+                        placeholder="Reps (override)"
+                        defaultValue={override?.reps_override ?? ""}
+                      />
+                    </div>
+
+                    <Button type="submit" variant="secondary">
+                      Save
+                    </Button>
+                  </form>
+                );
+              })}
+          </div>
+        </Card>
+      ))}
+    </div>
   );
 }
 

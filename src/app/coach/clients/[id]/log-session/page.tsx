@@ -11,6 +11,7 @@ interface ProgramDayJoinRow {
   day_number: number;
   day_label: string;
   program_day_exercises: {
+    id: string;
     position: number;
     sets: string | null;
     reps: string | null;
@@ -39,7 +40,7 @@ export default async function LogSessionPage({
     client.care_profile_id
       ? (supabase
           .from("program_days")
-          .select("phase, day_number, day_label, program_day_exercises(position, sets, reps, exercises(name))")
+          .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name))")
           .eq("care_profile_id", client.care_profile_id)
           .order("phase")
           .order("day_number") as unknown as Promise<{
@@ -49,18 +50,54 @@ export default async function LogSessionPage({
     getCurrentPhase(supabase, id),
   ]);
 
+  const allPdeIds = (days ?? []).flatMap((d) =>
+    d.program_day_exercises.map((pde) => pde.id)
+  );
+  const { data: overrides } = allPdeIds.length
+    ? await supabase
+        .from("client_program_overrides")
+        .select("program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed")
+        .eq("client_id", id)
+        .eq("active", true)
+        .in("program_day_exercise_id", allPdeIds)
+    : {
+        data: [] as {
+          program_day_exercise_id: string;
+          substitute_exercise_id: string | null;
+          sets_override: string | null;
+          reps_override: string | null;
+          removed: boolean;
+        }[],
+      };
+  const overrideByPdeId = new Map((overrides ?? []).map((o) => [o.program_day_exercise_id, o]));
+
+  const substituteIds = [...overrideByPdeId.values()]
+    .map((o) => o.substitute_exercise_id)
+    .filter((v): v is string => !!v);
+  const { data: substituteExercises } = substituteIds.length
+    ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
+    : { data: [] as { id: string; name: string }[] };
+  const substituteNameById = new Map((substituteExercises ?? []).map((e) => [e.id, e.name]));
+
   const programDayOptions: ProgramDayOption[] = (days ?? []).map((d) => ({
     phase: d.phase,
     dayNumber: d.day_number,
     label: d.day_label,
     exercises: (d.program_day_exercises ?? [])
+      .filter((pde) => !overrideByPdeId.get(pde.id)?.removed)
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((pde) => ({
-        exercise: pde.exercises?.name ?? "",
-        sets: pde.sets ?? "",
-        reps: pde.reps ?? "",
-      }))
+      .map((pde) => {
+        const override = overrideByPdeId.get(pde.id);
+        const substituteName = override?.substitute_exercise_id
+          ? substituteNameById.get(override.substitute_exercise_id)
+          : null;
+        return {
+          exercise: substituteName ?? pde.exercises?.name ?? "",
+          sets: override?.sets_override || pde.sets || "",
+          reps: override?.reps_override || pde.reps || "",
+        };
+      })
       .filter((e) => e.exercise),
   }));
 

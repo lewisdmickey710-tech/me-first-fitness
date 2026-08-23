@@ -231,6 +231,49 @@ export async function logSession(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=sessions`);
 }
 
+// Per-client edits to a prescribed exercise (swap it, change sets/reps, or
+// drop it entirely) without touching the shared care-profile template
+// everyone else on that track follows. One row per client + exercise slot
+// (client_program_overrides_client_slot_unique), so this is always an
+// upsert -- re-saving with everything blank/unchecked clears the override
+// back to the prescribed default.
+export async function setClientProgramOverride(
+  clientId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const program_day_exercise_id = String(
+    formData.get("program_day_exercise_id") ?? ""
+  );
+  if (!program_day_exercise_id) throw new Error("Missing exercise.");
+
+  const substitute_exercise_id =
+    String(formData.get("substitute_exercise_id") ?? "").trim() || null;
+  const sets_override = String(formData.get("sets_override") ?? "").trim() || null;
+  const reps_override = String(formData.get("reps_override") ?? "").trim() || null;
+  const removed = formData.get("removed") === "on";
+
+  const { error } = await supabase.from("client_program_overrides").upsert(
+    {
+      client_id: clientId,
+      program_day_exercise_id,
+      substitute_exercise_id,
+      sets_override,
+      reps_override,
+      removed,
+      edited_by: "coach",
+      active: true,
+    },
+    { onConflict: "client_id,program_day_exercise_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath(`/coach/clients/${clientId}/log-session`);
+}
+
 export async function logSessionOccurrence(
   clientId: string,
   formData: FormData
