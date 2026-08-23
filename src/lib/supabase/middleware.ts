@@ -6,6 +6,7 @@ type CookieToSet = { name: string; value: string; options: CookieOptions };
 const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",
+  "/auth/confirm",
   "/auth/reset-password",
   "/request-assessment",
 ];
