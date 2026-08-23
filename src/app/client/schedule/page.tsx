@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
@@ -77,9 +78,7 @@ export default async function ClientSchedulePage({
       .maybeSingle()) as { data: BusinessSettings | null };
     return (
       <div className="space-y-6">
-        <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-          ← Back
-        </Link>
+        <BackLink href="/client/dashboard" />
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
           Your schedule
@@ -162,9 +161,7 @@ export default async function ClientSchedulePage({
 
   return (
     <div className="space-y-6">
-      <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-        ← Back
-      </Link>
+      <BackLink href="/client/dashboard" />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

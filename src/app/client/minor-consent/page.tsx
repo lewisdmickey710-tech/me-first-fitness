@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { submitMinorConsent } from "@/app/client/actions";
@@ -43,9 +43,7 @@ export default async function MinorConsentPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/client/documents" className="text-sm text-gray hover:text-ink">
-        ← Back
-      </Link>
+      <BackLink href="/client/documents" />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

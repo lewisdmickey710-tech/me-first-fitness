@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { addNutritionLog, deleteNutritionLog } from "@/app/client/actions";
@@ -45,9 +45,7 @@ export default async function ClientNutritionPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-        ← Back
-      </Link>
+      <BackLink href="/client/dashboard" />
 
       <div>
         <h1 className="text-xl font-semibold text-ink">

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
 import { Button, Card, EmptyState, Heart, Input } from "@/components/ui";
@@ -19,11 +19,7 @@ export default async function ClientProfilePage() {
 
   return (
     <div className="space-y-6">
-      {!isFirstTime ? (
-        <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-          ← Back
-        </Link>
-      ) : null}
+      {!isFirstTime ? <BackLink href="/client/dashboard" /> : null}
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
@@ -26,9 +26,7 @@ export default async function ClientHistoryPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/client/program" className="text-sm text-gray hover:text-ink">
-        ← Back
-      </Link>
+      <BackLink href="/client/program" />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

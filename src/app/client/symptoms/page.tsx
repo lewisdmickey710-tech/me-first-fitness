@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { addSymptomLog, deleteSymptomLog } from "@/app/client/actions";
@@ -31,9 +31,7 @@ export default async function ClientSymptomsPage() {
   if (!me.symptom_tracker_enabled) {
     return (
       <div className="space-y-6">
-        <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-          ← Back
-        </Link>
+        <BackLink href="/client/dashboard" />
         <EmptyState
           title="Not turned on for your account"
           body="This one's optional and off by default — ask your coach if you'd like it enabled."
@@ -54,9 +52,7 @@ export default async function ClientSymptomsPage() {
 
   return (
     <div className="space-y-6">
-      <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
-        ← Back
-      </Link>
+      <BackLink href="/client/dashboard" />
 
       <div>
         <h1 className="text-xl font-semibold text-ink">

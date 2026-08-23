@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { submitRequest } from "@/app/client/actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 
@@ -11,12 +11,7 @@ export default async function RequestTimePage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={rescheduleFrom ? "/client/schedule" : "/client/dashboard"}
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back
-      </Link>
+      <BackLink href={rescheduleFrom ? "/client/schedule" : "/client/dashboard"} />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
