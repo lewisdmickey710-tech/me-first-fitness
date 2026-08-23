@@ -1,7 +1,8 @@
 import { BackLink } from "@/components/back-link";
 import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
-import { Button, Card, EmptyState, Heart, Input } from "@/components/ui";
+import { Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
+import { US_TIMEZONES } from "@/lib/timezone";
 
 export default async function ClientProfilePage() {
   const me = await getMyClient();
@@ -78,6 +79,22 @@ export default async function ClientProfilePage() {
               spellCheck={false}
               defaultValue={me.email ?? ""}
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Your timezone
+            </label>
+            <Select name="timezone" defaultValue={me.timezone ?? "America/Chicago"}>
+              {US_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-gray">
+              For virtual sessions — this is what session times get shown
+              in for you.
+            </p>
           </div>
 
           <p className="pt-2 text-sm font-medium text-gray">

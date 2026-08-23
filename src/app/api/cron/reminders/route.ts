@@ -7,7 +7,7 @@ import {
   sendSessionReminderEmail,
 } from "@/lib/email";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
-import { formatTimeOfDay } from "@/lib/schedule";
+import { formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 
 export const dynamic = "force-dynamic";
@@ -79,13 +79,13 @@ export async function GET(request: Request) {
 
   const { data: schedules } = await supabase
     .from("client_schedules")
-    .select("id, client_id, time_of_day, label, clients(name, user_id)")
+    .select("id, client_id, time_of_day, label, clients(name, user_id, timezone)")
     .eq("active", true)
     .eq("day_of_week", tomorrowDayOfWeek);
 
   for (const schedule of schedules ?? []) {
     const client = (schedule as unknown as {
-      clients: { name: string; user_id: string | null } | null;
+      clients: { name: string; user_id: string | null; timezone: string } | null;
     }).clients;
     if (!client?.user_id) continue;
     // Sessions are paused app-wide while a late cancellation fee is
@@ -111,7 +111,7 @@ export async function GET(request: Request) {
       await sendSessionReminderEmail(
         userResult.user.email,
         client.name,
-        `tomorrow at ${formatTimeOfDay(schedule.time_of_day)}${
+        `tomorrow at ${formatTimeOfDayForClient(tomorrowDateStr, schedule.time_of_day, client.timezone)}${
           schedule.label ? ` (${schedule.label})` : ""
         }`
       );
@@ -131,14 +131,14 @@ export async function GET(request: Request) {
   // session_reminders_log requires a client_schedule_id these don't have.
   const { data: oneOffOccurrences } = await supabase
     .from("session_occurrences")
-    .select("id, client_id, notes, reminder_sent_at, clients(name, user_id)")
+    .select("id, client_id, notes, reminder_sent_at, clients(name, user_id, timezone)")
     .eq("status", "scheduled")
     .eq("occurrence_date", tomorrowDateStr)
     .is("reminder_sent_at", null);
 
   for (const occurrence of oneOffOccurrences ?? []) {
     const client = (occurrence as unknown as {
-      clients: { name: string; user_id: string | null } | null;
+      clients: { name: string; user_id: string | null; timezone: string } | null;
     }).clients;
     if (!client?.user_id) continue;
     if (frozenClientIds.has(occurrence.client_id)) continue;
@@ -150,8 +150,11 @@ export async function GET(request: Request) {
       continue;
     }
 
-    const timeText = occurrence.notes?.startsWith("Confirmed request — ")
-      ? ` at ${occurrence.notes.replace("Confirmed request — ", "")}`
+    const rawTime = occurrence.notes?.startsWith("Confirmed request — ")
+      ? occurrence.notes.replace("Confirmed request — ", "")
+      : null;
+    const timeText = rawTime
+      ? ` at ${formatTimeOfDayForClient(tomorrowDateStr, rawTime, client.timezone)}`
       : "";
 
     try {

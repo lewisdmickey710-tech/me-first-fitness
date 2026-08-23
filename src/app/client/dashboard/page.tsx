@@ -4,7 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
-import { formatSchedule, nextSessionFromSchedules } from "@/lib/schedule";
+import { formatScheduleForClient, nextSessionFromSchedules } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
   BusinessSettings,
@@ -229,7 +229,7 @@ export default async function ClientDashboard() {
         <Card>
           <p className="text-sm font-medium text-gray">Next session</p>
           <p className="mt-1 text-lg font-semibold text-ink">
-            {formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)}
+            {formatScheduleForClient(nextSession.date, nextSession.timeOfDay, me.timezone)}
             {nextSession.label ? ` · ${nextSession.label}` : ""}
           </p>
           <Link

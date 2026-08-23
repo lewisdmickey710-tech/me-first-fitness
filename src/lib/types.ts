@@ -40,6 +40,7 @@ export interface Client {
   archived_at: string | null;
   symptom_tracker_enabled: boolean;
   last_viewed_at: string | null;
+  timezone: string;
 }
 
 export interface SessionEntry {

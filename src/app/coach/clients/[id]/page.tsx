@@ -48,7 +48,7 @@ import {
   nextSessionForClient,
   upcomingOccurrences,
 } from "@/lib/schedule";
-import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
 import type {
@@ -1022,6 +1022,22 @@ function ProfileTab({
                 <option value="monthly">Monthly client</option>
               </Select>
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Timezone
+            </label>
+            <Select name="timezone" defaultValue={client.timezone ?? "America/Chicago"}>
+              {US_TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-gray">
+              Session times shown to this client (schedule, reminder
+              emails) convert to their timezone if it&apos;s not yours.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">

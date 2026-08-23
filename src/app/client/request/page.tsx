@@ -1,6 +1,8 @@
 import { BackLink } from "@/components/back-link";
 import { submitRequest } from "@/app/client/actions";
+import { getMyClient } from "@/lib/current-client";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
+import { BUSINESS_TIMEZONE, timezoneLabel } from "@/lib/timezone";
 
 export default async function RequestTimePage({
   searchParams,
@@ -8,6 +10,9 @@ export default async function RequestTimePage({
   searchParams: Promise<{ reschedule_from?: string; error?: string }>;
 }) {
   const { reschedule_from: rescheduleFrom, error } = await searchParams;
+  const me = await getMyClient();
+  const clientTz = me?.timezone || BUSINESS_TIMEZONE;
+  const isOwnTimezone = clientTz === BUSINESS_TIMEZONE;
 
   return (
     <div className="space-y-6">
@@ -51,6 +56,11 @@ export default async function RequestTimePage({
               <Input name="preferred_time" type="time" />
             </div>
           </div>
+          {!isOwnTimezone ? (
+            <p className="-mt-2 text-xs text-gray">
+              Time is in your timezone ({timezoneLabel(clientTz)}).
+            </p>
+          ) : null}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">

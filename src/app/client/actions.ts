@@ -10,6 +10,7 @@ import {
   LATE_CANCELLATION_FEE,
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
+import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
 
 export async function logCheckin(formData: FormData) {
   const me = await getMyClient();
@@ -180,12 +181,32 @@ export async function submitRequest(formData: FormData) {
   // control (a day Mickey just blocked, a slot someone else just took) --
   // this should land back on a friendly inline message, never a crash.
   try {
-    const dayOfWeek = new Date(`${preferred_date}T00:00:00Z`).getUTCDay();
+    // Everything the client typed is in their own timezone; everything
+    // stored and checked against (blocked dates, availability windows,
+    // other clients' schedules) is business-tz wall-clock time -- convert
+    // once here so the rest of this function never has to think about it
+    // again. May shift the calendar date near midnight for a client far
+    // from the business timezone.
+    const clientTz = me.timezone || BUSINESS_TIMEZONE;
+    let businessDate = preferred_date;
+    let businessTime = preferred_time;
+    if (preferred_time && clientTz !== BUSINESS_TIMEZONE) {
+      const converted = convertWallTime(
+        preferred_date,
+        preferred_time,
+        clientTz,
+        BUSINESS_TIMEZONE
+      );
+      businessDate = converted.date;
+      businessTime = converted.time;
+    }
+
+    const dayOfWeek = new Date(`${businessDate}T00:00:00Z`).getUTCDay();
 
     const { data: blockedRows } = await supabase
       .from("coach_blocked_dates")
       .select("start_time, end_time")
-      .eq("blocked_date", preferred_date);
+      .eq("blocked_date", businessDate);
     for (const b of blockedRows ?? []) {
       if (!b.start_time || !b.end_time) {
         throw new Error(
@@ -193,9 +214,9 @@ export async function submitRequest(formData: FormData) {
         );
       }
       if (
-        preferred_time &&
-        preferred_time >= b.start_time.slice(0, 5) &&
-        preferred_time < b.end_time.slice(0, 5)
+        businessTime &&
+        businessTime >= b.start_time.slice(0, 5) &&
+        businessTime < b.end_time.slice(0, 5)
       ) {
         throw new Error(
           "That time is unavailable — please choose a different time."
@@ -217,11 +238,11 @@ export async function submitRequest(formData: FormData) {
           "Mickey isn't available on that day of the week — please choose a different date."
         );
       }
-      if (preferred_time) {
+      if (businessTime) {
         const withinWindow = availability.some(
           (a) =>
-            preferred_time >= a.start_time.slice(0, 5) &&
-            preferred_time < a.end_time.slice(0, 5)
+            businessTime! >= a.start_time.slice(0, 5) &&
+            businessTime! < a.end_time.slice(0, 5)
         );
         if (!withinWindow) {
           throw new Error(
@@ -236,22 +257,22 @@ export async function submitRequest(formData: FormData) {
     // client's own RLS session, so this narrow cross-client read needs
     // the service role -- it only checks for an existing conflict, never
     // exposes another client's details back to the requester.
-    if (preferred_time) {
+    if (businessTime) {
       const admin = createAdminClient();
       const { data: recurringConflict } = await admin
         .from("client_schedules")
         .select("id")
         .eq("day_of_week", dayOfWeek)
-        .eq("time_of_day", preferred_time)
+        .eq("time_of_day", businessTime)
         .eq("active", true)
         .limit(1);
       const { data: oneOffScheduled } = await admin
         .from("session_occurrences")
         .select("id, notes")
-        .eq("occurrence_date", preferred_date)
+        .eq("occurrence_date", businessDate)
         .eq("status", "scheduled");
       const oneOffTimeTaken = (oneOffScheduled ?? []).some((o) =>
-        o.notes?.includes(`Confirmed request — ${preferred_time}`)
+        o.notes?.includes(`Confirmed request — ${businessTime}`)
       );
       if ((recurringConflict && recurringConflict.length > 0) || oneOffTimeTaken) {
         throw new Error("That time is already taken — please choose a different time.");
@@ -260,8 +281,8 @@ export async function submitRequest(formData: FormData) {
 
     const { error } = await supabase.from("requests").insert({
       client_id: me.id,
-      preferred_date,
-      preferred_time: preferred_time || null,
+      preferred_date: businessDate,
+      preferred_time: businessTime || null,
       note: note || null,
       reschedule_from_date,
       status: "pending",
@@ -547,6 +568,7 @@ export async function submitClientProfile(formData: FormData) {
 
   const name = textOrNull("name");
   if (!name) throw new Error("Name is required.");
+  const timezone = textOrNull("timezone") ?? "America/Chicago";
 
   const { error } = await supabase
     .from("clients")
@@ -560,6 +582,7 @@ export async function submitClientProfile(formData: FormData) {
       emergency_contact_phone: textOrNull("emergency_contact_phone"),
       physician_name: textOrNull("physician_name"),
       physician_phone: textOrNull("physician_phone"),
+      timezone,
       profile_completed_at: me.profile_completed_at ?? new Date().toISOString(),
     })
     .eq("id", me.id);

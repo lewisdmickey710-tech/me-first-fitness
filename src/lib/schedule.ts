@@ -1,4 +1,10 @@
-import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import {
+  BUSINESS_TIMEZONE,
+  convertWallTime,
+  nowInBusinessTz,
+  timezoneLabel,
+  toDateString,
+} from "@/lib/timezone";
 
 export const DAY_NAMES = [
   "Sunday",
@@ -26,6 +32,39 @@ export function formatSchedule(
   timeOfDay: string
 ): string {
   return `${DAY_NAMES[dayOfWeek]}s at ${formatTimeOfDay(timeOfDay)}`;
+}
+
+/**
+ * Like formatSchedule, but converts from the business timezone to a
+ * client's own timezone (using `dateStr` to resolve DST correctly) and
+ * appends a short zone label when it actually differs -- e.g. "Tuesdays
+ * at 6:00 PM ET" for a client outside the business timezone, or plain
+ * "Tuesdays at 5:00 PM" when they're in it, matching the app's normal
+ * convention (their timezone is unambiguous, so no label needed).
+ */
+export function formatScheduleForClient(
+  dateStr: string,
+  timeOfDay: string,
+  clientTz: string
+): string {
+  if (clientTz === BUSINESS_TIMEZONE) {
+    const dayOfWeek = new Date(`${dateStr}T00:00:00Z`).getUTCDay();
+    return formatSchedule(dayOfWeek, timeOfDay);
+  }
+  const converted = convertWallTime(dateStr, timeOfDay, BUSINESS_TIMEZONE, clientTz);
+  return `${DAY_NAMES[converted.dayOfWeek]}s at ${formatTimeOfDay(converted.time)} ${timezoneLabel(clientTz)}`;
+}
+
+/** Like formatTimeOfDay, but converted to a client's own timezone (see
+ * formatScheduleForClient). */
+export function formatTimeOfDayForClient(
+  dateStr: string,
+  timeOfDay: string,
+  clientTz: string
+): string {
+  if (clientTz === BUSINESS_TIMEZONE) return formatTimeOfDay(timeOfDay);
+  const converted = convertWallTime(dateStr, timeOfDay, BUSINESS_TIMEZONE, clientTz);
+  return `${formatTimeOfDay(converted.time)} ${timezoneLabel(clientTz)}`;
 }
 
 /**

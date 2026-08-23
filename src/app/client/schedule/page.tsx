@@ -5,7 +5,7 @@ import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
 import { Badge, Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
-import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
+import { DAY_NAMES, formatTimeOfDayForClient } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type { BusinessSettings, ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
@@ -323,7 +323,7 @@ export default async function ClientSchedulePage({
 
           {selectedSchedules.map((s) => (
             <p key={s.id} className="text-sm text-gray">
-              {formatTimeOfDay(s.time_of_day)}
+              {formatTimeOfDayForClient(selectedCell.date, s.time_of_day, me.timezone)}
               {s.label ? ` · ${s.label}` : ""}
             </p>
           ))}
