@@ -84,6 +84,7 @@ export async function submitServiceCheckin(formData: FormData) {
   const what_working = String(formData.get("what_working") ?? "").trim();
   const what_would_help = String(formData.get("what_would_help") ?? "").trim();
   const anything_else = String(formData.get("anything_else") ?? "").trim();
+  const testimonial_consent = formData.get("testimonial_consent") === "on";
 
   if (!date) throw new Error("Date is required.");
 
@@ -94,6 +95,7 @@ export async function submitServiceCheckin(formData: FormData) {
     what_working: what_working || null,
     what_would_help: what_would_help || null,
     anything_else: anything_else || null,
+    testimonial_consent,
   });
 
   if (error) throw new Error(error.message);
@@ -101,6 +103,55 @@ export async function submitServiceCheckin(formData: FormData) {
   revalidatePath("/client/documents");
   revalidatePath("/client/dashboard");
   redirect("/client/documents");
+}
+
+export async function addProgressPhoto(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const date = String(formData.get("date") ?? "");
+  const angle = String(formData.get("angle") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim();
+  if (!date) throw new Error("Date is required.");
+
+  const photo = formData.get("photo");
+  if (!(photo instanceof File) || photo.size === 0) {
+    throw new Error("A photo is required.");
+  }
+
+  const supabase = await createClient();
+
+  const path = `${me.id}/progress-${crypto.randomUUID()}-${photo.name}`;
+  const { error: uploadError } = await supabase.storage
+    .from("form-checks")
+    .upload(path, photo, { contentType: photo.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error } = await supabase.from("client_progress_photos").insert({
+    client_id: me.id,
+    date,
+    angle,
+    photo_path: path,
+    notes: notes || null,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/progress");
+}
+
+export async function deleteProgressPhoto(photoId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_progress_photos")
+    .delete()
+    .eq("id", photoId)
+    .eq("client_id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/progress");
 }
 
 export async function submitRequest(formData: FormData) {

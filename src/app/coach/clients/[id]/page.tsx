@@ -59,6 +59,7 @@ import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
   ClientHabit,
+  ClientProgressPhoto,
   ClientHabitLog,
   ClientIntake,
   ClientMilestone,
@@ -175,6 +176,7 @@ export default async function ClientDetailPage({
     { data: schedules },
     { data: payments },
     { data: occurrences },
+    { data: progressPhotos },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -245,7 +247,29 @@ export default async function ClientDetailPage({
       .order("occurrence_date", { ascending: false }) as unknown as Promise<{
       data: SessionOccurrence[] | null;
     }>,
+    supabase
+      .from("client_progress_photos")
+      .select("*")
+      .eq("client_id", id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: ClientProgressPhoto[] | null;
+    }>,
   ]);
+
+  const progressPhotoUrlByPath = new Map<string, string>();
+  const progressPhotoPaths = [
+    ...new Set((progressPhotos ?? []).map((p) => p.photo_path)),
+  ];
+  if (progressPhotoPaths.length > 0) {
+    await Promise.all(
+      progressPhotoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) progressPhotoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
 
   const { data: clientIntake } = (await supabase
     .from("client_intake")
@@ -467,6 +491,8 @@ export default async function ClientDetailPage({
           clientId={id}
           measurements={measurements ?? []}
           serviceCheckins={serviceCheckins ?? []}
+          progressPhotos={progressPhotos ?? []}
+          progressPhotoUrlByPath={progressPhotoUrlByPath}
         />
       )}
       {tab === "activity" && <ActivityTab activities={activities ?? []} />}
@@ -2169,10 +2195,14 @@ function MeasurementsTab({
   clientId,
   measurements,
   serviceCheckins,
+  progressPhotos,
+  progressPhotoUrlByPath,
 }: {
   clientId: string;
   measurements: Measurement[];
   serviceCheckins: ServiceCheckin[];
+  progressPhotos: ClientProgressPhoto[];
+  progressPhotoUrlByPath: Map<string, string>;
 }) {
   const weights = measurements
     .slice()
@@ -2188,6 +2218,35 @@ function MeasurementsTab({
       >
         + Log measurement
       </Link>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray">Progress photos</p>
+        {progressPhotos.length === 0 ? (
+          <EmptyState
+            title="No progress photos yet"
+            body="Client-uploaded — they add these themselves from their own Progress page."
+          />
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {progressPhotos.map((p) => (
+              <div key={p.id} className="space-y-1">
+                {progressPhotoUrlByPath.has(p.photo_path) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={progressPhotoUrlByPath.get(p.photo_path)}
+                    alt={`Progress photo ${p.date}`}
+                    className="aspect-square w-full rounded-xl object-cover"
+                  />
+                ) : null}
+                <p className="text-xs text-gray">
+                  {p.date}
+                  {p.angle ? ` · ${p.angle}` : ""}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {measurements.length === 0 ? (
         <EmptyState
@@ -2250,9 +2309,14 @@ function MeasurementsTab({
               <Card key={sc.id}>
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-ink">{sc.date}</p>
-                  {sc.satisfaction != null ? (
-                    <Badge tone="gold">{sc.satisfaction}/5</Badge>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {sc.testimonial_consent ? (
+                      <Badge tone="teal">ok to quote</Badge>
+                    ) : null}
+                    {sc.satisfaction != null ? (
+                      <Badge tone="gold">{sc.satisfaction}/5</Badge>
+                    ) : null}
+                  </div>
                 </div>
                 {sc.what_working ? (
                   <p className="mt-2 text-sm text-ink">

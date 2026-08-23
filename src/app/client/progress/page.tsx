@@ -1,8 +1,19 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { Card, DeltaField, EmptyState, Heart, Sparkline } from "@/components/ui";
-import type { Measurement, TrainingSession } from "@/lib/types";
+import { addProgressPhoto, deleteProgressPhoto } from "@/app/client/actions";
+import {
+  Button,
+  Card,
+  DeltaField,
+  EmptyState,
+  Heart,
+  Input,
+  Select,
+  Sparkline,
+  Textarea,
+} from "@/components/ui";
+import type { ClientProgressPhoto, Measurement, TrainingSession } from "@/lib/types";
 
 function parseWeight(raw: string): number | null {
   const match = raw.match(/-?\d+(\.\d+)?/);
@@ -29,23 +40,47 @@ export default async function ClientProgressPage() {
   }
 
   const supabase = await createClient();
+  const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: measurements }, { data: sessions }] = await Promise.all([
-    supabase
-      .from("measurements")
-      .select("*")
-      .eq("client_id", me.id)
-      .order("date", { ascending: false }) as unknown as Promise<{
-      data: Measurement[] | null;
-    }>,
-    supabase
-      .from("sessions")
-      .select("*")
-      .eq("client_id", me.id)
-      .order("date", { ascending: true }) as unknown as Promise<{
-      data: TrainingSession[] | null;
-    }>,
-  ]);
+  const [{ data: measurements }, { data: sessions }, { data: progressPhotos }] =
+    await Promise.all([
+      supabase
+        .from("measurements")
+        .select("*")
+        .eq("client_id", me.id)
+        .order("date", { ascending: false }) as unknown as Promise<{
+        data: Measurement[] | null;
+      }>,
+      supabase
+        .from("sessions")
+        .select("*")
+        .eq("client_id", me.id)
+        .order("date", { ascending: true }) as unknown as Promise<{
+        data: TrainingSession[] | null;
+      }>,
+      supabase
+        .from("client_progress_photos")
+        .select("*")
+        .eq("client_id", me.id)
+        .order("date", { ascending: false }) as unknown as Promise<{
+        data: ClientProgressPhoto[] | null;
+      }>,
+    ]);
+
+  const photoUrlByPath = new Map<string, string>();
+  const photoPaths = [
+    ...new Set((progressPhotos ?? []).map((p) => p.photo_path)),
+  ];
+  if (photoPaths.length > 0) {
+    await Promise.all(
+      photoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) photoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
 
   const allMeasurements = measurements ?? [];
   const weights = allMeasurements
@@ -114,6 +149,89 @@ export default async function ClientProgressPage() {
         <p className="mt-1 text-sm text-gray">
           Your measurement trends and strength progress, all in one place.
         </p>
+      </div>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-gray">Progress photos</p>
+        <Card>
+          <form action={addProgressPhoto} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink">
+                  Date
+                </label>
+                <Input name="date" type="date" required defaultValue={today} />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink">
+                  Angle
+                </label>
+                <Select name="angle" defaultValue="">
+                  <option value="">Not specified</option>
+                  <option value="front">Front</option>
+                  <option value="side">Side</option>
+                  <option value="back">Back</option>
+                  <option value="other">Other</option>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Photo
+              </label>
+              <input
+                type="file"
+                name="photo"
+                accept="image/*"
+                capture="environment"
+                required
+                className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Notes{" "}
+                <span className="font-normal text-gray">(optional)</span>
+              </label>
+              <Textarea name="notes" rows={2} />
+            </div>
+            <Button type="submit">Add photo</Button>
+          </form>
+        </Card>
+
+        {(progressPhotos ?? []).length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {progressPhotos!.map((p) => (
+              <div key={p.id} className="space-y-1">
+                {photoUrlByPath.has(p.photo_path) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photoUrlByPath.get(p.photo_path)}
+                    alt={`Progress photo ${p.date}`}
+                    className="aspect-square w-full rounded-xl object-cover"
+                  />
+                ) : null}
+                <p className="text-xs text-gray">
+                  {p.date}
+                  {p.angle ? ` · ${p.angle}` : ""}
+                </p>
+                <form
+                  action={async () => {
+                    "use server";
+                    await deleteProgressPhoto(p.id);
+                  }}
+                >
+                  <button
+                    type="submit"
+                    className="text-xs text-gray hover:text-pink"
+                  >
+                    Delete
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <div className="space-y-3">

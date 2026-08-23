@@ -1,6 +1,6 @@
 import { BackLink } from "@/components/back-link";
 import { submitServiceCheckin } from "@/app/client/actions";
-import { Button, Card, Heart, Select, Textarea } from "@/components/ui";
+import { Button, Card, Checkbox, Heart, Select, Textarea } from "@/components/ui";
 
 export default function ServiceCheckinPage() {
   const today = new Date().toISOString().slice(0, 10);
@@ -40,23 +40,40 @@ export default function ServiceCheckinPage() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              What&apos;s working well?
+              What&apos;s changed for you since we started working together?
             </label>
-            <Textarea name="what_working" rows={3} />
+            <Textarea
+              name="what_working"
+              rows={3}
+              placeholder="Physically, mentally, day-to-day — whatever comes to mind"
+            />
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              What would help right now?
+              What would make this even better for you?
             </label>
             <Textarea name="what_would_help" rows={3} />
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Anything else on your mind?
+              Anything you&apos;d want to tell someone who&apos;s on the
+              fence about working with a coach?
             </label>
             <Textarea name="anything_else" rows={3} />
+          </div>
+
+          <div className="border-t border-grayLt pt-4">
+            <Checkbox
+              name="testimonial_consent"
+              label="I'm comfortable with Mickey sharing what I wrote above as a testimonial"
+            />
+            <p className="mt-1 text-xs text-gray">
+              She&apos;ll always check with you first on specifics like using
+              your name or photo — this just lets her know your words here
+              are fair game to ask about.
+            </p>
           </div>
 
           <Button type="submit">Send to my coach</Button>

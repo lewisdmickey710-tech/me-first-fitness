@@ -258,6 +258,19 @@ export interface ServiceCheckin {
   what_working: string | null;
   what_would_help: string | null;
   anything_else: string | null;
+  testimonial_consent: boolean;
+  created_at: string;
+}
+
+export type ProgressPhotoAngle = "front" | "side" | "back" | "other";
+
+export interface ClientProgressPhoto {
+  id: string;
+  client_id: string;
+  date: string;
+  angle: ProgressPhotoAngle | null;
+  photo_path: string;
+  notes: string | null;
   created_at: string;
 }
 
