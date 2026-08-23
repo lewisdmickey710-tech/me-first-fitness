@@ -367,6 +367,9 @@ export default async function LeadDetailPage({
                 <option value="1">1 day/week</option>
                 <option value="2">2 days/week</option>
                 <option value="3">3 days/week</option>
+                <option value="4">4 days/week</option>
+                <option value="5">5 days/week</option>
+                <option value="6">6 days/week</option>
               </Select>
               <Select name="session_mode" defaultValue="in_person">
                 <option value="in_person">In-person</option>

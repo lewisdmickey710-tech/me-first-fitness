@@ -18,7 +18,7 @@ export interface Client {
   created_at: string;
   user_id: string | null;
   care_profile_id: string | null;
-  days_per_week: 1 | 2 | 3 | null;
+  days_per_week: number | null;
   session_mode: "in_person" | "virtual" | "mixed" | null;
   last_inactivity_nudge_sent_at: string | null;
   preferred_name: string | null;
