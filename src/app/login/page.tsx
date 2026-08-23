@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sendClientLoginLink } from "@/app/login/actions";
 import { Button, Card, Heart, Input } from "@/components/ui";
 
 type Tab = "client" | "coach";
@@ -90,19 +91,13 @@ function ClientLogin() {
       return;
     }
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: trimmedEmail,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
-      },
-    });
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-    } else {
+    try {
+      await sendClientLoginLink(trimmedEmail);
       setSent(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
     }
+    setLoading(false);
   }
 
   if (sent) {

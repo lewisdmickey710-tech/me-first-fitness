@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendLeadInviteEmail } from "@/lib/email";
 
 export async function submitAssessmentRequest(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -25,37 +26,30 @@ export async function submitAssessmentRequest(formData: FormData) {
   try {
     const supabase = createAdminClient();
 
-    const { data: inviteData, error: inviteError } =
-      await supabase.auth.admin.inviteUserByEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
-      });
-
-    let userId: string;
-    if (inviteError) {
-      // Most likely: this email already has an account (a previous lead,
-      // an existing client, or just a repeated request) -- inviteUserByEmail
-      // refuses to re-invite someone who's already registered. Look the
-      // account up instead of failing the whole submission, but still send
-      // them a real way in: a magic link, since they can't be re-invited.
-      const { data: existing } = await supabase.auth.admin.listUsers({
-        perPage: 1000,
-      });
-      const match = existing?.users.find(
-        (u) => u.email?.toLowerCase() === email
-      );
-      if (!match) throw new Error(inviteError.message);
-      userId = match.id;
-
-      const { error: otpError } = await supabase.auth.signInWithOtp({
+    // generateLink creates the user if they don't exist yet (same as
+    // inviteUserByEmail) or just generates a login link if they do (same
+    // as signInWithOtp) -- one path handles both cases. Crucially, it
+    // never sends an email itself, so it never touches Supabase Auth's
+    // own email sender (the thing that was actually failing) -- the link
+    // is delivered through our own Resend pipeline instead.
+    const { data: linkData, error: linkError } =
+      await supabase.auth.admin.generateLink({
+        type: "magiclink",
         email,
         options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
         },
       });
-      if (otpError) throw new Error(otpError.message);
-    } else {
-      userId = inviteData.user.id;
-    }
+    if (linkError) throw new Error(linkError.message);
+
+    const userId = linkData.user.id;
+    // verifyOtp's own docs mark 'magiclink' as a deprecated verification
+    // type -- 'email' is the current one for verifying an emailed OTP/link,
+    // and it accepts the exact same hashed_token a 'magiclink' request
+    // produces. Hardcoded here rather than using verification_type, which
+    // would echo back the now-deprecated 'magiclink'.
+    const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${linkData.properties.hashed_token}&type=email&next=/`;
+    await sendLeadInviteEmail(email, name, actionLink);
 
     // Only set role to 'lead' for a brand-new profile -- never downgrade an
     // existing coach/client account that happens to reuse this email.

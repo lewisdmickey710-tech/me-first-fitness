@@ -20,6 +20,54 @@ function wrapper(bodyHtml: string): string {
   `;
 }
 
+// Sent from our own Resend pipeline rather than through Supabase Auth's
+// built-in email sender -- that one hits a very low, silent rate limit on
+// the free tier and was failing real lead signups outright ("Error
+// sending invite email"). The link itself still comes from Supabase
+// (admin.generateLink), just delivered through infrastructure that
+// actually works.
+export async function sendLeadInviteEmail(
+  to: string,
+  name: string,
+  actionLink: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping lead invite email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Set up your MeFirstFitness login",
+    html: wrapper(`
+      <p>Hi ${name},</p>
+      <p>Thanks for requesting a free assessment! Tap the link below to set up your login — you'll be able to fill out a bit more before we meet.</p>
+      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Set up your login →</a></p>
+      <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new assessment and I'll send a fresh one.</p>
+    `),
+  });
+}
+
+// Same reasoning as sendLeadInviteEmail -- delivered through Resend
+// instead of Supabase Auth's own (rate-limited, silently unreliable)
+// email sender.
+export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping client login link email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Your MeFirstFitness login link",
+    html: wrapper(`
+      <p>Here&apos;s your one-time login link:</p>
+      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Log in →</a></p>
+      <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new one.</p>
+    `),
+  });
+}
+
 export async function sendSessionReminderEmail(
   to: string,
   clientName: string,
