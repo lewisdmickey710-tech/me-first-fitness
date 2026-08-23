@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
 import type { Client } from "@/lib/types";
@@ -110,12 +110,7 @@ export default async function LogSessionPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/coach/clients/${id}?tab=sessions`}
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back
-      </Link>
+      <BackLink href={`/coach/clients/${id}?tab=sessions`} />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

@@ -3,6 +3,19 @@
 alter table public.program_day_exercises
   add column if not exists tempo text;
 
+-- Existing data can have duplicate (day, position) pairs from the old
+-- delete-and-reinsert save behavior -- renumber each day's rows to a
+-- clean, gap-free sequence (same relative order, ties broken by id) so
+-- the unique constraint below can actually be added.
+with ranked as (
+  select id, row_number() over (partition by program_day_id order by position, id) - 1 as new_position
+  from public.program_day_exercises
+)
+update public.program_day_exercises pde
+set position = ranked.new_position
+from ranked
+where pde.id = ranked.id and pde.position is distinct from ranked.new_position;
+
 -- saveProgramDay used to delete every row for a day and reinsert fresh
 -- ones on every save, which regenerated their ids -- silently orphaning
 -- (cascade-deleting) any client_program_overrides pointed at the old ids

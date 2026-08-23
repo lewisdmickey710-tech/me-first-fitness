@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
 import type { Exercise } from "@/lib/types";
 import { addExercise } from "@/app/coach/library/actions";
@@ -14,12 +14,7 @@ export default async function NewExercisePage() {
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/coach/library"
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back to library
-      </Link>
+      <BackLink href="/coach/library">← Back to library</BackLink>
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

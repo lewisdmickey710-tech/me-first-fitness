@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/back-link";
 import { addPayment } from "@/app/coach/actions";
 import { Button, Card, Heart, Input } from "@/components/ui";
 
@@ -14,12 +14,7 @@ export default async function NewPaymentPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/coach/clients/${id}?tab=payments`}
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back
-      </Link>
+      <BackLink href={`/coach/clients/${id}?tab=payments`} />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

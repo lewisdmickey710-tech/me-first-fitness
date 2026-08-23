@@ -19,6 +19,7 @@ import {
   updateClientProfile,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
+import { BackLink } from "@/components/back-link";
 import {
   Badge,
   Button,
@@ -357,9 +358,7 @@ export default async function ClientDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/coach/roster" className="text-sm text-gray hover:text-ink">
-        ← Back to roster
-      </Link>
+      <BackLink href="/coach/roster">← Back to roster</BackLink>
 
       <PhaseBanner
         phase={currentPhase?.phase ?? "n/a"}

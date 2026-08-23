@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
 import type { Exercise } from "@/lib/types";
 import { updateExercise } from "@/app/coach/library/actions";
@@ -30,12 +30,7 @@ export default async function EditExercisePage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/coach/library"
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back to library
-      </Link>
+      <BackLink href="/coach/library">← Back to library</BackLink>
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

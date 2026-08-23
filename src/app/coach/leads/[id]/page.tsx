@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BackLink } from "@/components/back-link";
 import {
   addMovementScreening,
   archiveLead,
@@ -128,9 +128,7 @@ export default async function LeadDetailPage({
 
   return (
     <div className="space-y-6">
-      <Link href="/coach/leads" className="text-sm text-gray hover:text-ink">
-        ← Back to leads
-      </Link>
+      <BackLink href="/coach/leads">← Back to leads</BackLink>
 
       <div className="flex items-center justify-between">
         <div>

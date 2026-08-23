@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { saveProgramDay } from "@/app/coach/programs/actions";
 import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui";
@@ -107,12 +108,7 @@ export default async function CareProfileProgramPage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href="/coach/programs"
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back to program templates
-      </Link>
+      <BackLink href="/coach/programs">← Back to program templates</BackLink>
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

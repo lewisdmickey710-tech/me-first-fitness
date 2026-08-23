@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { addClientSchedule, removeClientSchedule } from "@/app/coach/actions";
 import { Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
@@ -32,12 +32,7 @@ export default async function ClientSchedulePage({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/coach/clients/${id}`}
-        className="text-sm text-gray hover:text-ink"
-      >
-        ← Back
-      </Link>
+      <BackLink href={`/coach/clients/${id}`} />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
