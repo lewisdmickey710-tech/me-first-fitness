@@ -230,6 +230,7 @@ export interface ClientProgramOverride {
   sets_override: string | null;
   reps_override: string | null;
   removed: boolean;
+  position_override: number | null;
   edited_by: "coach" | "client";
   active: boolean;
   created_at: string;

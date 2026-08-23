@@ -56,7 +56,9 @@ export default async function LogSessionPage({
   const { data: overrides } = allPdeIds.length
     ? await supabase
         .from("client_program_overrides")
-        .select("program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed")
+        .select(
+          "program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed, position_override"
+        )
         .eq("client_id", id)
         .eq("active", true)
         .in("program_day_exercise_id", allPdeIds)
@@ -67,6 +69,7 @@ export default async function LogSessionPage({
           sets_override: string | null;
           reps_override: string | null;
           removed: boolean;
+          position_override: number | null;
         }[],
       };
   const overrideByPdeId = new Map((overrides ?? []).map((o) => [o.program_day_exercise_id, o]));
@@ -86,7 +89,11 @@ export default async function LogSessionPage({
     exercises: (d.program_day_exercises ?? [])
       .filter((pde) => !overrideByPdeId.get(pde.id)?.removed)
       .slice()
-      .sort((a, b) => a.position - b.position)
+      .sort(
+        (a, b) =>
+          (overrideByPdeId.get(a.id)?.position_override ?? a.position) -
+          (overrideByPdeId.get(b.id)?.position_override ?? b.position)
+      )
       .map((pde) => {
         const override = overrideByPdeId.get(pde.id);
         const substituteName = override?.substitute_exercise_id

@@ -13,6 +13,7 @@ import {
   logSessionOccurrence,
   markMilestoneAchieved,
   markPaymentPaid,
+  reorderClientProgramExercise,
   setClientDocumentAssignment,
   setClientProgramOverride,
   setRequestStatus,
@@ -1397,27 +1398,31 @@ function ProgramTab({
             Day {day.day_number}: {day.day_label}
           </p>
           <div className="mt-3 space-y-3">
-            {day.program_day_exercises
-              .slice()
-              .sort((a, b) => a.position - b.position)
-              .map((pde) => {
+            {(() => {
+              const ordered = day.program_day_exercises
+                .slice()
+                .map((pde) => ({
+                  pde,
+                  effectivePosition:
+                    overrideByPdeId.get(pde.id)?.position_override ?? pde.position,
+                }))
+                .sort((a, b) => a.effectivePosition - b.effectivePosition);
+
+              return ordered.map(({ pde, effectivePosition }, i) => {
                 const override = overrideByPdeId.get(pde.id);
                 const boundSave = setClientProgramOverride.bind(null, clientId);
+                const prev = ordered[i - 1];
+                const next = ordered[i + 1];
+                const boundReorder = reorderClientProgramExercise.bind(null, clientId);
                 return (
-                  <form
+                  <div
                     key={pde.id}
-                    action={boundSave}
                     className={`space-y-2 rounded-xl border p-3 ${
                       override?.removed
                         ? "border-pink/40 bg-pink/5"
                         : "border-grayLt"
                     }`}
                   >
-                    <input
-                      type="hidden"
-                      name="program_day_exercise_id"
-                      value={pde.id}
-                    />
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-ink">
                         {pde.exercises?.name ?? "(deleted exercise)"}
@@ -1427,11 +1432,53 @@ function ProgramTab({
                           </span>
                         ) : null}
                       </p>
-                      <p className="whitespace-nowrap text-xs text-gray">
-                        prescribed {pde.sets}×{pde.reps}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <form action={boundReorder}>
+                          <input type="hidden" name="pde_id_a" value={pde.id} />
+                          <input type="hidden" name="pos_a" value={effectivePosition} />
+                          <input type="hidden" name="pde_id_b" value={prev?.pde.id ?? ""} />
+                          <input
+                            type="hidden"
+                            name="pos_b"
+                            value={prev?.effectivePosition ?? ""}
+                          />
+                          <button
+                            type="submit"
+                            disabled={!prev}
+                            className="rounded-lg border border-grayLt px-2 py-1 text-xs text-ink disabled:opacity-30"
+                          >
+                            ↑
+                          </button>
+                        </form>
+                        <form action={boundReorder}>
+                          <input type="hidden" name="pde_id_a" value={pde.id} />
+                          <input type="hidden" name="pos_a" value={effectivePosition} />
+                          <input type="hidden" name="pde_id_b" value={next?.pde.id ?? ""} />
+                          <input
+                            type="hidden"
+                            name="pos_b"
+                            value={next?.effectivePosition ?? ""}
+                          />
+                          <button
+                            type="submit"
+                            disabled={!next}
+                            className="rounded-lg border border-grayLt px-2 py-1 text-xs text-ink disabled:opacity-30"
+                          >
+                            ↓
+                          </button>
+                        </form>
+                      </div>
                     </div>
+                    <p className="text-right text-xs text-gray">
+                      prescribed {pde.sets}×{pde.reps}
+                    </p>
 
+                    <form action={boundSave} className="space-y-2">
+                    <input
+                      type="hidden"
+                      name="program_day_exercise_id"
+                      value={pde.id}
+                    />
                     <div className="grid grid-cols-2 gap-2">
                       <Select
                         name="substitute_exercise_id"
@@ -1470,9 +1517,11 @@ function ProgramTab({
                     <Button type="submit" variant="secondary">
                       Save
                     </Button>
-                  </form>
+                    </form>
+                  </div>
                 );
-              })}
+              });
+            })()}
           </div>
         </Card>
       ))}
