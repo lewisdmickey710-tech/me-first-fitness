@@ -5,17 +5,67 @@ import {
   blockDate,
   unblockDate,
 } from "@/app/coach/actions";
+import { BlockHoursGrid } from "./BlockHoursGrid";
 import { Button, Card, EmptyState, Heart, Input, Select, Textarea } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
-import type { CoachAvailability, CoachBlockedDate } from "@/lib/types";
+import type { ClientSchedule, CoachAvailability, CoachBlockedDate } from "@/lib/types";
 
-export default async function CoachAvailabilityPage() {
+const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEK_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+
+type ScheduleRow = ClientSchedule & { clients: { id: string; name: string } | null };
+
+export default async function CoachAvailabilityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
   const supabase = await createClient();
 
-  const todayStr = toDateString(nowInBusinessTz());
+  const now = nowInBusinessTz();
+  const todayStr = toDateString(now);
 
-  const [{ data: availability }, { data: blockedDates }] = await Promise.all([
+  const { week: weekParam } = await searchParams;
+  let weekStart: Date;
+  if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
+    weekStart = new Date(`${weekParam}T00:00:00Z`);
+  } else {
+    weekStart = new Date(`${todayStr}T00:00:00Z`);
+    weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  }
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setUTCDate(d.getUTCDate() + i);
+    const dateStr = toDateString(d);
+    return {
+      date: dateStr,
+      dayOfWeek: d.getUTCDay(),
+      label: `${WEEKDAY_SHORT[d.getUTCDay()]} ${WEEK_LABEL_FMT.format(d)}`,
+    };
+  });
+  const weekStartStr = weekDays[0].date;
+  const weekEndStr = weekDays[6].date;
+  const prevWeekDate = new Date(weekStart);
+  prevWeekDate.setUTCDate(prevWeekDate.getUTCDate() - 7);
+  const nextWeekDate = new Date(weekStart);
+  nextWeekDate.setUTCDate(nextWeekDate.getUTCDate() + 7);
+  const weekLabel = `${WEEK_LABEL_FMT.format(weekStart)} – ${WEEK_LABEL_FMT.format(
+    new Date(`${weekEndStr}T00:00:00Z`)
+  )}`;
+
+  const [
+    { data: availability },
+    { data: blockedDates },
+    { data: weekBlocks },
+    { data: schedules },
+    { data: weekOccurrences },
+    { data: allClients },
+  ] = await Promise.all([
     supabase
       .from("coach_availability")
       .select("*")
@@ -26,6 +76,26 @@ export default async function CoachAvailabilityPage() {
       .select("*")
       .gte("blocked_date", todayStr)
       .order("blocked_date") as unknown as Promise<{ data: CoachBlockedDate[] | null }>,
+    supabase
+      .from("coach_blocked_dates")
+      .select("*")
+      .gte("blocked_date", weekStartStr)
+      .lte("blocked_date", weekEndStr) as unknown as Promise<{ data: CoachBlockedDate[] | null }>,
+    supabase
+      .from("client_schedules")
+      .select("*, clients(id, name)")
+      .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
+    supabase
+      .from("session_occurrences")
+      .select("client_id, occurrence_date, notes")
+      .gte("occurrence_date", weekStartStr)
+      .lte("occurrence_date", weekEndStr)
+      .eq("status", "scheduled") as unknown as Promise<{
+      data: { client_id: string; occurrence_date: string; notes: string | null }[] | null;
+    }>,
+    supabase.from("clients").select("id, name") as unknown as Promise<{
+      data: { id: string; name: string }[] | null;
+    }>,
   ]);
 
   const availabilityByDay = new Map<number, CoachAvailability[]>();
@@ -33,6 +103,36 @@ export default async function CoachAvailabilityPage() {
     const list = availabilityByDay.get(a.day_of_week) ?? [];
     list.push(a);
     availabilityByDay.set(a.day_of_week, list);
+  }
+
+  const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
+
+  const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
+  for (const s of schedules ?? []) {
+    if (!s.clients) continue;
+    const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
+    list.push(s);
+    scheduleByDayOfWeek.set(s.day_of_week, list);
+  }
+
+  const bookings: { date: string; timeOfDay: string; clientName: string }[] = [];
+  for (const day of weekDays) {
+    for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
+      bookings.push({
+        date: day.date,
+        timeOfDay: s.time_of_day,
+        clientName: s.clients!.name,
+      });
+    }
+  }
+  for (const o of weekOccurrences ?? []) {
+    const timeMatch = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    if (!timeMatch) continue;
+    bookings.push({
+      date: o.occurrence_date,
+      timeOfDay: timeMatch[1],
+      clientName: clientNameById.get(o.client_id) ?? "Client",
+    });
   }
 
   return (
@@ -43,8 +143,8 @@ export default async function CoachAvailabilityPage() {
       </h1>
       <p className="text-sm text-gray">
         Set the windows you&apos;re open for sessions — clients can only
-        request times inside them. Block off a specific day here and then,
-        and any client with a session that day gets auto-cancelled with a
+        request times inside them. Block off a day or just part of one, and
+        any client with a session in that window gets auto-cancelled with a
         free reschedule and an email letting them know.
       </p>
 
@@ -121,7 +221,35 @@ export default async function CoachAvailabilityPage() {
       </Card>
 
       <Card className="space-y-3">
-        <p className="font-medium text-ink">Block a day off</p>
+        <p className="font-medium text-ink">Block specific hours</p>
+        <p className="text-sm text-gray">
+          Bookings show teal, existing blocks show pink. Select a range to
+          block just part of a day — no need to block the whole thing.
+        </p>
+        <BlockHoursGrid
+          weekDays={weekDays}
+          availability={(availability ?? []).map((a) => ({
+            dayOfWeek: a.day_of_week,
+            startTime: a.start_time,
+            endTime: a.end_time,
+          }))}
+          blocks={(weekBlocks ?? []).map((b) => ({
+            id: b.id,
+            date: b.blocked_date,
+            startTime: b.start_time,
+            endTime: b.end_time,
+            reason: b.reason,
+          }))}
+          bookings={bookings}
+          prevWeekHref={`/coach/availability?week=${toDateString(prevWeekDate)}`}
+          nextWeekHref={`/coach/availability?week=${toDateString(nextWeekDate)}`}
+          weekLabel={weekLabel}
+          todayStr={todayStr}
+        />
+      </Card>
+
+      <Card className="space-y-3">
+        <p className="font-medium text-ink">Block a whole day off</p>
         <p className="text-sm text-gray">
           Anyone scheduled that day is auto-cancelled — free reschedule, no
           fee, and they&apos;ll get an email right away.
@@ -144,17 +272,27 @@ export default async function CoachAvailabilityPage() {
       </Card>
 
       <div className="space-y-2">
-        <p className="text-sm font-medium text-gray">Upcoming blocked days</p>
+        <p className="text-sm font-medium text-gray">Upcoming blocks</p>
         {!blockedDates || blockedDates.length === 0 ? (
           <EmptyState
             title="Nothing blocked"
-            body="Days you block off will show up here."
+            body="Days or hours you block off will show up here."
           />
         ) : (
           blockedDates.map((b) => (
             <Card key={b.id} className="flex items-center justify-between">
               <div>
-                <p className="font-medium text-ink">{b.blocked_date}</p>
+                <p className="font-medium text-ink">
+                  {b.blocked_date}
+                  {b.start_time && b.end_time ? (
+                    <span className="font-normal text-gray">
+                      {" "}
+                      · {formatTimeOfDay(b.start_time)} – {formatTimeOfDay(b.end_time)}
+                    </span>
+                  ) : (
+                    <span className="font-normal text-gray"> · Whole day</span>
+                  )}
+                </p>
                 {b.reason ? <p className="text-sm text-gray">{b.reason}</p> : null}
               </div>
               <form

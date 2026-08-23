@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { coachCancelSession } from "@/app/coach/actions";
+import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type { ClientSchedule, SessionOccurrence } from "@/lib/types";
@@ -233,8 +234,10 @@ export default async function CoachSchedulePage({
             const occurrence = occurrenceByClientDate.get(
               `${s.clientId}:${selectedCell.date}`
             );
+            const status = occurrence?.status ?? "scheduled";
+            const cancellable = status === "scheduled" && selectedCell.date >= todayStr;
             return (
-              <Card key={s.clientId}>
+              <Card key={s.clientId} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div>
                     <Link
@@ -248,10 +251,28 @@ export default async function CoachSchedulePage({
                       {s.timeOfDay && s.label ? ` · ${s.label}` : ""}
                     </p>
                   </div>
-                  <Badge tone={occurrence?.status === "completed" ? "green" : "teal"}>
-                    {occurrence ? STATUS_LABEL[occurrence.status] : "Scheduled"}
+                  <Badge tone={status === "completed" ? "green" : status === "scheduled" ? "teal" : "pink"}>
+                    {STATUS_LABEL[status] ?? "Scheduled"}
+                    {(status === "cancelled" || status === "late_cancelled") &&
+                    occurrence?.cancelled_by
+                      ? occurrence.cancelled_by === "coach"
+                        ? " (by you)"
+                        : " (by client)"
+                      : ""}
                   </Badge>
                 </div>
+                {cancellable ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await coachCancelSession(s.clientId, selectedCell.date, null);
+                    }}
+                  >
+                    <Button type="submit" variant="danger">
+                      I&apos;m unavailable — cancel &amp; email them
+                    </Button>
+                  </form>
+                ) : null}
               </Card>
             );
           })}

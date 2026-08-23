@@ -930,43 +930,93 @@ export async function blockDate(formData: FormData) {
 
   const blocked_date = String(formData.get("blocked_date") ?? "").trim();
   const reason = String(formData.get("reason") ?? "").trim() || null;
+  const start_time = String(formData.get("start_time") ?? "").trim() || null;
+  const end_time = String(formData.get("end_time") ?? "").trim() || null;
   if (!blocked_date) throw new Error("Date is required.");
+  if ((start_time && !end_time) || (!start_time && end_time)) {
+    throw new Error(
+      "Provide both a start and end time, or leave both blank to block the whole day."
+    );
+  }
+  if (start_time && end_time && end_time <= start_time) {
+    throw new Error("End time must be after start time.");
+  }
 
-  const { error: blockError } = await supabase
-    .from("coach_blocked_dates")
-    .upsert({ blocked_date, reason }, { onConflict: "blocked_date" });
-  if (blockError) throw new Error(blockError.message);
+  const isPartial = !!(start_time && end_time);
+
+  // A whole-day block is unique per date (upsert-able); a partial
+  // time-range block isn't unique -- a date can have several -- so it's
+  // always a fresh insert.
+  if (isPartial) {
+    const { error } = await supabase
+      .from("coach_blocked_dates")
+      .insert({ blocked_date, reason, start_time, end_time });
+    if (error) throw new Error(error.message);
+  } else {
+    const { data: existing } = await supabase
+      .from("coach_blocked_dates")
+      .select("id")
+      .eq("blocked_date", blocked_date)
+      .is("start_time", null)
+      .maybeSingle();
+    if (existing) {
+      const { error } = await supabase
+        .from("coach_blocked_dates")
+        .update({ reason })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("coach_blocked_dates")
+        .insert({ blocked_date, reason, start_time: null, end_time: null });
+      if (error) throw new Error(error.message);
+    }
+  }
 
   // Auto-cancel whichever clients had a session that day -- anyone whose
   // recurring weekly time falls on this weekday (and isn't already
   // resolved for this exact date) plus anyone with a one-off confirmed
-  // ("scheduled") occurrence on this exact date.
+  // ("scheduled") occurrence on this exact date. When the block is
+  // partial, only sessions whose time actually falls inside the blocked
+  // window are cancelled -- everything else that day is untouched.
   const dayOfWeek = new Date(`${blocked_date}T00:00:00Z`).getUTCDay();
+  const startNorm = start_time?.slice(0, 5) ?? null;
+  const endNorm = end_time?.slice(0, 5) ?? null;
+  function timeInBlockedRange(timeOfDay: string | null): boolean {
+    if (!isPartial) return true;
+    if (!timeOfDay) return false;
+    const norm = timeOfDay.slice(0, 5);
+    return norm >= startNorm! && norm < endNorm!;
+  }
 
   const [{ data: schedules }, { data: dateOccurrences }] = await Promise.all([
     supabase
       .from("client_schedules")
-      .select("client_id")
+      .select("client_id, time_of_day")
       .eq("day_of_week", dayOfWeek)
       .eq("active", true),
     supabase
       .from("session_occurrences")
-      .select("client_id, status")
+      .select("client_id, status, notes")
       .eq("occurrence_date", blocked_date),
   ]);
 
-  const occurrenceStatusByClient = new Map(
-    (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
+  const occurrenceByClient = new Map(
+    (dateOccurrences ?? []).map((o) => [o.client_id, o])
   );
 
   const affectedIds = new Set<string>();
   for (const s of schedules ?? []) {
-    const existingStatus = occurrenceStatusByClient.get(s.client_id);
-    if (existingStatus && existingStatus !== "scheduled") continue;
+    if (!timeInBlockedRange(s.time_of_day)) continue;
+    const existing = occurrenceByClient.get(s.client_id);
+    if (existing && existing.status !== "scheduled") continue;
     affectedIds.add(s.client_id);
   }
-  for (const [clientId, status] of occurrenceStatusByClient) {
-    if (status === "scheduled") affectedIds.add(clientId);
+  for (const [clientId, o] of occurrenceByClient) {
+    if (o.status !== "scheduled") continue;
+    const timeMatch = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    if (!timeInBlockedRange(timeMatch?.[1] ?? null)) continue;
+    affectedIds.add(clientId);
   }
 
   if (affectedIds.size > 0) {
@@ -976,6 +1026,9 @@ export async function blockDate(formData: FormData) {
       .in("id", [...affectedIds]);
 
     const dayName = DAY_NAMES[dayOfWeek];
+    const whenText = isPartial
+      ? `${dayName}, ${blocked_date} (${formatTimeOfDay(start_time!)}–${formatTimeOfDay(end_time!)})`
+      : `${dayName}, ${blocked_date}`;
     for (const client of affectedClients ?? []) {
       const { error: cancelError } = await supabase.from("session_occurrences").upsert(
         {
@@ -984,8 +1037,8 @@ export async function blockDate(formData: FormData) {
           status: "cancelled",
           cancelled_by: "coach",
           notes: reason
-            ? `Coach blocked this day: ${reason}`
-            : "Coach blocked this day.",
+            ? `Coach blocked this time: ${reason}`
+            : "Coach blocked this time.",
         },
         { onConflict: "client_id,occurrence_date" }
       );
@@ -994,12 +1047,7 @@ export async function blockDate(formData: FormData) {
       try {
         const email = await clientLoginEmail(client.user_id);
         if (email) {
-          await sendDayBlockedEmail(
-            email,
-            client.name,
-            `${dayName}, ${blocked_date}`,
-            reason
-          );
+          await sendDayBlockedEmail(email, client.name, whenText, reason);
         }
       } catch (emailError) {
         console.error("Failed to send day-blocked email", emailError);

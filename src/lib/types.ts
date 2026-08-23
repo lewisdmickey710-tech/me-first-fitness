@@ -362,6 +362,10 @@ export interface CoachAvailability {
 export interface CoachBlockedDate {
   id: string;
   blocked_date: string;
+  // Both null = the whole day is blocked. Both set = only that window
+  // within the day is blocked.
+  start_time: string | null;
+  end_time: string | null;
   reason: string | null;
   created_at: string;
 }

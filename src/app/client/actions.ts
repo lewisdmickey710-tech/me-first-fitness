@@ -131,15 +131,25 @@ export async function submitRequest(formData: FormData) {
   try {
     const dayOfWeek = new Date(`${preferred_date}T00:00:00Z`).getUTCDay();
 
-    const { data: blocked } = await supabase
+    const { data: blockedRows } = await supabase
       .from("coach_blocked_dates")
-      .select("id")
-      .eq("blocked_date", preferred_date)
-      .maybeSingle();
-    if (blocked) {
-      throw new Error(
-        "Mickey isn't available that day — please choose a different date."
-      );
+      .select("start_time, end_time")
+      .eq("blocked_date", preferred_date);
+    for (const b of blockedRows ?? []) {
+      if (!b.start_time || !b.end_time) {
+        throw new Error(
+          "Mickey isn't available that day — please choose a different date."
+        );
+      }
+      if (
+        preferred_time &&
+        preferred_time >= b.start_time.slice(0, 5) &&
+        preferred_time < b.end_time.slice(0, 5)
+      ) {
+        throw new Error(
+          "That time is unavailable — please choose a different time."
+        );
+      }
     }
 
     const { data: availability } = await supabase
