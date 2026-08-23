@@ -1,11 +1,25 @@
 import { submitAssessmentRequest } from "./actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 
-export default function RequestAssessmentPage() {
+export default async function RequestAssessmentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="flex min-h-screen flex-col items-center px-4 py-12">
+      {error ? (
+        <div className="mb-4 w-full max-w-sm rounded-xl border border-pink/40 bg-pink/5 px-4 py-3 text-sm text-ink">
+          <p className="font-medium">That didn&apos;t go through</p>
+          <p className="mt-1 text-gray">{error}</p>
+          <p className="mt-1 text-gray">
+            Try again in a bit, or reach out directly if it keeps happening.
+          </p>
+        </div>
+      ) : null}
       <div className="mb-8 max-w-md text-center">
         <h1 className="text-2xl font-semibold text-ink">
           <Heart className="mr-2" />

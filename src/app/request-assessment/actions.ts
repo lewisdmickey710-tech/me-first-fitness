@@ -14,92 +14,102 @@ export async function submitAssessmentRequest(formData: FormData) {
   const preferredTime = String(formData.get("preferred_time") ?? "");
 
   if (!name || !email || !preferredDate) {
-    throw new Error("Name, email, and a preferred date are required.");
-  }
-
-  const supabase = createAdminClient();
-
-  const { data: inviteData, error: inviteError } =
-    await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
-    });
-
-  let userId: string;
-  if (inviteError) {
-    // Most likely: this email already has an account (a previous lead,
-    // an existing client, or just a repeated request) -- inviteUserByEmail
-    // refuses to re-invite someone who's already registered. Look the
-    // account up instead of failing the whole submission, but still send
-    // them a real way in: a magic link, since they can't be re-invited.
-    const { data: existing } = await supabase.auth.admin.listUsers({
-      perPage: 1000,
-    });
-    const match = existing?.users.find(
-      (u) => u.email?.toLowerCase() === email
+    redirect(
+      `/request-assessment?error=${encodeURIComponent("Name, email, and a preferred date are required.")}`
     );
-    if (!match) throw new Error(inviteError.message);
-    userId = match.id;
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
-      },
-    });
-    if (otpError) throw new Error(otpError.message);
-  } else {
-    userId = inviteData.user.id;
   }
 
-  // Only set role to 'lead' for a brand-new profile -- never downgrade an
-  // existing coach/client account that happens to reuse this email.
-  const { data: existingProfile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle();
+  // Anything below can fail on us (email sending, a transient DB hiccup) --
+  // this is a public-facing form, so a visitor should always land back on
+  // a friendly message, never a raw crash page.
+  try {
+    const supabase = createAdminClient();
 
-  if (!existingProfile) {
-    const { error: profileError } = await supabase
-      .from("profiles")
-      .insert({ id: userId, role: "lead" });
-    if (profileError) throw new Error(profileError.message);
-  }
+    const { data: inviteData, error: inviteError } =
+      await supabase.auth.admin.inviteUserByEmail(email, {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+      });
 
-  const { data: existingLead } = await supabase
-    .from("leads")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
+    let userId: string;
+    if (inviteError) {
+      // Most likely: this email already has an account (a previous lead,
+      // an existing client, or just a repeated request) -- inviteUserByEmail
+      // refuses to re-invite someone who's already registered. Look the
+      // account up instead of failing the whole submission, but still send
+      // them a real way in: a magic link, since they can't be re-invited.
+      const { data: existing } = await supabase.auth.admin.listUsers({
+        perPage: 1000,
+      });
+      const match = existing?.users.find(
+        (u) => u.email?.toLowerCase() === email
+      );
+      if (!match) throw new Error(inviteError.message);
+      userId = match.id;
 
-  let leadId: string;
-  if (existingLead) {
-    leadId = existingLead.id;
-  } else {
-    const { data: newLead, error: leadError } = await supabase
-      .from("leads")
-      .insert({
-        user_id: userId,
-        name,
+      const { error: otpError } = await supabase.auth.signInWithOtp({
         email,
-        phone: phone || null,
-        note: note || null,
-      })
-      .select("id")
-      .single();
-    if (leadError) throw new Error(leadError.message);
-    leadId = newLead.id;
-  }
+        options: {
+          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+        },
+      });
+      if (otpError) throw new Error(otpError.message);
+    } else {
+      userId = inviteData.user.id;
+    }
 
-  const { error: requestError } = await supabase
-    .from("lead_assessment_requests")
-    .insert({
-      lead_id: leadId,
-      preferred_date: preferredDate,
-      preferred_time: preferredTime || null,
-      note: note || null,
-    });
-  if (requestError) throw new Error(requestError.message);
+    // Only set role to 'lead' for a brand-new profile -- never downgrade an
+    // existing coach/client account that happens to reuse this email.
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({ id: userId, role: "lead" });
+      if (profileError) throw new Error(profileError.message);
+    }
+
+    const { data: existingLead } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    let leadId: string;
+    if (existingLead) {
+      leadId = existingLead.id;
+    } else {
+      const { data: newLead, error: leadError } = await supabase
+        .from("leads")
+        .insert({
+          user_id: userId,
+          name,
+          email,
+          phone: phone || null,
+          note: note || null,
+        })
+        .select("id")
+        .single();
+      if (leadError) throw new Error(leadError.message);
+      leadId = newLead.id;
+    }
+
+    const { error: requestError } = await supabase
+      .from("lead_assessment_requests")
+      .insert({
+        lead_id: leadId,
+        preferred_date: preferredDate,
+        preferred_time: preferredTime || null,
+        note: note || null,
+      });
+    if (requestError) throw new Error(requestError.message);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Something went wrong.";
+    redirect(`/request-assessment?error=${encodeURIComponent(message)}`);
+  }
 
   redirect("/request-assessment/sent");
 }
