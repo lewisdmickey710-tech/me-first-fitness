@@ -209,6 +209,7 @@ export default async function ClientDashboard() {
           <QuickAction href="/client/symptoms" label="Symptom log" />
         ) : null}
         <QuickAction href="/client/progress" label="My progress" />
+        <QuickAction href="/client/community" label="Community" />
         <QuickAction href="/client/milestones" label="Milestones" />
         <QuickAction href="/client/guide" label="Wellness guide" />
         <QuickAction href="/client/documents" label="Documents" />

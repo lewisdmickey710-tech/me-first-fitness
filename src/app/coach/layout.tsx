@@ -19,6 +19,7 @@ export default function CoachLayout({
           { href: "/coach/programs", label: "Programs" },
           { href: "/coach/documents", label: "Documents" },
           { href: "/coach/testimonials", label: "Testimonials" },
+          { href: "/coach/community", label: "Community" },
           { href: "/coach/settings", label: "Settings" },
         ]}
       />

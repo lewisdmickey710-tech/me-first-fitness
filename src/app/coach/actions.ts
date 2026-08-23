@@ -894,6 +894,46 @@ export async function touchClientViewed(clientId: string) {
   }
 }
 
+// ---- Community board moderation ----
+
+export async function addCommunityCommentAsCoach(postId: string, formData: FormData) {
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) throw new Error("Comment can't be empty.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("community_post_comments").insert({
+    post_id: postId,
+    client_id: null,
+    author_role: "coach",
+    body,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/community");
+  revalidatePath("/client/community");
+}
+
+export async function deleteCommunityPostAsCoach(postId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("community_posts").delete().eq("id", postId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/community");
+  revalidatePath("/client/community");
+}
+
+export async function deleteCommunityCommentAsCoach(commentId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("community_post_comments")
+    .delete()
+    .eq("id", commentId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/community");
+  revalidatePath("/client/community");
+}
+
 // ---- Availability & coach-initiated cancellations ----
 
 async function clientLoginEmail(userId: string | null): Promise<string | null> {

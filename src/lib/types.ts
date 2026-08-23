@@ -709,6 +709,33 @@ export interface LeadMovementScreening {
   created_at: string;
 }
 
+export type CommunityPostKind = "win" | "question" | "progress" | "general";
+
+export interface CommunityPost {
+  id: string;
+  client_id: string;
+  kind: CommunityPostKind;
+  body: string | null;
+  photo_path: string | null;
+  created_at: string;
+}
+
+export interface CommunityPostComment {
+  id: string;
+  post_id: string;
+  client_id: string | null;
+  author_role: "client" | "coach";
+  body: string;
+  created_at: string;
+}
+
+export interface CommunityPostReaction {
+  id: string;
+  post_id: string;
+  client_id: string;
+  created_at: string;
+}
+
 export interface LeadMovementScreeningResult {
   id: string;
   screening_id: string;
