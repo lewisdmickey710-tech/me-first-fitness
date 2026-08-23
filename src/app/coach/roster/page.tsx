@@ -84,7 +84,7 @@ export default async function RosterPage({
     clientIds.length > 0
       ? supabase
           .from("sessions")
-          .select("client_id, date, payment_made")
+          .select("client_id, date, payment_status")
           .in("client_id", clientIds)
           .order("date", { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -149,10 +149,13 @@ export default async function RosterPage({
 
   // sessionRows is ordered by date desc, so the first row seen per client
   // is their most recent session.
-  const mostRecentPaymentMadeByClient = new Map<string, boolean | null>();
+  const mostRecentPaymentStatusByClient = new Map<
+    string,
+    "paid" | "unpaid" | "waived" | null
+  >();
   for (const row of sessionRows ?? []) {
-    if (!mostRecentPaymentMadeByClient.has(row.client_id)) {
-      mostRecentPaymentMadeByClient.set(row.client_id, row.payment_made ?? null);
+    if (!mostRecentPaymentStatusByClient.has(row.client_id)) {
+      mostRecentPaymentStatusByClient.set(row.client_id, row.payment_status ?? null);
     }
   }
 
@@ -340,7 +343,7 @@ export default async function RosterPage({
             const highRisk = riskByClient.get(client.id) ?? false;
             const paymentStatus =
               client.payment_schedule === "pay_as_you_go"
-                ? payAsYouGoStatus(mostRecentPaymentMadeByClient.get(client.id))
+                ? payAsYouGoStatus(mostRecentPaymentStatusByClient.get(client.id))
                 : client.payment_schedule === "monthly"
                   ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
                   : null;

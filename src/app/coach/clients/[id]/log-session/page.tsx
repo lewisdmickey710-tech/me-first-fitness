@@ -83,7 +83,6 @@ export default async function LogSessionPage({
         today={today}
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
-        paymentSchedule={client.payment_schedule}
       />
     </div>
   );

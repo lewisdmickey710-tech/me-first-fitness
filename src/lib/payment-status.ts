@@ -1,15 +1,17 @@
 export type PaymentStatusBadge = {
   label: string;
-  tone: "teal" | "gold" | "pink";
+  tone: "teal" | "gold" | "pink" | "gray";
 } | null;
 
 // Pay-as-you-go clients don't have scheduled invoices -- their status is
 // just whatever the coach marked on their most recent logged session.
 export function payAsYouGoStatus(
-  mostRecentPaymentMade: boolean | null | undefined
+  mostRecentPaymentStatus: "paid" | "unpaid" | "waived" | null | undefined
 ): PaymentStatusBadge {
-  if (mostRecentPaymentMade === true) return { label: "Paid last session", tone: "teal" };
-  if (mostRecentPaymentMade === false) return { label: "Payment due", tone: "pink" };
+  if (mostRecentPaymentStatus === "paid") return { label: "Paid last session", tone: "teal" };
+  if (mostRecentPaymentStatus === "unpaid") return { label: "Payment due", tone: "pink" };
+  if (mostRecentPaymentStatus === "waived")
+    return { label: "Waived last session", tone: "gray" };
   return null;
 }
 

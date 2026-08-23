@@ -82,7 +82,7 @@ export interface TrainingSession {
   logged_by: "coach" | "client";
   session_type: SessionType;
   body_map: BodyMapMarker[] | null;
-  payment_made: boolean | null;
+  payment_status: "paid" | "unpaid" | "waived" | null;
   created_at: string;
 }
 

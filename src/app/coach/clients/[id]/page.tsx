@@ -439,7 +439,7 @@ function Overview({
   const nextDue = unpaid.sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
   const payAsYouGo =
     client.payment_schedule === "pay_as_you_go"
-      ? payAsYouGoStatus(allSessions[0]?.payment_made)
+      ? payAsYouGoStatus(allSessions[0]?.payment_status)
       : null;
 
   const fourWeeksAgo = new Date();
@@ -1345,10 +1345,12 @@ async function SessionsTab({
                   {s.logged_by === "client" ? (
                     <Badge tone="teal">logged by client</Badge>
                   ) : null}
-                  {s.payment_made === true ? (
+                  {s.payment_status === "paid" ? (
                     <Badge tone="teal">paid</Badge>
-                  ) : s.payment_made === false ? (
+                  ) : s.payment_status === "unpaid" ? (
                     <Badge tone="pink">not paid</Badge>
+                  ) : s.payment_status === "waived" ? (
+                    <Badge tone="gray">waived</Badge>
                   ) : null}
                 </div>
                 <p className="text-sm text-gray">{s.date}</p>

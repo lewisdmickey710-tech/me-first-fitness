@@ -6,7 +6,7 @@ import { addHabitForClient, logSession } from "@/app/coach/actions";
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { PHASES } from "@/lib/constants";
-import type { PaymentSchedule, SessionType } from "@/lib/types";
+import type { SessionType } from "@/lib/types";
 
 export interface ProgramDayOption {
   phase: string;
@@ -54,13 +54,11 @@ export function LogSessionForm({
   today,
   programDayOptions,
   defaultPhase,
-  paymentSchedule,
 }: {
   clientId: string;
   today: string;
   programDayOptions: ProgramDayOption[];
   defaultPhase: string;
-  paymentSchedule: PaymentSchedule | null;
 }) {
   const availablePhases = useMemo(
     () =>
@@ -351,19 +349,18 @@ export function LogSessionForm({
             <Textarea name="day_notes" rows={3} />
           </div>
 
-          {paymentSchedule === "pay_as_you_go" ? (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                Payment{" "}
-                <span className="font-normal text-gray">(optional)</span>
-              </label>
-              <Select name="payment_made" defaultValue="">
-                <option value="">— Not recorded —</option>
-                <option value="paid">Paid this session</option>
-                <option value="unpaid">Not paid this session</option>
-              </Select>
-            </div>
-          ) : null}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Payment{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Select name="payment_status" defaultValue="">
+              <option value="">— Not recorded —</option>
+              <option value="paid">Paid this session</option>
+              <option value="unpaid">Not paid this session</option>
+              <option value="waived">Waived (free session)</option>
+            </Select>
+          </div>
 
           <div>
             <p className="mb-1 text-sm font-medium text-ink">
