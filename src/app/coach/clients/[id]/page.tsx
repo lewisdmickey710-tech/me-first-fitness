@@ -28,6 +28,7 @@ import {
   Checkbox,
   Collapsible,
   DeltaField,
+  DocumentBody,
   EmptyState,
   Heart,
   Input,
@@ -54,6 +55,7 @@ import type {
   CareProfile,
   Checkin,
   Client,
+  ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
   ClientHabit,
   ClientHabitLog,
@@ -80,6 +82,7 @@ import type {
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "profile", label: "Profile" },
+  { id: "documents", label: "Documents" },
   { id: "program", label: "Program" },
   { id: "sessions", label: "Sessions" },
   { id: "attendance", label: "Attendance" },
@@ -247,25 +250,35 @@ export default async function ClientDetailPage({
     .eq("client_id", id)
     .maybeSingle()) as { data: ClientIntake | null };
 
-  const [{ data: optionalDocuments }, { data: assignments }, { data: minorConsent }] =
-    await Promise.all([
-      supabase
-        .from("legal_documents")
-        .select("*")
-        .eq("assigned_to_all", false)
-        .order("key") as unknown as Promise<{ data: LegalDocument[] | null }>,
-      supabase
-        .from("client_document_assignments")
-        .select("*")
-        .eq("client_id", id) as unknown as Promise<{
-        data: ClientDocumentAssignment[] | null;
-      }>,
-      supabase
-        .from("client_minor_consent")
-        .select("*")
-        .eq("client_id", id)
-        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
-    ]);
+  const [
+    { data: allDocuments },
+    { data: assignments },
+    { data: minorConsent },
+    { data: documentAcks },
+  ] = await Promise.all([
+    supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
+      data: LegalDocument[] | null;
+    }>,
+    supabase
+      .from("client_document_assignments")
+      .select("*")
+      .eq("client_id", id) as unknown as Promise<{
+      data: ClientDocumentAssignment[] | null;
+    }>,
+    supabase
+      .from("client_minor_consent")
+      .select("*")
+      .eq("client_id", id)
+      .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+    supabase
+      .from("client_document_acknowledgments")
+      .select("*")
+      .eq("client_id", id) as unknown as Promise<{
+      data: ClientDocumentAcknowledgment[] | null;
+    }>,
+  ]);
+
+  const optionalDocuments = (allDocuments ?? []).filter((d) => !d.assigned_to_all);
 
   const { data: careProfiles } = (await supabase
     .from("care_profiles")
@@ -409,11 +422,18 @@ export default async function ClientDetailPage({
         <ProfileTab
           client={client}
           intake={clientIntake}
-          optionalDocuments={optionalDocuments ?? []}
-          assignments={assignments ?? []}
-          minorConsent={minorConsent}
           careProfiles={careProfiles ?? []}
           milestones={milestones ?? []}
+        />
+      )}
+      {tab === "documents" && (
+        <DocumentsTab
+          clientId={id}
+          allDocuments={allDocuments ?? []}
+          optionalDocuments={optionalDocuments}
+          assignments={assignments ?? []}
+          acks={documentAcks ?? []}
+          minorConsent={minorConsent}
         />
       )}
       {tab === "program" && (
@@ -831,21 +851,14 @@ function Overview({
 function ProfileTab({
   client,
   intake,
-  optionalDocuments,
-  assignments,
-  minorConsent,
   careProfiles,
   milestones,
 }: {
   client: Client;
   intake: ClientIntake | null;
-  optionalDocuments: LegalDocument[];
-  assignments: ClientDocumentAssignment[];
-  minorConsent: ClientMinorConsent | null;
   careProfiles: CareProfile[];
   milestones: ClientMilestone[];
 }) {
-  const assignedDocIds = new Set(assignments.map((a) => a.document_id));
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
@@ -1038,53 +1051,6 @@ function ProfileTab({
         )}
       </div>
 
-      {optionalDocuments.length > 0 ? (
-        <div>
-          <p className="mb-2 text-sm font-medium text-gray">
-            Additional documents
-          </p>
-          <Card className="space-y-4">
-            <p className="text-sm text-gray">
-              These only go to clients checked below — not everyone.
-            </p>
-            {optionalDocuments.map((doc) => {
-              const isAssigned = assignedDocIds.has(doc.id);
-              return (
-                <div key={doc.id} className="space-y-2 border-t border-grayLt pt-3 first:border-0 first:pt-0">
-                  <form
-                    action={async (formData: FormData) => {
-                      "use server";
-                      await setClientDocumentAssignment(
-                        client.id,
-                        doc.id,
-                        formData.get("assigned") === "on"
-                      );
-                    }}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <Checkbox
-                      name="assigned"
-                      label={doc.title}
-                      defaultChecked={isAssigned}
-                    />
-                    <Button type="submit" variant="secondary">
-                      Save
-                    </Button>
-                  </form>
-                  {isAssigned && doc.key === "minor_consent" ? (
-                    <p className="text-xs text-gray">
-                      {minorConsent?.signed_at
-                        ? `Filled out and signed by ${minorConsent.guardian_signature_name} on ${minorConsent.signed_at.slice(0, 10)}`
-                        : "Assigned — not filled out yet."}
-                    </p>
-                  ) : null}
-                </div>
-              );
-            })}
-          </Card>
-        </div>
-      ) : null}
-
       <Card className="space-y-2 border-pink/40">
         <p className="font-medium text-pink">Danger zone</p>
         <p className="text-sm text-gray">
@@ -1103,6 +1069,135 @@ function ProfileTab({
           </Button>
         </form>
       </Card>
+    </div>
+  );
+}
+
+function DocumentsTab({
+  clientId,
+  allDocuments,
+  optionalDocuments,
+  assignments,
+  acks,
+  minorConsent,
+}: {
+  clientId: string;
+  allDocuments: LegalDocument[];
+  optionalDocuments: LegalDocument[];
+  assignments: ClientDocumentAssignment[];
+  acks: ClientDocumentAcknowledgment[];
+  minorConsent: ClientMinorConsent | null;
+}) {
+  const assignedDocIds = new Set(assignments.map((a) => a.document_id));
+  const ackByDocumentAndVersion = new Map<string, ClientDocumentAcknowledgment>();
+  for (const a of acks) {
+    ackByDocumentAndVersion.set(`${a.document_id}:${a.document_version}`, a);
+  }
+
+  const minorConsentDoc = allDocuments.find((d) => d.key === "minor_consent");
+  const minorConsentAssigned = minorConsentDoc
+    ? assignedDocIds.has(minorConsentDoc.id)
+    : false;
+  const visibleDocuments = allDocuments.filter(
+    (d) => d.key !== "minor_consent" && (d.assigned_to_all || assignedDocIds.has(d.id))
+  );
+
+  return (
+    <div className="space-y-4">
+      {minorConsentAssigned ? (
+        <Card className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-ink">Minor Consent &amp; Intake Addendum</p>
+            {minorConsent?.signed_at ? (
+              <Badge tone="green">signed {minorConsent.signed_at.slice(0, 10)}</Badge>
+            ) : (
+              <Badge tone="gold">not filled out yet</Badge>
+            )}
+          </div>
+          {minorConsent?.signed_at ? (
+            <p className="text-xs text-gray">
+              Signed by {minorConsent.guardian_signature_name} on{" "}
+              {minorConsent.signed_at.slice(0, 10)}
+            </p>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {visibleDocuments.length === 0 ? (
+        <EmptyState
+          title="No documents yet"
+          body="Documents assigned to this client — and whether they've read or signed them — will show up here."
+        />
+      ) : (
+        visibleDocuments.map((doc) => {
+          const ack = ackByDocumentAndVersion.get(`${doc.id}:${doc.version}`);
+          return (
+            <Card key={doc.id} className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">{doc.title}</p>
+                {ack ? (
+                  <Badge tone="green">
+                    {ack.signed_name
+                      ? `signed ${ack.acknowledged_at.slice(0, 10)}`
+                      : `read ${ack.acknowledged_at.slice(0, 10)}`}
+                  </Badge>
+                ) : (
+                  <Badge tone="gold">not reviewed yet</Badge>
+                )}
+              </div>
+              <DocumentBody text={doc.body} />
+              {ack?.signed_name ? (
+                <p className="text-xs text-gray">
+                  Signed by {ack.signed_name} on {ack.acknowledged_at.slice(0, 10)}
+                </p>
+              ) : null}
+            </Card>
+          );
+        })
+      )}
+
+      {optionalDocuments.length > 0 ? (
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray">
+            Assign additional documents
+          </p>
+          <Card className="space-y-4">
+            <p className="text-sm text-gray">
+              These only go to clients checked below — not everyone.
+            </p>
+            {optionalDocuments.map((doc) => {
+              const isAssigned = assignedDocIds.has(doc.id);
+              return (
+                <div
+                  key={doc.id}
+                  className="space-y-2 border-t border-grayLt pt-3 first:border-0 first:pt-0"
+                >
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      await setClientDocumentAssignment(
+                        clientId,
+                        doc.id,
+                        formData.get("assigned") === "on"
+                      );
+                    }}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <Checkbox
+                      name="assigned"
+                      label={doc.title}
+                      defaultChecked={isAssigned}
+                    />
+                    <Button type="submit" variant="secondary">
+                      Save
+                    </Button>
+                  </form>
+                </div>
+              );
+            })}
+          </Card>
+        </div>
+      ) : null}
     </div>
   );
 }
