@@ -390,7 +390,9 @@ export type LegalDocumentKey =
   | "onboarding_form"
   | "disclaimer"
   | "minor_consent"
-  | "community_agreement";
+  | "community_agreement"
+  | "monthly_plan_terms"
+  | "payg_plan_terms";
 
 export interface LegalDocument {
   id: string;

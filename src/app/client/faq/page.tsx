@@ -67,10 +67,22 @@ export default function ClientFaqPage() {
           for what happens if you can&apos;t.
         </Q>
         <Q q="What counts as a late cancellation?">
-          Cancelling with less than 12 hours notice. Your first one is
-          just noted, no penalty. A second one within a rolling 16 weeks
-          adds a $10 fee, and your upcoming sessions pause until it&apos;s
-          paid.
+          Cancelling with less than 12 hours notice. What happens next
+          depends on your payment plan. Monthly: your first one is just
+          noted, no penalty — a second within a rolling 16 weeks adds a
+          $10 fee. Pay-as-you-go: there&apos;s no free pass, so the very
+          first late cancellation in that window adds a $20 fee. Either
+          way, your upcoming sessions pause until the fee is paid.
+        </Q>
+        <Q q="Can I switch between monthly and pay-as-you-go?">
+          Yes, any time — Profile → Payment plan. You&apos;ll read and
+          agree to the terms of whichever plan you&apos;re switching to
+          before it takes effect. Your late-cancellation history carries
+          over no matter which way you switch, and a fee that&apos;s
+          already been charged stays owed even if you switch right after.
+          One exception: switching from monthly to pay-as-you-go forfeits
+          any remaining free late cancellation and moves you to the $20
+          fee right away.
         </Q>
         <Q q="What if Mickey has to cancel on me instead?">
           You&apos;ll never be charged or lose anything for it — it&apos;s

@@ -7,10 +7,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyClient } from "@/lib/current-client";
 import {
   isLateCancellation,
-  LATE_CANCELLATION_FEE,
+  lateCancellationFeeAmount,
+  lateCancellationFeeThreshold,
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
 import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
+import type { PaymentSchedule } from "@/lib/types";
 
 export async function logCheckin(formData: FormData) {
   const me = await getMyClient();
@@ -343,7 +345,9 @@ export async function cancelMySession(
       .eq("status", "late_cancelled")
       .gte("occurrence_date", windowCutoff.toISOString().slice(0, 10));
 
-    if ((count ?? 0) >= 2) {
+    const threshold = lateCancellationFeeThreshold(me.payment_schedule);
+
+    if ((count ?? 0) >= threshold) {
       const { data: existingFee } = await supabase
         .from("payments")
         .select("id")
@@ -355,7 +359,7 @@ export async function cancelMySession(
         const { error: feeError } = await supabase.from("payments").insert({
           client_id: me.id,
           description: `Late cancellation fee (#${count} late cancellation within 16 weeks)`,
-          amount: LATE_CANCELLATION_FEE,
+          amount: lateCancellationFeeAmount(me.payment_schedule),
           due_date: new Date().toISOString().slice(0, 10),
           kind: "late_cancellation_fee",
           session_occurrence_id: occurrence.id,
@@ -401,6 +405,54 @@ export async function acknowledgeDocument(
   revalidatePath("/client/documents");
   revalidatePath("/client/dashboard");
   revalidatePath("/client/community");
+}
+
+export async function switchPaymentSchedule(
+  newSchedule: PaymentSchedule,
+  formData: FormData
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+  if (me.payment_schedule === newSchedule) return;
+
+  const signedName = String(formData.get("signed_name") ?? "").trim();
+  if (!signedName) {
+    throw new Error("Type your full legal name to confirm the switch.");
+  }
+
+  const supabase = await createClient();
+
+  const documentKey =
+    newSchedule === "monthly" ? "monthly_plan_terms" : "payg_plan_terms";
+
+  const { data: doc, error: docError } = await supabase
+    .from("legal_documents")
+    .select("id, version")
+    .eq("key", documentKey)
+    .single();
+  if (docError || !doc) throw new Error("Could not load the plan terms.");
+
+  const { error: ackError } = await supabase
+    .from("client_document_acknowledgments")
+    .upsert(
+      {
+        client_id: me.id,
+        document_id: doc.id,
+        document_version: doc.version,
+        signed_name: signedName,
+      },
+      { onConflict: "client_id,document_id,document_version" }
+    );
+  if (ackError) throw new Error(ackError.message);
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ payment_schedule: newSchedule })
+    .eq("id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/plan");
+  revalidatePath("/client/dashboard");
 }
 
 function checked(formData: FormData, name: string): boolean {

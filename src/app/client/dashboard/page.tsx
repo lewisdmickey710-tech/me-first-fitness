@@ -213,6 +213,7 @@ export default async function ClientDashboard() {
         <QuickAction href="/client/milestones" label="Milestones" />
         <QuickAction href="/client/guide" label="Wellness guide" />
         <QuickAction href="/client/documents" label="Documents" />
+        <QuickAction href="/client/plan" label="Payment plan" />
       </div>
 
       {hasUnpaidLateFee ? (

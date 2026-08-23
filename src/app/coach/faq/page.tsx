@@ -103,9 +103,21 @@ export default function CoachFaqPage() {
         </Q>
         <Q q="How do late cancellation fees work?">
           A client cancelling with under 12 hours notice is a late
-          cancellation. First one is just noted. The second within a
-          rolling 16 weeks adds a $10 fee and pauses their upcoming
-          sessions until it&apos;s marked paid.
+          cancellation. It&apos;s tiered by payment plan: monthly clients
+          get one free pass, then a $10 fee on the second within a
+          rolling 16 weeks. Pay-as-you-go clients have no free pass — the
+          first late cancellation in that window adds a $20 fee. Either
+          way, their upcoming sessions pause until it&apos;s marked paid.
+        </Q>
+        <Q q="Can clients switch their own payment plan?">
+          Yes — Profile → Payment plan on their side, fully self-serve.
+          They read and sign the terms of whichever plan they&apos;re
+          switching to before it takes effect. Their late-cancellation
+          count carries over regardless of direction, and a fee already
+          charged stays owed even if they switch right after. Switching
+          from monthly down to pay-as-you-go forfeits any remaining free
+          late cancellation and moves them to the $20 rate immediately —
+          that&apos;s the one asymmetric case.
         </Q>
       </Section>
 
