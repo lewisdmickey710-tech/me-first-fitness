@@ -26,8 +26,11 @@ export async function submitAssessmentRequest(formData: FormData) {
 
   let userId: string;
   if (inviteError) {
-    // Most likely: this email already has an account. Look it up instead
-    // of failing the whole submission.
+    // Most likely: this email already has an account (a previous lead,
+    // an existing client, or just a repeated request) -- inviteUserByEmail
+    // refuses to re-invite someone who's already registered. Look the
+    // account up instead of failing the whole submission, but still send
+    // them a real way in: a magic link, since they can't be re-invited.
     const { data: existing } = await supabase.auth.admin.listUsers({
       perPage: 1000,
     });
@@ -36,6 +39,14 @@ export async function submitAssessmentRequest(formData: FormData) {
     );
     if (!match) throw new Error(inviteError.message);
     userId = match.id;
+
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+      },
+    });
+    if (otpError) throw new Error(otpError.message);
   } else {
     userId = inviteData.user.id;
   }
