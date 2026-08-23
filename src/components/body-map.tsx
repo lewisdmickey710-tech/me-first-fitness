@@ -9,17 +9,31 @@ const LEVEL_FILL: Record<number, string> = {
   3: "#E75480", // pink
 };
 
-// Simple humanoid silhouette, front and back -- not anatomically precise,
-// just clear enough regions (head, shoulders, chest/back, arms, torso,
-// hips, legs) to click a general area and drop a marker.
+// Markers are stored as 0-100 percentages of the rendered box (independent
+// of the SVG's own coordinate system) so saved data stays valid no matter
+// how the silhouette artwork changes -- these just scale a percentage into
+// actual viewBox units for drawing.
+const VIEW_W = 200;
+const VIEW_H = 400;
+
+// Standing figure, arms out and legs apart (same pose used on standard
+// clinical body-pain charts) so every limb is fully visible to tap on.
+// Same outline for front and back -- it's a silhouette, not a detailed
+// drawing, so there's nothing view-specific to draw differently.
 function BodySilhouette() {
   return (
     <>
-      <circle cx="50" cy="16" r="14" />
-      <rect x="38" y="30" width="24" height="8" rx="4" />
-      <path d="M30 38 h40 q6 0 6 8 v46 q0 8 -6 8 h-8 v54 h-10 v-70 h-4 v70 h-10 v-54 h-8 q-6 0 -6 -8 v-46 q0 -8 6 -8 z" />
-      <rect x="12" y="42" width="12" height="60" rx="6" />
-      <rect x="76" y="42" width="12" height="60" rx="6" />
+      <circle cx="100" cy="28" r="20" />
+      <rect x="90" y="46" width="20" height="14" />
+      <polygon
+        points="
+          90,60 110,60 145,64 185,112 195,172 175,182 165,152 140,112
+          132,182 140,222 60,222 68,182 60,112 35,152 25,182 5,172
+          15,112 55,64
+        "
+      />
+      <polygon points="60,222 96,222 88,396 52,396" />
+      <polygon points="104,222 140,222 148,396 112,396" />
     </>
   );
 }
@@ -113,20 +127,20 @@ export function BodyMapInput({
 
       <svg
         ref={svgRef}
-        viewBox="0 0 100 200"
+        viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
         onClick={handleClick}
-        className={`mx-auto h-64 w-32 fill-grayLt/70 ${readOnly ? "" : "cursor-crosshair"}`}
+        className={`mx-auto h-80 w-40 fill-grayLt/70 ${readOnly ? "" : "cursor-crosshair"}`}
       >
         <BodySilhouette />
         {visibleMarkers.map((m) => (
           <circle
             key={m.id}
-            cx={m.x}
-            cy={m.y}
-            r={2.5}
+            cx={(m.x / 100) * VIEW_W}
+            cy={(m.y / 100) * VIEW_H}
+            r={5}
             fill={LEVEL_FILL[m.level] ?? LEVEL_FILL[1]}
             stroke="white"
-            strokeWidth={0.5}
+            strokeWidth={1.5}
           />
         ))}
       </svg>
