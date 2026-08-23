@@ -777,6 +777,12 @@ function ProfileTab({
           }}
           className="space-y-4"
         >
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Full name
+            </label>
+            <Input name="name" required defaultValue={client.name} />
+          </div>
           <CareProfilePicker
             careProfiles={careProfiles}
             defaultValue={client.care_profile_id ?? undefined}
