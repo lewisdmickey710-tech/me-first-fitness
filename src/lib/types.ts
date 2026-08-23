@@ -154,6 +154,7 @@ export interface CareProfile {
   id: string;
   name: string;
   description: string | null;
+  client_label: string | null;
   created_at: string;
 }
 

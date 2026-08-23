@@ -163,7 +163,7 @@ export default async function ClientDashboard() {
       <PhaseBanner
         phase={currentPhase?.phase ?? "n/a"}
         title={`Hey, ${me.name.split(" ")[0]}`}
-        subtitle={careProfile?.name ?? undefined}
+        subtitle={careProfile?.client_label ?? careProfile?.name ?? undefined}
       />
 
       <Link
