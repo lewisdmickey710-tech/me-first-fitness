@@ -5,6 +5,7 @@ import {
   addMovementScreening,
   archiveLead,
   convertLeadToClient,
+  deleteLead,
   setLeadRequestStatus,
 } from "@/app/coach/leads/actions";
 import {
@@ -386,18 +387,30 @@ export default async function LeadDetailPage({
         </Card>
       ) : null}
 
-      {lead.status === "new" ? (
+      <div className="flex gap-2">
+        {lead.status === "new" ? (
+          <form
+            action={async () => {
+              "use server";
+              await archiveLead(id);
+            }}
+          >
+            <Button type="submit" variant="ghost">
+              Archive this lead
+            </Button>
+          </form>
+        ) : null}
         <form
           action={async () => {
             "use server";
-            await archiveLead(id);
+            await deleteLead(id);
           }}
         >
-          <Button type="submit" variant="ghost">
-            Archive this lead
+          <Button type="submit" variant="danger">
+            Delete this lead
           </Button>
         </form>
-      ) : null}
+      </div>
     </div>
   );
 }

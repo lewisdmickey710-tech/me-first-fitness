@@ -214,3 +214,21 @@ export async function archiveLead(leadId: string) {
   revalidatePath("/coach/leads");
   redirect("/coach/leads");
 }
+
+// Unlike clients, leads are often just inquiries or test data -- a real,
+// permanent delete (rather than only archive) makes sense here. Cascades
+// to lead_assessment_requests/lead_intake/lead_movement_screening. If the
+// lead already has a real login (auth user + role='lead' profile), that
+// account isn't touched -- it's just left with no linked lead record,
+// same graceful "not linked yet" state a client sees before the coach
+// links their signup.
+export async function deleteLead(leadId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase.from("leads").delete().eq("id", leadId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/leads");
+  redirect("/coach/leads");
+}
