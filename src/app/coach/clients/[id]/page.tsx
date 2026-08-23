@@ -393,7 +393,7 @@ export default async function ClientDetailPage({
         <HabitsTab habits={habits ?? []} habitLogs={habitLogs ?? []} />
       )}
       {tab === "nutrition" && (
-        <NutritionTab nutritionLogs={nutritionLogs ?? []} />
+        <NutritionTab nutritionLogs={nutritionLogs ?? []} supabase={supabase} />
       )}
       {tab === "symptoms" && client.symptom_tracker_enabled && (
         <SymptomsTab symptomLogs={symptomLogs ?? []} />
@@ -1652,11 +1652,28 @@ function SymptomsTab({ symptomLogs }: { symptomLogs: ClientSymptomLog[] }) {
   );
 }
 
-function NutritionTab({
+async function NutritionTab({
   nutritionLogs,
+  supabase,
 }: {
   nutritionLogs: ClientNutritionLog[];
+  supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
+  const photoPaths = [
+    ...new Set(nutritionLogs.map((n) => n.photo_path).filter(Boolean)),
+  ] as string[];
+  const photoUrlByPath = new Map<string, string>();
+  if (photoPaths.length > 0) {
+    await Promise.all(
+      photoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) photoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
+
   return (
     <div>
       <p className="text-sm font-medium text-gray">Nutrition log</p>
@@ -1675,6 +1692,14 @@ function NutritionTab({
                   {n.meal_label ? ` · ${n.meal_label}` : ""}
                 </p>
               </div>
+              {n.photo_path && photoUrlByPath.has(n.photo_path) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrlByPath.get(n.photo_path)}
+                  alt="Food photo"
+                  className="mt-2 max-h-64 w-full rounded-xl object-cover"
+                />
+              ) : null}
               {n.description ? (
                 <p className="mt-1 text-sm text-ink">{n.description}</p>
               ) : null}

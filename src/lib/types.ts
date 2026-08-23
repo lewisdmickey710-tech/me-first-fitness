@@ -269,6 +269,7 @@ export interface ClientNutritionLog {
   carbs_g: number | null;
   fat_g: number | null;
   notes: string | null;
+  photo_path: string | null;
   created_at: string;
 }
 

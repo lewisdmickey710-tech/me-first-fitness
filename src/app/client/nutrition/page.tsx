@@ -28,6 +28,21 @@ export default async function ClientNutritionPage() {
     .order("log_date", { ascending: false })
     .limit(20)) as { data: ClientNutritionLog[] | null };
 
+  const photoUrlByPath = new Map<string, string>();
+  const photoPaths = [
+    ...new Set((nutritionLogs ?? []).map((n) => n.photo_path).filter(Boolean)),
+  ] as string[];
+  if (photoPaths.length > 0) {
+    await Promise.all(
+      photoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) photoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Link href="/client/dashboard" className="text-sm text-gray hover:text-ink">
@@ -40,8 +55,9 @@ export default async function ClientNutritionPage() {
           Nutrition log
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Use whatever style fits you — hunger/fullness and satisfaction
-          notes, numbers, or both. Nothing here is required.
+          Use whatever style fits you — a quick photo, hunger/fullness and
+          satisfaction notes, numbers, or any mix. Nothing here is
+          required.
         </p>
       </div>
 
@@ -60,6 +76,21 @@ export default async function ClientNutritionPage() {
               </label>
               <Input name="meal_label" placeholder="e.g. Lunch" />
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Photo{" "}
+              <span className="font-normal text-gray">
+                (easiest option — just snap it, no description needed)
+              </span>
+            </label>
+            <input
+              type="file"
+              name="photo"
+              accept="image/*"
+              capture="environment"
+              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+            />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
@@ -146,6 +177,14 @@ export default async function ClientNutritionPage() {
                   </button>
                 </form>
               </div>
+              {n.photo_path && photoUrlByPath.has(n.photo_path) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrlByPath.get(n.photo_path)}
+                  alt="Food photo"
+                  className="mt-2 max-h-64 w-full rounded-xl object-cover"
+                />
+              ) : null}
               {n.description ? (
                 <p className="mt-1 text-sm text-ink">{n.description}</p>
               ) : null}

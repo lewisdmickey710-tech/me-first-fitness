@@ -767,6 +767,18 @@ export async function addNutritionLog(formData: FormData) {
   };
 
   const supabase = await createClient();
+
+  let photoPath: string | null = null;
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    const path = `${me.id}/nutrition-${crypto.randomUUID()}-${photo.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("form-checks")
+      .upload(path, photo, { contentType: photo.type });
+    if (uploadError) throw new Error(uploadError.message);
+    photoPath = path;
+  }
+
   const { error } = await supabase.from("client_nutrition_logs").insert({
     client_id: me.id,
     log_date: logDate,
@@ -780,6 +792,7 @@ export async function addNutritionLog(formData: FormData) {
     carbs_g: numOrNull("carbs_g"),
     fat_g: numOrNull("fat_g"),
     notes: textOrNull("notes"),
+    photo_path: photoPath,
   });
   if (error) throw new Error(error.message);
 
