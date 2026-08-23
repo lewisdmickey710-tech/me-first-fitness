@@ -11,6 +11,8 @@ import {
   sendDayBlockedEmail,
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
+import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
@@ -677,6 +679,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   };
 
   const payment_schedule = String(formData.get("payment_schedule") ?? "");
+  const session_mode = String(formData.get("session_mode") ?? "");
   const care_profile_id = String(formData.get("care_profile_id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim();
@@ -697,6 +700,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       physician_phone: textOrNull("physician_phone"),
       start_date: textOrNull("start_date"),
       payment_schedule: payment_schedule || null,
+      session_mode: session_mode || null,
       primary_goal: textOrNull("primary_goal"),
       secondary_goal: textOrNull("secondary_goal"),
       key_health_notes: textOrNull("key_health_notes"),
@@ -733,6 +737,64 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       if (phaseError) throw new Error(phaseError.message);
     }
   }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Puts a client's membership on hold: no standing sessions, but a flat
+// weekly retainer keeps their app access and reserves their spot. Creates
+// the first week's retainer payment immediately -- the daily cron rolls
+// subsequent weeks forward for as long as hold_started_at stays set (see
+// src/app/api/cron/reminders/route.ts).
+export async function startClientHold(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ hold_started_at: new Date().toISOString() })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  const { error: paymentError } = await supabase.from("payments").insert({
+    client_id: clientId,
+    description: "Weekly hold retainer",
+    amount: RETAINER_FEE_PER_WEEK,
+    due_date: toDateString(nowInBusinessTz()),
+    kind: "retainer",
+  });
+  if (paymentError) throw new Error(paymentError.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+}
+
+export async function endClientHold(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ hold_started_at: null })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+}
+
+// Marks "today" as when a virtual-async client's program was last updated,
+// so their dashboard can show something concrete in place of a
+// next-session card. Deliberately a manual button rather than something
+// wired into every program-override mutation -- keeps the signal
+// intentional (Mickey confirming she actually updated it for the
+// week/cycle) rather than firing on every minor tweak.
+export async function touchProgramUpdated(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ program_last_updated_at: new Date().toISOString() })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
 }

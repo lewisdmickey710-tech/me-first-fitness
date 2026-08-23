@@ -214,7 +214,20 @@ export default async function ClientDashboard() {
         <QuickAction href="/client/guide" label="Wellness guide" />
         <QuickAction href="/client/documents" label="Documents" />
         <QuickAction href="/client/plan" label="Payment plan" />
+        <QuickAction href="/client/checkin-call" label="Book a check-in call" />
       </div>
+
+      {me.hold_started_at ? (
+        <Card className="space-y-1 border-gold/40 bg-gold/5">
+          <p className="font-medium text-ink">Your spot is on hold</p>
+          <p className="text-sm text-gray">
+            You&apos;re not currently scheduled for sessions — the weekly
+            $10 retainer keeps your app access and reserves your spot for
+            whenever you&apos;re ready to come back. Reach out to Mickey
+            when you want to resume.
+          </p>
+        </Card>
+      ) : null}
 
       {hasUnpaidLateFee ? (
         <Card className="space-y-1 border-pink/40 bg-pink/5">
@@ -225,6 +238,26 @@ export default async function ClientDashboard() {
             methods below, then your schedule picks back up right away.
           </p>
           <PaymentMethods settings={businessSettings} />
+        </Card>
+      ) : me.session_mode === "virtual_async" ? (
+        <Card>
+          <p className="text-sm font-medium text-gray">Program</p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {me.program_last_updated_at
+              ? `Last updated ${me.program_last_updated_at.slice(0, 10)}`
+              : "Not updated yet"}
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            No standing session calls on this plan — Mickey updates your
+            program directly on her own cadence. Need dedicated time to
+            talk something through? Book a check-in call above.
+          </p>
+          <Link
+            href="/client/program"
+            className="mt-2 inline-block text-sm text-rose hover:underline"
+          >
+            View your program →
+          </Link>
         </Card>
       ) : nextSession ? (
         <Card>
@@ -340,12 +373,13 @@ export default async function ClientDashboard() {
         <Card>
           <p className="text-sm font-medium text-gray">
             <Heart className="mr-1" />
-            Pending time requests
+            Pending requests
           </p>
           <div className="mt-2 space-y-2">
             {requests!.map((r) => (
               <div key={r.id} className="flex items-center justify-between">
                 <p className="text-sm text-ink">
+                  {r.request_type === "checkin_call" ? "Check-in call — " : ""}
                   {r.preferred_date}
                   {r.preferred_time ? ` at ${r.preferred_time}` : ""}
                 </p>

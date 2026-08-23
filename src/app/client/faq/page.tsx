@@ -116,6 +116,19 @@ export default function ClientFaqPage() {
           automatically. If a time still looks off, double check that
           field is set correctly.
         </Q>
+        <Q q="What's a check-in call?">
+          A one-time, 30-minute call for anything that needs more time
+          than a quick message — getting a home setup or equipment
+          situated, going deep on something specific, whatever comes up.
+          Available whether you train in-person, virtually, or fully
+          async. Book one anytime from your dashboard.
+        </Q>
+        <Q q="Can I pause training without losing my spot?">
+          Yes — a membership hold. There&apos;s no session schedule while
+          you&apos;re on hold, but a flat $10/week retainer keeps your app
+          access active and reserves your spot rather than opening it up
+          to someone else. Ask Mickey to start or end a hold for you.
+        </Q>
       </Section>
 
       <Section title="Working With Mickey">
@@ -151,6 +164,14 @@ export default function ClientFaqPage() {
           foam rolling, and Theragun work. Virtual covers form coaching,
           programming, and nutrition support over video. A standalone
           written program (no sessions at all) is also available.
+        </Q>
+        <Q q="What is fully virtual / async coaching?">
+          A different model for fully-virtual clients: no standing video
+          calls at all. Mickey updates your program directly in the app
+          on her own cadence, and your dashboard shows when it was last
+          updated instead of a next-session time. If you want dedicated
+          time to talk something through, book a 30-minute check-in call
+          whenever you need one.
         </Q>
         <Q q="What equipment do I need for a virtual session?">
           Depends entirely on what that session is for. Prop your phone

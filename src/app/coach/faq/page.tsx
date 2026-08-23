@@ -119,6 +119,21 @@ export default function CoachFaqPage() {
           late cancellation and moves them to the $20 rate immediately —
           that&apos;s the one asymmetric case.
         </Q>
+        <Q q="How does a membership hold work?">
+          Client profile → Membership hold → &quot;Start hold.&quot; It
+          pauses their session reminders and marks them on hold on the
+          roster, and adds a $10 retainer payment right away — a new one
+          gets added automatically every 7 days for as long as they stay
+          on hold, so it never needs manual follow-up. &quot;End hold&quot;
+          any time to send them back to normal.
+        </Q>
+        <Q q="What are check-in call requests?">
+          A client can book a one-time 30-minute call from their side —
+          shows up in your pending requests the same as a session time
+          request, just labeled &quot;Check-in call.&quot; Confirm it the
+          same way; it lands on your calendar as a normal one-off session
+          from that point on.
+        </Q>
       </Section>
 
       <Section title="Programs">
@@ -160,6 +175,16 @@ export default function CoachFaqPage() {
       </Section>
 
       <Section title="Virtual Clients &amp; Data">
+        <Q q="What's the 'Fully virtual — async' session mode?">
+          For virtual clients you&apos;d rather manage with programming
+          updates than standing video calls. Set it on their Profile tab. They get
+          no session reminders and no next-session card — their dashboard
+          shows &quot;program last updated&quot; instead, which you control
+          with the &quot;Mark program updated today&quot; button on their
+          Program tab after you actually make their changes. They can
+          still book a 30-minute check-in call any time they want dedicated
+          time with you.
+        </Q>
         <Q q="How do I set a client's timezone?">
           Client profile tab → Timezone. Their schedule, next-session
           card, and reminder emails all convert to that timezone

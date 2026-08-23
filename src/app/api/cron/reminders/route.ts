@@ -9,6 +9,7 @@ import {
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
+import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,17 @@ export async function GET(request: Request) {
     .select("client_id")
     .eq("kind", "late_cancellation_fee")
     .is("paid_on", null);
-  const frozenClientIds = new Set((frozenClientRows ?? []).map((p) => p.client_id));
+  const { data: heldClientRows } = await supabase
+    .from("clients")
+    .select("id")
+    .not("hold_started_at", "is", null);
+  // A client on hold isn't training right now -- skip session reminders
+  // the same way an unpaid late fee freezes them, even if an old
+  // client_schedule row is still sitting there active.
+  const frozenClientIds = new Set([
+    ...(frozenClientRows ?? []).map((p) => p.client_id),
+    ...(heldClientRows ?? []).map((c) => c.id),
+  ]);
 
   const { data: schedules } = await supabase
     .from("client_schedules")
@@ -431,6 +442,49 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Weekly retainer billing: rolls a new $10 payment forward for
+  // every client currently on hold, one week after their last retainer
+  // payment's due date (the first week's payment is created immediately
+  // when the hold starts, in startClientHold -- this only ever adds the
+  // *next* one). ----
+  let retainerPayments = 0;
+  const { data: onHoldClients } = await supabase
+    .from("clients")
+    .select("id, hold_started_at")
+    .not("hold_started_at", "is", null);
+
+  for (const client of onHoldClients ?? []) {
+    const { data: lastRetainer } = await supabase
+      .from("payments")
+      .select("due_date")
+      .eq("client_id", client.id)
+      .eq("kind", "retainer")
+      .order("due_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const lastDueDate =
+      lastRetainer?.due_date ?? toDateString(new Date(client.hold_started_at!));
+    const nextDue = new Date(`${lastDueDate}T00:00:00Z`);
+    nextDue.setUTCDate(nextDue.getUTCDate() + 7);
+    const nextDueStr = toDateString(nextDue);
+
+    if (nextDueStr <= todayDateStr) {
+      try {
+        await supabase.from("payments").insert({
+          client_id: client.id,
+          description: "Weekly hold retainer",
+          amount: RETAINER_FEE_PER_WEEK,
+          due_date: nextDueStr,
+          kind: "retainer",
+        });
+        retainerPayments++;
+      } catch (e) {
+        errors.push(`Retainer billing failed for client ${client.id}: ${e}`);
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     sessionReminders,
@@ -438,6 +492,7 @@ export async function GET(request: Request) {
     inactivityNudges,
     documentNudges,
     serviceCheckinNudges,
+    retainerPayments,
     errors,
   });
 }

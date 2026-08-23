@@ -374,6 +374,7 @@ export default async function LeadDetailPage({
                 <option value="in_person">In-person</option>
                 <option value="virtual">Virtual</option>
                 <option value="mixed">Mixed</option>
+                <option value="virtual_async">Fully virtual — async</option>
               </Select>
             </div>
             <Input

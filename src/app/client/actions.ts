@@ -168,11 +168,16 @@ export async function submitRequest(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim();
   const reschedule_from_date =
     String(formData.get("reschedule_from_date") ?? "").trim() || null;
+  const request_type =
+    String(formData.get("request_type") ?? "session") === "checkin_call"
+      ? "checkin_call"
+      : "session";
 
   const backTo = (error: string) => {
     const params = new URLSearchParams({ error });
     if (reschedule_from_date) params.set("reschedule_from", reschedule_from_date);
-    return `/client/request?${params.toString()}`;
+    const base = request_type === "checkin_call" ? "/client/checkin-call" : "/client/request";
+    return `${base}?${params.toString()}`;
   };
 
   if (!preferred_date) {
@@ -287,6 +292,7 @@ export async function submitRequest(formData: FormData) {
       preferred_time: businessTime || null,
       note: note || null,
       reschedule_from_date,
+      request_type,
       status: "pending",
     });
 

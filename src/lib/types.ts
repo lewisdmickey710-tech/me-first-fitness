@@ -19,7 +19,7 @@ export interface Client {
   user_id: string | null;
   care_profile_id: string | null;
   days_per_week: number | null;
-  session_mode: "in_person" | "virtual" | "mixed" | null;
+  session_mode: "in_person" | "virtual" | "mixed" | "virtual_async" | null;
   last_inactivity_nudge_sent_at: string | null;
   preferred_name: string | null;
   date_of_birth: string | null;
@@ -41,6 +41,8 @@ export interface Client {
   symptom_tracker_enabled: boolean;
   last_viewed_at: string | null;
   timezone: string;
+  hold_started_at: string | null;
+  program_last_updated_at: string | null;
 }
 
 export interface SessionEntry {
@@ -140,6 +142,8 @@ export interface Activity {
 
 export type RequestStatus = "pending" | "confirmed" | "declined";
 
+export type RequestType = "session" | "checkin_call";
+
 export interface SessionRequest {
   id: string;
   client_id: string;
@@ -148,6 +152,7 @@ export interface SessionRequest {
   note: string | null;
   status: RequestStatus;
   reschedule_from_date: string | null;
+  request_type: RequestType;
   created_at: string;
 }
 
@@ -331,7 +336,7 @@ export interface ClientSchedule {
   created_at: string;
 }
 
-export type PaymentKind = "session" | "late_cancellation_fee";
+export type PaymentKind = "session" | "late_cancellation_fee" | "retainer";
 
 export interface Payment {
   id: string;

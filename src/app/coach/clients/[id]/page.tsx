@@ -11,12 +11,15 @@ import {
   coachCancelSession,
   deleteClientNote,
   deleteMilestone,
+  endClientHold,
   logSessionOccurrence,
   markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
   setRequestStatus,
+  startClientHold,
   touchClientViewed,
+  touchProgramUpdated,
   unmarkMilestoneAchieved,
   updateClientProfile,
 } from "@/app/coach/actions";
@@ -51,6 +54,7 @@ import {
 import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
+import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import type {
   Activity,
   CareProfile,
@@ -471,6 +475,8 @@ export default async function ClientDetailPage({
           overrides={programOverrides ?? []}
           exerciseOptions={exerciseOptions ?? []}
           recentSessions={sessions ?? []}
+          sessionMode={client.session_mode}
+          programLastUpdatedAt={client.program_last_updated_at}
         />
       )}
       {tab === "sessions" && (
@@ -1025,6 +1031,27 @@ function ProfileTab({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
+              Session mode
+            </label>
+            <Select
+              name="session_mode"
+              defaultValue={client.session_mode ?? ""}
+            >
+              <option value="">— Choose one —</option>
+              <option value="in_person">In-person</option>
+              <option value="virtual">Virtual</option>
+              <option value="mixed">Mixed</option>
+              <option value="virtual_async">
+                Fully virtual — async programming (no standing sessions)
+              </option>
+            </Select>
+            <p className="mt-1 text-xs text-gray">
+              Async clients get a &quot;program last updated&quot; card
+              instead of a next-session card, and no session reminders.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
               Timezone
             </label>
             <Select name="timezone" defaultValue={client.timezone ?? "America/Chicago"}>
@@ -1075,6 +1102,36 @@ function ProfileTab({
           />
 
           <Button type="submit">Save</Button>
+        </form>
+      </Card>
+
+      <Card className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="font-medium text-ink">Membership hold</p>
+          {client.hold_started_at ? (
+            <Badge tone="gold">
+              on hold since {client.hold_started_at.slice(0, 10)}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="text-sm text-gray">
+          {client.hold_started_at
+            ? `Reserving their spot for a flat $${RETAINER_FEE_PER_WEEK}/week retainer instead of standing sessions. A new retainer payment is added automatically each week they stay on hold.`
+            : `No standing sessions, but keeps their app access and reserves their spot for a flat $${RETAINER_FEE_PER_WEEK}/week retainer instead of a full billing gap.`}
+        </p>
+        <form
+          action={async () => {
+            "use server";
+            if (client.hold_started_at) {
+              await endClientHold(client.id);
+            } else {
+              await startClientHold(client.id);
+            }
+          }}
+        >
+          <Button type="submit" variant="secondary">
+            {client.hold_started_at ? "End hold" : "Start hold"}
+          </Button>
         </form>
       </Card>
 
@@ -1514,6 +1571,8 @@ function ProgramTab({
   overrides,
   exerciseOptions,
   recentSessions,
+  sessionMode,
+  programLastUpdatedAt,
 }: {
   clientId: string;
   currentPhase: ClientPhaseHistory | null;
@@ -1521,6 +1580,8 @@ function ProgramTab({
   overrides: ClientProgramOverride[];
   exerciseOptions: { id: string; name: string }[];
   recentSessions: TrainingSession[];
+  sessionMode: Client["session_mode"];
+  programLastUpdatedAt: string | null;
 }) {
   const overrideByPdeId = new Map(overrides.map((o) => [o.program_day_exercise_id, o]));
 
@@ -1551,6 +1612,29 @@ function ProgramTab({
 
   return (
     <div className="space-y-4">
+      {sessionMode === "virtual_async" ? (
+        <Card className="space-y-2">
+          <p className="font-medium text-ink">Async programming</p>
+          <p className="text-sm text-gray">
+            {programLastUpdatedAt
+              ? `Last marked updated ${programLastUpdatedAt.slice(0, 10)}.`
+              : "Never marked updated yet."}{" "}
+            This client has no standing sessions — after you make their
+            program changes for the week/cycle below, mark it updated so
+            their dashboard reflects it.
+          </p>
+          <form
+            action={async () => {
+              "use server";
+              await touchProgramUpdated(clientId);
+            }}
+          >
+            <Button type="submit" variant="secondary">
+              Mark program updated today
+            </Button>
+          </form>
+        </Card>
+      ) : null}
       <p className="text-sm text-gray">
         {phaseInfo(currentPhase.phase).name} — this client&apos;s program.
         Drag by the handle to reorder, or swap/change sets-reps/remove a
@@ -2435,7 +2519,11 @@ function RequestsTab({
         <Card key={r.id}>
           <div className="flex items-center justify-between">
             <div>
-              {r.reschedule_from_date ? (
+              {r.request_type === "checkin_call" ? (
+                <p className="text-xs font-medium text-rose">
+                  30-minute check-in call
+                </p>
+              ) : r.reschedule_from_date ? (
                 <p className="text-xs font-medium text-rose">
                   Reschedule from {r.reschedule_from_date} →
                 </p>

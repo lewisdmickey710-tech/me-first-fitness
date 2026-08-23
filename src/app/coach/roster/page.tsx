@@ -62,7 +62,7 @@ export default async function RosterPage({
   ] = await Promise.all([
     supabase
       .from("requests")
-      .select("client_id, reschedule_from_date")
+      .select("client_id, reschedule_from_date, request_type")
       .eq("status", "pending"),
     supabase.from("profiles").select("id").eq("role", "client"),
     clientIds.length > 0
@@ -132,15 +132,17 @@ export default async function RosterPage({
 
   const pendingRequestsByClient = new Map<
     string,
-    { total: number; reschedules: number }
+    { total: number; reschedules: number; checkinCalls: number }
   >();
   for (const r of pendingRequests ?? []) {
     const cur = pendingRequestsByClient.get(r.client_id) ?? {
       total: 0,
       reschedules: 0,
+      checkinCalls: 0,
     };
     cur.total += 1;
     if (r.reschedule_from_date) cur.reschedules += 1;
+    if (r.request_type === "checkin_call") cur.checkinCalls += 1;
     pendingRequestsByClient.set(r.client_id, cur);
   }
 
@@ -439,7 +441,8 @@ export default async function RosterPage({
           {clients.map((client) => {
             const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
             const reqs = pendingRequestsByClient.get(client.id);
-            const newRequests = (reqs?.total ?? 0) - (reqs?.reschedules ?? 0);
+            const newRequests =
+              (reqs?.total ?? 0) - (reqs?.reschedules ?? 0) - (reqs?.checkinCalls ?? 0);
             const needsWindow =
               inWindow &&
               (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
@@ -473,6 +476,14 @@ export default async function RosterPage({
                   : `Requested reschedule (${reqs!.reschedules})`
               );
             }
+            if ((reqs?.checkinCalls ?? 0) > 0) {
+              flags.push(
+                reqs!.checkinCalls === 1
+                  ? "Check-in call requested"
+                  : `Check-in call requested (${reqs!.checkinCalls})`
+              );
+            }
+            if (client.hold_started_at) flags.push("On hold");
             if (highRisk) flags.push("High risk");
             if (paymentStatus) flags.push(paymentStatus.label);
             if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
