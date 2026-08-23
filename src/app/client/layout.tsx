@@ -7,7 +7,7 @@ export default function ClientAreaLayout({
 }) {
   return (
     <div className="min-h-screen">
-      <TopNav title="MeFirstFitness" />
+      <TopNav title="MeFirstFitness" faqHref="/client/faq" />
       <main className="mx-auto max-w-xl px-4 py-6">{children}</main>
     </div>
   );
