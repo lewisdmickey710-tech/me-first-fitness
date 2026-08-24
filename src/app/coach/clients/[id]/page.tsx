@@ -19,13 +19,13 @@ import {
   setClientDocumentAssignment,
   setRequestStatus,
   startClientHold,
-  touchClientViewed,
   touchProgramUpdated,
   unmarkMilestoneAchieved,
   updateClientProfile,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { BackLink } from "@/components/back-link";
+import { MarkViewed } from "./MarkViewed";
 import {
   Badge,
   Button,
@@ -169,8 +169,6 @@ export default async function ClientDetailPage({
   };
 
   if (!client) notFound();
-
-  await touchClientViewed(id);
 
   const [
     { data: sessions },
@@ -406,6 +404,7 @@ export default async function ClientDetailPage({
 
   return (
     <div className="space-y-6">
+      <MarkViewed clientId={id} />
       <BackLink href="/coach/roster">← Back to roster</BackLink>
 
       <PhaseBanner

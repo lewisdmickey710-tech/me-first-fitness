@@ -962,6 +962,11 @@ export async function unmarkMilestoneAchieved(clientId: string, milestoneId: str
 
 // Best-effort bookkeeping so the Motherboard knows the coach has actually
 // seen this client's latest activity -- never blocks the page if it fails.
+// Must be invoked as a real action (from a Client Component, e.g. on
+// mount) rather than awaited during a Server Component's render -- the
+// revalidatePath call below is a no-op (or throws) otherwise, which is
+// exactly why the Motherboard's document/cancellation flags used to keep
+// showing after the coach had already viewed the client.
 export async function touchClientViewed(clientId: string) {
   try {
     const supabase = await createClient();
@@ -969,6 +974,7 @@ export async function touchClientViewed(clientId: string) {
       .from("clients")
       .update({ last_viewed_at: new Date().toISOString() })
       .eq("id", clientId);
+    revalidatePath("/coach/roster");
   } catch (err) {
     console.error("Failed to record client view", err);
   }
