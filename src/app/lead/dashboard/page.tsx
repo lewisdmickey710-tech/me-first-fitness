@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyLead } from "@/lib/current-lead";
 import { requestPacket } from "@/app/lead/actions";
 import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
@@ -64,6 +65,26 @@ export default async function LeadDashboard() {
   const packetRequestByCareProfile = new Map(
     (packetRequests ?? []).map((r) => [r.care_profile_id, r])
   );
+
+  // Signed download links for any already-fulfilled packet request, as a
+  // fallback next to the email that already went out. Generated with the
+  // admin client so no lead-facing storage.objects policy is needed.
+  const packetDownloadUrlByCareProfile = new Map<string, string>();
+  const paidCareProfiles = (packetRequests ?? [])
+    .filter((r) => r.status === "paid_and_sent")
+    .map((r) => (careProfiles ?? []).find((cp) => cp.id === r.care_profile_id))
+    .filter((cp): cp is CareProfile => !!cp?.phase1_packet_path);
+  if (paidCareProfiles.length > 0) {
+    const admin = createAdminClient();
+    await Promise.all(
+      paidCareProfiles.map(async (cp) => {
+        const { data: signed } = await admin.storage
+          .from("packets")
+          .createSignedUrl(cp.phase1_packet_path!, 60 * 60 * 24);
+        if (signed) packetDownloadUrlByCareProfile.set(cp.id, signed.signedUrl);
+      })
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -203,7 +224,22 @@ export default async function LeadDashboard() {
                   {packetRequest ? (
                     <div className="mt-3 border-t border-grayLt pt-3">
                       {packetRequest.status === "paid_and_sent" ? (
-                        <Badge tone="green">packet sent</Badge>
+                        <>
+                          <Badge tone="green">packet sent</Badge>
+                          <p className="mt-2 text-sm text-gray">
+                            Check your email — or grab it right here.
+                          </p>
+                          {packetDownloadUrlByCareProfile.has(cp.id) ? (
+                            <a
+                              href={packetDownloadUrlByCareProfile.get(cp.id)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-block text-sm font-medium text-rose hover:opacity-80"
+                            >
+                              Download your packet →
+                            </a>
+                          ) : null}
+                        </>
                       ) : (
                         <>
                           <Badge tone="gold">packet requested</Badge>

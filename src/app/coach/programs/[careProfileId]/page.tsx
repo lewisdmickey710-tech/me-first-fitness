@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
-import { saveProgramDay } from "@/app/coach/programs/actions";
+import { saveProgramDay, uploadCareProfilePacket } from "@/app/coach/programs/actions";
 import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui";
 import { PHASES } from "@/lib/constants";
 import type {
@@ -114,6 +114,33 @@ export default async function CareProfileProgramPage({
         <Heart className="mr-1.5" />
         {careProfile.name}
       </h1>
+
+      <Card className="space-y-2">
+        <p className="font-medium text-ink">Phase 1 packet PDF</p>
+        <p className="text-sm text-gray">
+          {careProfile.phase1_packet_path
+            ? "Uploaded — this is what gets emailed when you mark a lead's packet request paid & sent."
+            : "Nothing uploaded yet. Leads can request this track's packet, but you won't be able to confirm one until a PDF is here."}
+        </p>
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            await uploadCareProfilePacket(careProfileId, formData);
+          }}
+          className="flex items-center gap-2"
+        >
+          <input
+            type="file"
+            name="packet"
+            accept="application/pdf"
+            required
+            className="text-sm text-ink"
+          />
+          <Button type="submit" variant="secondary">
+            {careProfile.phase1_packet_path ? "Replace" : "Upload"}
+          </Button>
+        </form>
+      </Card>
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">
         {PHASES.filter((p) => p.id !== "n/a").map((p) => (

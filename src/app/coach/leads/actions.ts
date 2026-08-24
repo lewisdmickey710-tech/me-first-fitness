@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendWelcomeToClientEmail } from "@/lib/email";
+import { sendPacketEmail, sendWelcomeToClientEmail } from "@/lib/email";
 import type { RequestStatus } from "@/lib/types";
 
 export async function setLeadRequestStatus(
@@ -24,8 +24,49 @@ export async function setLeadRequestStatus(
   revalidatePath(`/coach/leads/${leadId}`);
 }
 
+// Confirming a paid packet request now actually delivers it -- generates a
+// signed URL for the track's uploaded PDF and emails it through the same
+// Resend pipeline every other app email goes through, then marks the
+// request fulfilled. The signed URL is generated with the admin client so
+// no lead-facing storage.objects policy is needed at all.
 export async function markPacketSent(packetRequestId: string, leadId: string) {
   const supabase = await createClient();
+
+  const { data: request, error: requestError } = await supabase
+    .from("lead_packet_requests")
+    .select("care_profile_id")
+    .eq("id", packetRequestId)
+    .single();
+  if (requestError || !request) throw new Error("Packet request not found.");
+
+  const { data: careProfile, error: careProfileError } = await supabase
+    .from("care_profiles")
+    .select("name, phase1_packet_path")
+    .eq("id", request.care_profile_id)
+    .single();
+  if (careProfileError || !careProfile) throw new Error("Track not found.");
+  if (!careProfile.phase1_packet_path) {
+    throw new Error(
+      "No packet PDF uploaded for this track yet -- upload one from Programs first."
+    );
+  }
+
+  const { data: lead, error: leadError } = await supabase
+    .from("leads")
+    .select("name, email")
+    .eq("id", leadId)
+    .single();
+  if (leadError || !lead) throw new Error("Lead not found.");
+
+  const admin = createAdminClient();
+  const { data: signed, error: signError } = await admin.storage
+    .from("packets")
+    .createSignedUrl(careProfile.phase1_packet_path, 60 * 60 * 24 * 7);
+  if (signError || !signed) {
+    throw new Error(signError?.message ?? "Could not generate a download link.");
+  }
+
+  await sendPacketEmail(lead.email, lead.name, careProfile.name, signed.signedUrl);
 
   const { error } = await supabase
     .from("lead_packet_requests")

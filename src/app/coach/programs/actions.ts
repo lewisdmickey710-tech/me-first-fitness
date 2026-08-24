@@ -3,6 +3,32 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
+export async function uploadCareProfilePacket(
+  careProfileId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const file = formData.get("packet");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("A PDF file is required.");
+  }
+
+  const path = `${careProfileId}/phase1-${crypto.randomUUID()}-${file.name}`;
+  const { error: uploadError } = await supabase.storage
+    .from("packets")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error } = await supabase
+    .from("care_profiles")
+    .update({ phase1_packet_path: path })
+    .eq("id", careProfileId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/programs/${careProfileId}`);
+}
+
 export async function saveProgramDay(
   careProfileId: string,
   phase: string,

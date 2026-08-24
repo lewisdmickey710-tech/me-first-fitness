@@ -244,7 +244,7 @@ export default async function LeadDetailPage({
                     }}
                     className="mt-3"
                   >
-                    <Button type="submit">Mark paid &amp; sent</Button>
+                    <Button type="submit">Mark paid &amp; email packet</Button>
                   </form>
                 ) : null}
               </Card>

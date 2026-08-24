@@ -235,6 +235,30 @@ export async function sendDayBlockedEmail(
   });
 }
 
+export async function sendPacketEmail(
+  to: string,
+  leadName: string,
+  trackName: string,
+  downloadUrl: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping packet email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Your ${trackName} packet is ready`,
+    html: wrapper(`
+      <p>Hi ${leadName},</p>
+      <p>Thanks for grabbing the <strong>${trackName}</strong> packet! Here's your download link:</p>
+      <p><a href="${downloadUrl}" style="color: #E75480; font-weight: 600;">Download your packet →</a></p>
+      <p style="font-size: 13px; color: #8A8078;">This link expires in a week — if it's stopped working, just let me know and I'll send a fresh one.</p>
+      <p>One thing worth saying: this doesn't replace your free assessment. I still like to actually meet before handing over a full program — let's find time for that too.</p>
+    `),
+  });
+}
+
 export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,

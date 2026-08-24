@@ -166,6 +166,7 @@ export interface CareProfile {
   name: string;
   description: string | null;
   client_label: string | null;
+  phase1_packet_path: string | null;
   created_at: string;
 }
 
