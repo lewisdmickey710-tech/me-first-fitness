@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { Card, Collapsible, Heart } from "@/components/ui";
+import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 
 function Section({
   title,
@@ -121,11 +122,11 @@ export default function ClientFaqPage() {
           field is set correctly.
         </Q>
         <Q q="What's a check-in call?">
-          A one-time, 30-minute call for anything that needs more time
-          than a quick message — getting a home setup or equipment
-          situated, going deep on something specific, whatever comes up.
-          Available whether you train in-person, virtually, or fully
-          async. Book one anytime from your dashboard.
+          A one-time, {CALL_DURATION_MINUTES}-minute call for anything
+          that needs more time than a quick message — getting a home
+          setup or equipment situated, going deep on something specific,
+          whatever comes up. Available whether you train in-person or
+          virtually. Book one anytime from your dashboard.
         </Q>
         <Q q="Can I pause training without losing my spot?">
           Yes — a membership hold. There&apos;s no session schedule while
@@ -166,19 +167,21 @@ export default function ClientFaqPage() {
         <Q q="What's the difference between in-person and virtual?">
           In-person means standing sessions with Mickey in person —
           hands-on support like assisted stretching, foam rolling, and
-          Theragun work. Virtual means your program is built and updated
-          in the app on Mickey&apos;s own cadence, with no standing calls
-          by default. A standalone written program (no ongoing coaching
-          at all) is also available.
+          Theragun work, billed per session. Virtual means your program
+          is built and updated in the app on Mickey&apos;s own cadence,
+          with no standing calls by default, for a flat $90/month. A
+          standalone written program (no ongoing coaching at all) is
+          also available.
         </Q>
         <Q q="Can I add video sessions to either mode?">
           Yes, if Mickey&apos;s turned the video session add-on on for
           your profile — check your dashboard for a &quot;Book a video
           session&quot; option. It works the same whether you&apos;re
-          in-person or virtual: propose a time, pay the $25 balance via
-          Cash App or Zelle, and Mickey confirms the timeslot once it
-          clears. Once confirmed, a &quot;Join video call&quot; link
-          shows up on your dashboard and schedule for that session.
+          in-person or virtual: propose a time, pay the ${VIDEO_SESSION_RATE}{" "}
+          balance via Cash App or Zelle, and Mickey confirms the timeslot
+          once it clears. Sessions run {CALL_DURATION_MINUTES} minutes.
+          Once confirmed, a &quot;Join video call&quot; link shows up on
+          your dashboard and schedule for that session.
         </Q>
         <Q q="I'm on the virtual plan with no session booked — what happens?">
           Your dashboard shows when your program was last updated instead

@@ -5,7 +5,7 @@ import { getMyClient } from "@/lib/current-client";
 import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { BUSINESS_TIMEZONE, timezoneLabel } from "@/lib/timezone";
-import { VIDEO_SESSION_RATE } from "@/lib/video-session";
+import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import type { BusinessSettings } from "@/lib/types";
 
 export default async function VideoSessionPage({
@@ -56,10 +56,11 @@ export default async function VideoSessionPage({
         Book a video session
       </h1>
       <p className="text-sm text-gray">
-        Propose a time and pay the ${VIDEO_SESSION_RATE} session balance via
-        Cash App or Zelle below. Mickey confirms your timeslot once the
-        payment comes through, and you&apos;ll get her video call link right
-        here once it&apos;s confirmed.
+        A {CALL_DURATION_MINUTES}-minute video call. Propose a time and pay
+        the ${VIDEO_SESSION_RATE} session balance via Cash App or Zelle
+        below. Mickey confirms your timeslot once the payment comes
+        through, and you&apos;ll get her video call link right here once
+        it&apos;s confirmed.
       </p>
 
       {error ? (

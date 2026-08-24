@@ -134,7 +134,7 @@ export default async function LeadDashboard() {
             talking it through.
           </p>
           <p className="text-xs text-gray">
-            $40/session in-person · $25/session virtual · $50 self-led plan
+            $40/session in-person · $90/mo virtual · $50 self-led plan
           </p>
         </Card>
 

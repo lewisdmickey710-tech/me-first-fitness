@@ -57,6 +57,7 @@ import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
 import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { lateCancellationFreeAllotment } from "@/lib/cancellation";
+import { CALL_DURATION_MINUTES } from "@/lib/video-session";
 import type {
   Activity,
   CareProfile,
@@ -2550,10 +2551,12 @@ function RequestsTab({
             <div className="flex items-center justify-between">
               <div>
                 {r.request_type === "video_session" ? (
-                  <p className="text-xs font-medium text-rose">Video session</p>
+                  <p className="text-xs font-medium text-rose">
+                    Video session ({CALL_DURATION_MINUTES} min)
+                  </p>
                 ) : r.request_type === "checkin_call" ? (
                   <p className="text-xs font-medium text-rose">
-                    30-minute check-in call
+                    {CALL_DURATION_MINUTES}-minute check-in call
                   </p>
                 ) : r.reschedule_from_date ? (
                   <p className="text-xs font-medium text-rose">

@@ -3,6 +3,7 @@ import { submitRequest } from "@/app/client/actions";
 import { getMyClient } from "@/lib/current-client";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 import { BUSINESS_TIMEZONE, timezoneLabel } from "@/lib/timezone";
+import { CALL_DURATION_MINUTES } from "@/lib/video-session";
 
 export default async function CheckinCallPage({
   searchParams,
@@ -23,11 +24,12 @@ export default async function CheckinCallPage({
         Book a check-in call
       </h1>
       <p className="text-sm text-gray">
-        A one-time 30-minute call for whatever needs extra time to sort
-        out — getting equipment or a home setup situated, going over
-        something in depth, or anything else a quick program note can&apos;t
-        cover. Available whether you train in-person or virtually.
-        Propose a time and your coach will confirm or suggest another.
+        A one-time {CALL_DURATION_MINUTES}-minute call for whatever needs
+        extra time to sort out — getting equipment or a home setup
+        situated, going over something in depth, or anything else a quick
+        program note can&apos;t cover. Available whether you train
+        in-person or virtually. Propose a time and your coach will confirm
+        or suggest another.
       </p>
 
       {error ? (

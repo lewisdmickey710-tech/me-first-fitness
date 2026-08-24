@@ -37,7 +37,7 @@ export default async function RequestAssessmentPage({
           goals, and for you to see if working together feels right.
         </p>
         <p className="mt-3 text-xs text-gray">
-          $40/session in-person · $25/session virtual · $50 self-led plan
+          $40/session in-person · $90/mo virtual · $50 self-led plan
         </p>
       </div>
 

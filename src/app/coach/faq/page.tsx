@@ -1,5 +1,6 @@
 import { BackLink } from "@/components/back-link";
 import { Card, Collapsible, Heart } from "@/components/ui";
+import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 
 function Section({
   title,
@@ -132,11 +133,11 @@ export default function CoachFaqPage() {
           any time to send them back to normal.
         </Q>
         <Q q="What are check-in call requests?">
-          A client can book a one-time 30-minute call from their side —
-          shows up in your pending requests the same as a session time
-          request, just labeled &quot;Check-in call.&quot; Confirm it the
-          same way; it lands on your calendar as a normal one-off session
-          from that point on.
+          A client can book a one-time {CALL_DURATION_MINUTES}-minute call
+          from their side — shows up in your pending requests the same as
+          a session time request, just labeled &quot;Check-in call.&quot;
+          Confirm it the same way; it lands on your calendar as a normal
+          one-off session from that point on.
         </Q>
       </Section>
 
@@ -182,12 +183,13 @@ export default function CoachFaqPage() {
         <Q q="What's the difference between session mode and the video session add-on?">
           Session mode (Profile tab) is just in-person vs. virtual — virtual
           means their program is managed through async updates by default,
-          with no standing calls. The video session add-on is a separate
-          toggle, also on the Profile tab, that works for either mode: it
-          lets a client book and pay for one-off video sessions from their
-          side. So a virtual client can still get occasional video calls
-          with the add-on on, and an in-person client can add video
-          sessions too — what used to be called &quot;mixed.&quot;
+          with no standing calls, for a flat $90/month. The video session
+          add-on is a separate toggle, also on the Profile tab, that works
+          for either mode: it lets a client book and pay for one-off video
+          sessions from their side. So a virtual client can still get
+          occasional video calls with the add-on on, and an in-person
+          client can add video sessions too — what used to be called
+          &quot;mixed.&quot;
         </Q>
         <Q q="What happens on a virtual client's dashboard when nothing's booked?">
           It shows &quot;program last updated&quot; instead of a
@@ -199,8 +201,10 @@ export default function CoachFaqPage() {
         </Q>
         <Q q="How do video session requests and payment work?">
           A client with the add-on enabled requests a time from their
-          side, which creates a pending payment balance ($25) they pay via
-          Cash App or Zelle — your links for both come from Settings. It
+          side (sessions run {CALL_DURATION_MINUTES} minutes), which
+          creates a pending payment balance (${VIDEO_SESSION_RATE}) they
+          pay via Cash App or Zelle — your links for both come from
+          Settings. It
           shows up in their Requests tab labeled &quot;Video session,&quot;
           with the balance status right on the card. Once they&apos;ve
           paid, use &quot;Mark paid &amp; confirm&quot; to do both at
