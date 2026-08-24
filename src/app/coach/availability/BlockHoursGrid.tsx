@@ -217,7 +217,17 @@ export function BlockHoursGrid({
       </p>
 
       <div className="flex gap-1 overflow-x-auto pb-1">
-        <div className="shrink-0 pt-6" style={{ width: 44 }}>
+        <div className="shrink-0" style={{ width: 44 }}>
+          {/* Invisible but real header, sized/spaced exactly like the day
+              columns' header pill -- a hardcoded pt-* here previously
+              only approximated that height, so the time labels slowly
+              drifted out of alignment with the actual colored rows. */}
+          <div
+            aria-hidden
+            className="invisible rounded-t-lg py-1 text-center text-xs font-medium"
+          >
+            .
+          </div>
           {BOUNDARIES.slice(0, SLOT_COUNT).map((t, slot) =>
             slot % SLOTS_PER_HOUR === 0 ? (
               <div
