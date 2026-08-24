@@ -55,11 +55,11 @@ export default async function ClientPlanPage() {
           Payment plan
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Switch between monthly and pay-as-you-go any time. Your
-          late-cancellation history carries over either way — but switching
-          from monthly to pay-as-you-go forfeits any remaining free late
-          cancellation and moves you to the higher fee right away, so read
-          the terms below before confirming.
+          Switch between monthly and pay-as-you-go any time. A fee
+          already charged stays owed either way. Switching from monthly
+          to pay-as-you-go forfeits any free cancellation beyond
+          pay-as-you-go&apos;s smaller allotment and moves you to the
+          higher fee right away — read the terms below before confirming.
         </p>
       </div>
 

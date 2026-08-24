@@ -43,6 +43,7 @@ export interface Client {
   timezone: string;
   hold_started_at: string | null;
   program_last_updated_at: string | null;
+  late_cancel_free_remaining: number | null;
 }
 
 export interface SessionEntry {

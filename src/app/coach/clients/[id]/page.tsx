@@ -55,6 +55,7 @@ import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
 import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
+import { lateCancellationFreeAllotment } from "@/lib/cancellation";
 import type {
   Activity,
   CareProfile,
@@ -1027,6 +1028,17 @@ function ProfileTab({
                 <option value="pay_as_you_go">Pay-as-you-go</option>
                 <option value="monthly">Monthly client</option>
               </Select>
+              <p className="mt-1 text-xs text-gray">
+                {client.late_cancel_free_remaining ??
+                  lateCancellationFreeAllotment(client.payment_schedule)}{" "}
+                free late cancellation
+                {(client.late_cancel_free_remaining ??
+                  lateCancellationFreeAllotment(client.payment_schedule)) === 1
+                  ? ""
+                  : "s"}{" "}
+                left this cycle — resets after 16 weeks with no late
+                cancellation.
+              </p>
             </div>
           </div>
           <div>

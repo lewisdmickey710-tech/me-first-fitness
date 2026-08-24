@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyClient } from "@/lib/current-client";
 import {
+  adjustFreeRemainingForSwitch,
+  effectiveFreeRemaining,
   isLateCancellation,
   lateCancellationFeeAmount,
-  lateCancellationFeeThreshold,
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
 import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
@@ -323,6 +324,31 @@ export async function cancelMySession(
   const late = timeOfDay ? isLateCancellation(occurrenceDate, timeOfDay) : false;
   const status = late ? "late_cancelled" : "cancelled";
 
+  // Free-cancellation accounting must only ever run once per actual late
+  // cancellation -- this upsert is otherwise idempotent (same status wins
+  // on a resubmit), but decrementing a stored counter is not, so check the
+  // prior state before touching anything.
+  const { data: existingOccurrence } = await supabase
+    .from("session_occurrences")
+    .select("status")
+    .eq("client_id", me.id)
+    .eq("occurrence_date", occurrenceDate)
+    .maybeSingle();
+  const isNewLateCancellation = late && existingOccurrence?.status !== "late_cancelled";
+
+  let priorLateCancellationCount = 0;
+  if (isNewLateCancellation) {
+    const windowCutoff = new Date();
+    windowCutoff.setUTCDate(windowCutoff.getUTCDate() - LATE_CANCEL_WINDOW_DAYS);
+    const { count } = await supabase
+      .from("session_occurrences")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", me.id)
+      .eq("status", "late_cancelled")
+      .gte("occurrence_date", windowCutoff.toISOString().slice(0, 10));
+    priorLateCancellationCount = count ?? 0;
+  }
+
   const { data: occurrence, error } = await supabase
     .from("session_occurrences")
     .upsert(
@@ -340,38 +366,35 @@ export async function cancelMySession(
 
   if (error) throw new Error(error.message);
 
-  if (late) {
-    const windowCutoff = new Date();
-    windowCutoff.setUTCDate(windowCutoff.getUTCDate() - LATE_CANCEL_WINDOW_DAYS);
+  if (isNewLateCancellation) {
+    const remaining = effectiveFreeRemaining(
+      me.late_cancel_free_remaining,
+      priorLateCancellationCount > 0,
+      me.payment_schedule
+    );
 
-    const { count } = await supabase
-      .from("session_occurrences")
-      .select("id", { count: "exact", head: true })
-      .eq("client_id", me.id)
-      .eq("status", "late_cancelled")
-      .gte("occurrence_date", windowCutoff.toISOString().slice(0, 10));
+    if (remaining > 0) {
+      const { error: remainingError } = await supabase
+        .from("clients")
+        .update({ late_cancel_free_remaining: remaining - 1 })
+        .eq("id", me.id);
+      if (remainingError) throw new Error(remainingError.message);
+    } else {
+      const { error: feeError } = await supabase.from("payments").insert({
+        client_id: me.id,
+        description: "Late cancellation fee",
+        amount: lateCancellationFeeAmount(me.payment_schedule),
+        due_date: new Date().toISOString().slice(0, 10),
+        kind: "late_cancellation_fee",
+        session_occurrence_id: occurrence.id,
+      });
+      if (feeError) throw new Error(feeError.message);
 
-    const threshold = lateCancellationFeeThreshold(me.payment_schedule);
-
-    if ((count ?? 0) >= threshold) {
-      const { data: existingFee } = await supabase
-        .from("payments")
-        .select("id")
-        .eq("session_occurrence_id", occurrence.id)
-        .eq("kind", "late_cancellation_fee")
-        .maybeSingle();
-
-      if (!existingFee) {
-        const { error: feeError } = await supabase.from("payments").insert({
-          client_id: me.id,
-          description: `Late cancellation fee (#${count} late cancellation within 16 weeks)`,
-          amount: lateCancellationFeeAmount(me.payment_schedule),
-          due_date: new Date().toISOString().slice(0, 10),
-          kind: "late_cancellation_fee",
-          session_occurrence_id: occurrence.id,
-        });
-        if (feeError) throw new Error(feeError.message);
-      }
+      const { error: remainingError } = await supabase
+        .from("clients")
+        .update({ late_cancel_free_remaining: 0 })
+        .eq("id", me.id);
+      if (remainingError) throw new Error(remainingError.message);
     }
   }
 
@@ -451,9 +474,33 @@ export async function switchPaymentSchedule(
     );
   if (ackError) throw new Error(ackError.message);
 
+  // Free-cancellation accounting carries across the switch, asymmetrically
+  // -- see adjustFreeRemainingForSwitch. Only matters if there's an active
+  // cycle (a late cancellation within the rolling window); otherwise
+  // there's nothing banked to forfeit or protect.
+  const windowCutoff = new Date();
+  windowCutoff.setUTCDate(windowCutoff.getUTCDate() - LATE_CANCEL_WINDOW_DAYS);
+  const { count: priorLateCancellationCount } = await supabase
+    .from("session_occurrences")
+    .select("id", { count: "exact", head: true })
+    .eq("client_id", me.id)
+    .eq("status", "late_cancelled")
+    .gte("occurrence_date", windowCutoff.toISOString().slice(0, 10));
+
+  const currentRemaining = effectiveFreeRemaining(
+    me.late_cancel_free_remaining,
+    (priorLateCancellationCount ?? 0) > 0,
+    me.payment_schedule
+  );
+  const newRemaining = adjustFreeRemainingForSwitch(
+    currentRemaining,
+    me.payment_schedule,
+    newSchedule
+  );
+
   const { error } = await supabase
     .from("clients")
-    .update({ payment_schedule: newSchedule })
+    .update({ payment_schedule: newSchedule, late_cancel_free_remaining: newRemaining })
     .eq("id", me.id);
   if (error) throw new Error(error.message);
 

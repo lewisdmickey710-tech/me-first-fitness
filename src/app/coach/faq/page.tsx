@@ -103,21 +103,25 @@ export default function CoachFaqPage() {
         </Q>
         <Q q="How do late cancellation fees work?">
           A client cancelling with under 12 hours notice is a late
-          cancellation. It&apos;s tiered by payment plan: monthly clients
-          get one free pass, then a $10 fee on the second within a
-          rolling 16 weeks. Pay-as-you-go clients have no free pass — the
-          first late cancellation in that window adds a $20 fee. Either
-          way, their upcoming sessions pause until it&apos;s marked paid.
+          cancellation, tracked on a rolling 16-week cycle. It&apos;s
+          tiered by payment plan: monthly clients get 2 free passes, then
+          a $10 fee on the 3rd within that window. Pay-as-you-go clients
+          get 1 free pass, then a $20 fee on the 2nd. Either way, their
+          upcoming sessions pause until it&apos;s marked paid, and free
+          passes don&apos;t roll over once 16 weeks pass with no late
+          cancellation.
         </Q>
         <Q q="Can clients switch their own payment plan?">
           Yes — Profile → Payment plan on their side, fully self-serve.
           They read and sign the terms of whichever plan they&apos;re
-          switching to before it takes effect. Their late-cancellation
-          count carries over regardless of direction, and a fee already
-          charged stays owed even if they switch right after. Switching
-          from monthly down to pay-as-you-go forfeits any remaining free
-          late cancellation and moves them to the $20 rate immediately —
-          that&apos;s the one asymmetric case.
+          switching to before it takes effect. A fee already charged
+          stays owed no matter which plan they switch to afterward. It&apos;s
+          asymmetric by design: switching monthly → pay-as-you-go
+          forfeits any free cancellation beyond pay-as-you-go&apos;s
+          smaller allotment (an unused first one still carries over) and
+          moves them to the $20 rate; switching pay-as-you-go → monthly
+          never restores a free cancellation they&apos;ve already used —
+          only their future fee rate drops, to $10.
         </Q>
         <Q q="How does a membership hold work?">
           Client profile → Membership hold → &quot;Start hold.&quot; It
