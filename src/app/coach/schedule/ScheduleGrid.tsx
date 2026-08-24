@@ -118,8 +118,12 @@ export function ScheduleGrid({
   }
 
   function isAvailable(date: string, dayOfWeek: number, slot: number): boolean {
+    // Matches submitRequest's actual gating: nothing configured anywhere
+    // means every day is wide open, but once any window exists, a day
+    // with none of its own is fully closed -- not "open all day".
+    if (availability.length === 0) return true;
     const windows = availabilityForDay(dayOfWeek);
-    if (windows.length === 0) return true;
+    if (windows.length === 0) return false;
     const t = BOUNDARIES[slot];
     return windows.some((w) => t >= norm(w.startTime) && t < norm(w.endTime));
   }
