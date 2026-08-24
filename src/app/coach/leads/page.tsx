@@ -4,6 +4,8 @@ import { deleteLead } from "@/app/coach/leads/actions";
 import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
 import type { Lead } from "@/lib/types";
 
+type PendingPacketRow = { lead_id: string };
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -19,6 +21,12 @@ export default async function LeadsPage({
     ? leadsQuery.eq("status", "archived")
     : leadsQuery.neq("status", "archived");
   const { data: leads } = (await leadsQuery) as { data: Lead[] | null };
+
+  const { data: pendingPackets } = (await supabase
+    .from("lead_packet_requests")
+    .select("lead_id")
+    .eq("status", "pending")) as { data: PendingPacketRow[] | null };
+  const pendingPacketLeadIds = new Set((pendingPackets ?? []).map((p) => p.lead_id));
 
   return (
     <div className="space-y-6">
@@ -66,6 +74,9 @@ export default async function LeadsPage({
                 <p className="mt-0.5 text-sm text-gray">{lead.email}</p>
               </div>
               <div className="flex items-center gap-2">
+                {pendingPacketLeadIds.has(lead.id) ? (
+                  <Badge tone="gold">packet requested</Badge>
+                ) : null}
                 <StatusBadge status={lead.status} />
                 <Link
                   href={`/coach/leads/${lead.id}`}

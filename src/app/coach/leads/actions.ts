@@ -24,6 +24,19 @@ export async function setLeadRequestStatus(
   revalidatePath(`/coach/leads/${leadId}`);
 }
 
+export async function markPacketSent(packetRequestId: string, leadId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("lead_packet_requests")
+    .update({ status: "paid_and_sent", paid_at: new Date().toISOString() })
+    .eq("id", packetRequestId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/leads/${leadId}`);
+}
+
 const MOVEMENTS = [
   "squat",
   "deadlift_hinge",

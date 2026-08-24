@@ -1,8 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyLead } from "@/lib/current-lead";
-import { Badge, Card, EmptyState, Heart } from "@/components/ui";
-import type { CareProfile, LeadAssessmentRequest, LeadIntake } from "@/lib/types";
+import { requestPacket } from "@/app/lead/actions";
+import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
+import { PaymentMethods } from "@/components/payment-methods";
+import type {
+  BusinessSettings,
+  CareProfile,
+  LeadAssessmentRequest,
+  LeadIntake,
+  LeadPacketRequest,
+} from "@/lib/types";
 
 export default async function LeadDashboard() {
   const lead = await getMyLead();
@@ -18,27 +26,44 @@ export default async function LeadDashboard() {
 
   const supabase = await createClient();
 
-  const [{ data: requests }, { data: intake }, { data: careProfiles }] =
-    await Promise.all([
-      supabase
-        .from("lead_assessment_requests")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .order("created_at", { ascending: false }) as unknown as Promise<{
-        data: LeadAssessmentRequest[] | null;
-      }>,
-      supabase
-        .from("lead_intake")
-        .select("*")
-        .eq("lead_id", lead.id)
-        .maybeSingle() as unknown as Promise<{ data: LeadIntake | null }>,
-      supabase
-        .from("care_profiles")
-        .select("*")
-        .order("name") as unknown as Promise<{ data: CareProfile[] | null }>,
-    ]);
+  const [
+    { data: requests },
+    { data: intake },
+    { data: careProfiles },
+    { data: packetRequests },
+    { data: businessSettings },
+  ] = await Promise.all([
+    supabase
+      .from("lead_assessment_requests")
+      .select("*")
+      .eq("lead_id", lead.id)
+      .order("created_at", { ascending: false }) as unknown as Promise<{
+      data: LeadAssessmentRequest[] | null;
+    }>,
+    supabase
+      .from("lead_intake")
+      .select("*")
+      .eq("lead_id", lead.id)
+      .maybeSingle() as unknown as Promise<{ data: LeadIntake | null }>,
+    supabase
+      .from("care_profiles")
+      .select("*")
+      .order("name") as unknown as Promise<{ data: CareProfile[] | null }>,
+    supabase
+      .from("lead_packet_requests")
+      .select("*")
+      .eq("lead_id", lead.id) as unknown as Promise<{ data: LeadPacketRequest[] | null }>,
+    supabase
+      .from("business_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle() as unknown as Promise<{ data: BusinessSettings | null }>,
+  ]);
 
   const latestRequest = requests?.[0] ?? null;
+  const packetRequestByCareProfile = new Map(
+    (packetRequests ?? []).map((r) => [r.care_profile_id, r])
+  );
 
   return (
     <div className="space-y-6">
@@ -161,14 +186,49 @@ export default async function LeadDashboard() {
             <p className="text-sm font-medium text-gray">
               Programs I build around real circumstances
             </p>
-            {(careProfiles ?? []).map((cp) => (
-              <Card key={cp.id}>
-                <p className="font-medium text-ink">{cp.name}</p>
-                {cp.description ? (
-                  <p className="mt-1 text-sm text-gray">{cp.description}</p>
-                ) : null}
-              </Card>
-            ))}
+            <p className="text-xs text-gray">
+              Want to get moving before we even meet? Grab your track&apos;s
+              first packet below for $50 — this never replaces your free
+              assessment, it&apos;s just a head start if you want one. I
+              still like to talk before handing you a full program.
+            </p>
+            {(careProfiles ?? []).map((cp) => {
+              const packetRequest = packetRequestByCareProfile.get(cp.id);
+              return (
+                <Card key={cp.id}>
+                  <p className="font-medium text-ink">{cp.name}</p>
+                  {cp.description ? (
+                    <p className="mt-1 text-sm text-gray">{cp.description}</p>
+                  ) : null}
+                  {packetRequest ? (
+                    <div className="mt-3 border-t border-grayLt pt-3">
+                      {packetRequest.status === "paid_and_sent" ? (
+                        <Badge tone="green">packet sent</Badge>
+                      ) : (
+                        <>
+                          <Badge tone="gold">packet requested</Badge>
+                          <p className="mt-2 text-sm text-gray">
+                            Send $50 below and I&apos;ll get your packet
+                            right over.
+                          </p>
+                          <PaymentMethods settings={businessSettings} />
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <form
+                      action={requestPacket}
+                      className="mt-3 border-t border-grayLt pt-3"
+                    >
+                      <input type="hidden" name="care_profile_id" value={cp.id} />
+                      <Button type="submit" variant="secondary">
+                        Get the packet — $50
+                      </Button>
+                    </form>
+                  )}
+                </Card>
+              );
+            })}
           </div>
         ) : null}
       </div>

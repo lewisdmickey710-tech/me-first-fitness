@@ -507,6 +507,16 @@ export interface LeadAssessmentRequest {
   created_at: string;
 }
 
+export interface LeadPacketRequest {
+  id: string;
+  lead_id: string;
+  care_profile_id: string;
+  status: "pending" | "paid_and_sent";
+  paid_at: string | null;
+  note: string | null;
+  created_at: string;
+}
+
 export type MedicalClearance = "have_clearance" | "in_progress" | "not_needed";
 export type NutritionRelationship =
   | "comfortable"

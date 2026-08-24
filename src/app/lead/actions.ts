@@ -131,6 +131,26 @@ export async function submitLeadIntake(formData: FormData) {
   redirect("/lead/dashboard");
 }
 
+export async function requestPacket(formData: FormData) {
+  const lead = await getMyLead();
+  if (!lead) throw new Error("No linked lead profile found.");
+
+  const supabase = await createClient();
+
+  const care_profile_id = String(formData.get("care_profile_id") ?? "");
+  if (!care_profile_id) throw new Error("Missing track.");
+
+  const { error } = await supabase.from("lead_packet_requests").insert({
+    lead_id: lead.id,
+    care_profile_id,
+    note: textOrNull(formData, "note"),
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/lead/dashboard");
+}
+
 export async function submitLeadProfile(formData: FormData) {
   const lead = await getMyLead();
   if (!lead) throw new Error("No linked lead profile found.");

@@ -6,6 +6,7 @@ import {
   archiveLead,
   convertLeadToClient,
   deleteLead,
+  markPacketSent,
   setLeadRequestStatus,
 } from "@/app/coach/leads/actions";
 import {
@@ -26,6 +27,7 @@ import type {
   LeadIntake,
   LeadMovementScreening,
   LeadMovementScreeningResult,
+  LeadPacketRequest,
   MovementName,
 } from "@/lib/types";
 
@@ -102,6 +104,7 @@ export default async function LeadDetailPage({
     { data: requests },
     { data: screenings },
     { data: careProfiles },
+    { data: packetRequests },
   ] = await Promise.all([
     supabase.from("lead_intake").select("*").eq("lead_id", id).maybeSingle() as unknown as Promise<{
       data: LeadIntake | null;
@@ -125,7 +128,16 @@ export default async function LeadDetailPage({
     supabase.from("care_profiles").select("*").order("name") as unknown as Promise<{
       data: CareProfile[] | null;
     }>,
+    supabase
+      .from("lead_packet_requests")
+      .select("*")
+      .eq("lead_id", id)
+      .order("created_at", { ascending: false }) as unknown as Promise<{
+      data: LeadPacketRequest[] | null;
+    }>,
   ]);
+
+  const careProfileNameById = new Map((careProfiles ?? []).map((cp) => [cp.id, cp.name]));
 
   return (
     <div className="space-y-6">
@@ -204,6 +216,42 @@ export default async function LeadDetailPage({
           </div>
         )}
       </div>
+
+      {(packetRequests ?? []).length > 0 ? (
+        <div>
+          <p className="mb-2 text-sm font-medium text-gray">
+            Packet requests
+          </p>
+          <div className="space-y-2">
+            {packetRequests!.map((p) => (
+              <Card key={p.id}>
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-ink">
+                    {careProfileNameById.get(p.care_profile_id) ?? "Unknown track"}
+                  </p>
+                  <Badge tone={p.status === "paid_and_sent" ? "green" : "gold"}>
+                    {p.status === "paid_and_sent" ? "paid & sent" : "pending"}
+                  </Badge>
+                </div>
+                {p.note ? (
+                  <p className="mt-1 text-sm text-gray">{p.note}</p>
+                ) : null}
+                {p.status === "pending" ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await markPacketSent(p.id, id);
+                    }}
+                    className="mt-3"
+                  >
+                    <Button type="submit">Mark paid &amp; sent</Button>
+                  </form>
+                ) : null}
+              </Card>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <p className="mb-2 text-sm font-medium text-gray">
