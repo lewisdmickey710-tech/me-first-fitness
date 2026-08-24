@@ -268,7 +268,7 @@ export function Badge({
   tone = "rose",
 }: {
   children: ReactNode;
-  tone?: "rose" | "teal" | "pink" | "green" | "gold" | "gray";
+  tone?: "rose" | "teal" | "pink" | "green" | "gold" | "gray" | "purple";
 }) {
   const tones: Record<string, string> = {
     rose: "bg-rose/10 text-rose",
@@ -277,6 +277,7 @@ export function Badge({
     green: "bg-green/10 text-green",
     gold: "bg-gold/10 text-gold",
     gray: "bg-grayLt/60 text-gray",
+    purple: "bg-purple/10 text-purple",
   };
   return (
     <span

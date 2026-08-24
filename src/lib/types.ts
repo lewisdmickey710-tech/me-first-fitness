@@ -143,7 +143,7 @@ export interface Activity {
   created_at: string;
 }
 
-export type RequestStatus = "pending" | "confirmed" | "declined";
+export type RequestStatus = "pending" | "confirmed" | "declined" | "countered";
 
 export type RequestType = "session" | "checkin_call" | "video_session";
 
@@ -156,6 +156,8 @@ export interface SessionRequest {
   status: RequestStatus;
   reschedule_from_date: string | null;
   request_type: RequestType;
+  countered_date: string | null;
+  countered_time: string | null;
   created_at: string;
 }
 

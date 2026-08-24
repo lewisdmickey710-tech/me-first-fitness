@@ -98,6 +98,13 @@ export function BlockHoursGrid({
     return bookings.find((b) => b.date === date && norm(b.timeOfDay) === t) ?? null;
   }
 
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/);
+    return parts.length > 1
+      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+      : name.slice(0, 2).toUpperCase();
+  }
+
   function isAvailable(date: string, dayOfWeek: number, slot: number): boolean {
     const windows = availabilityForDay(dayOfWeek);
     if (windows.length === 0) return true; // nothing configured -- no restriction shading
@@ -238,9 +245,13 @@ export function BlockHoursGrid({
                 const available = isAvailable(day.date, day.dayOfWeek, slot);
                 const selected = isSelected(day.date, slot);
                 const hourLine = slot % SLOTS_PER_HOUR === 0;
-                let bg = available ? "bg-white" : "bg-bg";
-                if (block) bg = "bg-pink/40";
-                else if (booking) bg = "bg-teal/30";
+                let bg = available ? "bg-teal/25" : "bg-bg";
+                let text = "text-ink";
+                if (booking) bg = "bg-pink/20";
+                if (block) {
+                  bg = "bg-pink";
+                  text = "text-white";
+                }
                 if (selected) bg = "bg-rose/50";
                 return (
                   <button
@@ -255,12 +266,12 @@ export function BlockHoursGrid({
                           ? booking.clientName
                           : formatTimeOfDay(BOUNDARIES[slot])
                     }
-                    className={`w-full border-x border-grayLt text-[9px] leading-none text-ink ${bg} ${
+                    className={`w-full border-x border-grayLt text-[9px] leading-none ${text} ${bg} ${
                       hourLine ? "border-t border-t-grayLt" : "border-t border-t-grayLt/30"
                     }`}
                     style={{ height: 20 }}
                   >
-                    {booking && !block ? booking.clientName.slice(0, 1) : ""}
+                    {booking && !block ? initials(booking.clientName) : ""}
                   </button>
                 );
               })}
@@ -271,10 +282,13 @@ export function BlockHoursGrid({
 
       <div className="flex flex-wrap gap-3 text-xs text-gray">
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-teal/30" /> Booked
+          <span className="h-3 w-3 rounded bg-teal/25" /> Available
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-pink/40" /> Blocked
+          <span className="h-3 w-3 rounded bg-pink/20" /> Booked
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded bg-pink" /> Blocked
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-bg" /> Outside hours

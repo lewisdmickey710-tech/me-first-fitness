@@ -10,6 +10,7 @@ const config: Config = {
         green: "#5D8A5E", // Phase 3 — Size
         gold: "#C9A96E", // Phase 4 — Power
         rose: "#B9829A", // standalone/general
+        purple: "#9B85C4", // time requests awaiting a decision
         ink: "#3E363A", // primary text
         gray: "#6B5F63", // secondary text
         grayLt: "#E4DADD", // borders, dividers

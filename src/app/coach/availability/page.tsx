@@ -223,8 +223,10 @@ export default async function CoachAvailabilityPage({
       <Card className="space-y-3">
         <p className="font-medium text-ink">Block specific hours</p>
         <p className="text-sm text-gray">
-          Bookings show teal, existing blocks show pink. Select a range to
-          block just part of a day — no need to block the whole thing.
+          Available time shows teal, bookings show light pink with the
+          client&apos;s initials, and blocked time shows dark pink. Select a
+          range to block just part of a day — no need to block the whole
+          thing.
         </p>
         <BlockHoursGrid
           weekDays={weekDays}

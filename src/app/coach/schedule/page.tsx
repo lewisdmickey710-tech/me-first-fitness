@@ -1,10 +1,24 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { coachCancelSession } from "@/app/coach/actions";
+import { ScheduleGrid, type RequestChip } from "./ScheduleGrid";
 import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
-import type { ClientSchedule, SessionOccurrence } from "@/lib/types";
+import type {
+  ClientSchedule,
+  CoachAvailability,
+  CoachBlockedDate,
+  SessionOccurrence,
+  SessionRequest,
+} from "@/lib/types";
+
+const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEK_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
 
 const STATUS_LABEL: Record<string, string> = {
   scheduled: "Scheduled",
@@ -19,7 +33,6 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
-const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 type ScheduleRow = ClientSchedule & { clients: { id: string; name: string } | null };
 
@@ -33,10 +46,10 @@ interface DaySession {
 export default async function CoachSchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; date?: string }>;
+  searchParams: Promise<{ month?: string; date?: string; week?: string }>;
 }) {
   const supabase = await createClient();
-  const { month: monthParam, date: dateParam } = await searchParams;
+  const { month: monthParam, date: dateParam, week: weekParam } = await searchParams;
 
   const now = nowInBusinessTz();
   const todayStr = toDateString(now);
@@ -56,23 +69,81 @@ export default async function CoachSchedulePage({
   const firstDateStr = toDateString(firstOfMonth);
   const lastDateStr = toDateString(new Date(Date.UTC(year, month, daysInMonth)));
 
-  const [{ data: schedules }, { data: monthOccurrences }, { data: allClients }] =
-    await Promise.all([
-      supabase
-        .from("client_schedules")
-        .select("*, clients(id, name)")
-        .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
-      supabase
-        .from("session_occurrences")
-        .select("*")
-        .gte("occurrence_date", firstDateStr)
-        .lte("occurrence_date", lastDateStr) as unknown as Promise<{
-        data: SessionOccurrence[] | null;
-      }>,
-      supabase.from("clients").select("id, name") as unknown as Promise<{
-        data: { id: string; name: string }[] | null;
-      }>,
-    ]);
+  let weekStart: Date;
+  if (weekParam && /^\d{4}-\d{2}-\d{2}$/.test(weekParam)) {
+    weekStart = new Date(`${weekParam}T00:00:00Z`);
+  } else {
+    weekStart = new Date(`${todayStr}T00:00:00Z`);
+    weekStart.setUTCDate(weekStart.getUTCDate() - weekStart.getUTCDay());
+  }
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setUTCDate(d.getUTCDate() + i);
+    const dateStr = toDateString(d);
+    return {
+      date: dateStr,
+      dayOfWeek: d.getUTCDay(),
+      label: `${WEEKDAY_SHORT[d.getUTCDay()]} ${WEEK_LABEL_FMT.format(d)}`,
+    };
+  });
+  const weekStartStr = weekDays[0].date;
+  const weekEndStr = weekDays[6].date;
+  const prevWeekDate = new Date(weekStart);
+  prevWeekDate.setUTCDate(prevWeekDate.getUTCDate() - 7);
+  const nextWeekDate = new Date(weekStart);
+  nextWeekDate.setUTCDate(nextWeekDate.getUTCDate() + 7);
+  const weekLabel = `${WEEK_LABEL_FMT.format(weekStart)} – ${WEEK_LABEL_FMT.format(
+    new Date(`${weekEndStr}T00:00:00Z`)
+  )}`;
+
+  const [
+    { data: schedules },
+    { data: monthOccurrences },
+    { data: allClients },
+    { data: availability },
+    { data: weekBlocks },
+    { data: weekOccurrences },
+    { data: openRequests },
+  ] = await Promise.all([
+    supabase
+      .from("client_schedules")
+      .select("*, clients(id, name)")
+      .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
+    supabase
+      .from("session_occurrences")
+      .select("*")
+      .gte("occurrence_date", firstDateStr)
+      .lte("occurrence_date", lastDateStr) as unknown as Promise<{
+      data: SessionOccurrence[] | null;
+    }>,
+    supabase.from("clients").select("id, name") as unknown as Promise<{
+      data: { id: string; name: string }[] | null;
+    }>,
+    supabase.from("coach_availability").select("*") as unknown as Promise<{
+      data: CoachAvailability[] | null;
+    }>,
+    supabase
+      .from("coach_blocked_dates")
+      .select("*")
+      .gte("blocked_date", weekStartStr)
+      .lte("blocked_date", weekEndStr) as unknown as Promise<{
+      data: CoachBlockedDate[] | null;
+    }>,
+    supabase
+      .from("session_occurrences")
+      .select("client_id, occurrence_date, notes")
+      .gte("occurrence_date", weekStartStr)
+      .lte("occurrence_date", weekEndStr)
+      .eq("status", "scheduled") as unknown as Promise<{
+      data: { client_id: string; occurrence_date: string; notes: string | null }[] | null;
+    }>,
+    supabase
+      .from("requests")
+      .select("*, clients(id, name)")
+      .in("status", ["pending", "countered"]) as unknown as Promise<{
+      data: (SessionRequest & { clients: { id: string; name: string } | null })[] | null;
+    }>,
+  ]);
 
   const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
 
@@ -83,6 +154,35 @@ export default async function CoachSchedulePage({
     list.push(s);
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
+
+  const weekBookings: { date: string; timeOfDay: string; clientName: string }[] = [];
+  for (const day of weekDays) {
+    for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
+      weekBookings.push({
+        date: day.date,
+        timeOfDay: s.time_of_day,
+        clientName: s.clients!.name,
+      });
+    }
+  }
+  for (const o of weekOccurrences ?? []) {
+    const timeMatch = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    if (!timeMatch) continue;
+    weekBookings.push({
+      date: o.occurrence_date,
+      timeOfDay: timeMatch[1],
+      clientName: clientNameById.get(o.client_id) ?? "Client",
+    });
+  }
+
+  const requestChips: RequestChip[] = (openRequests ?? []).map((r) => ({
+    id: r.id,
+    clientId: r.client_id,
+    clientName: r.clients?.name ?? clientNameById.get(r.client_id) ?? "Client",
+    date: r.status === "countered" ? r.countered_date : r.preferred_date,
+    time: r.status === "countered" ? r.countered_time : r.preferred_time,
+    status: r.status as "pending" | "countered",
+  }));
 
   const occurrencesByDate = new Map<string, SessionOccurrence[]>();
   const occurrenceByClientDate = new Map<string, SessionOccurrence>();
@@ -150,10 +250,35 @@ export default async function CoachSchedulePage({
         Your schedule
       </h1>
       <p className="text-sm text-gray">
-        Every client&apos;s recurring weekly time, plus any one-off
-        confirmed requests, in one place. Manage an individual client&apos;s
-        recurring times from their own Schedule tab.
+        Teal is available time, light pink is booked (with client initials),
+        dark pink is blocked, and purple is a time request waiting on you.
       </p>
+
+      <Card className="space-y-3">
+        <p className="font-medium text-ink">This week</p>
+        <ScheduleGrid
+          weekDays={weekDays}
+          availability={(availability ?? []).map((a) => ({
+            dayOfWeek: a.day_of_week,
+            startTime: a.start_time,
+            endTime: a.end_time,
+          }))}
+          blocks={(weekBlocks ?? []).map((b) => ({
+            date: b.blocked_date,
+            startTime: b.start_time,
+            endTime: b.end_time,
+            reason: b.reason,
+          }))}
+          bookings={weekBookings}
+          requests={requestChips}
+          prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
+          nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
+          weekLabel={weekLabel}
+          todayStr={todayStr}
+        />
+      </Card>
+
+      <p className="text-sm font-medium text-gray">Full month</p>
 
       <Card>
         <div className="flex items-center justify-between">

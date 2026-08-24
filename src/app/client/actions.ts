@@ -340,6 +340,86 @@ export async function submitRequest(formData: FormData) {
   redirect("/client/dashboard");
 }
 
+// Requests has no client-facing update policy (only coach: full access,
+// client: insert own) -- everything below runs through the admin client,
+// same reasoning as the cross-client conflict check in submitRequest.
+// The .eq("client_id", me.id) and .eq("status", "countered") guards on
+// the initial read are what keep this scoped to the caller's own,
+// still-open counter-offer even though the write itself bypasses RLS.
+export async function respondToCounteredRequest(
+  requestId: string,
+  decision: "accept" | "decline"
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const admin = createAdminClient();
+  const { data: request, error } = await admin
+    .from("requests")
+    .select("countered_date, countered_time, reschedule_from_date, request_type")
+    .eq("id", requestId)
+    .eq("client_id", me.id)
+    .eq("status", "countered")
+    .single();
+  if (error || !request || !request.countered_date) {
+    throw new Error("That proposed time is no longer available.");
+  }
+
+  if (decision === "decline") {
+    const { error: updateError } = await admin
+      .from("requests")
+      .update({ status: "declined" })
+      .eq("id", requestId);
+    if (updateError) throw new Error(updateError.message);
+  } else {
+    const { error: updateError } = await admin
+      .from("requests")
+      .update({
+        status: "confirmed",
+        preferred_date: request.countered_date,
+        preferred_time: request.countered_time,
+      })
+      .eq("id", requestId);
+    if (updateError) throw new Error(updateError.message);
+
+    if (request.reschedule_from_date) {
+      const { error: originalError } = await admin
+        .from("session_occurrences")
+        .upsert(
+          {
+            client_id: me.id,
+            occurrence_date: request.reschedule_from_date,
+            status: "rescheduled",
+            rescheduled_to_date: request.countered_date,
+          },
+          { onConflict: "client_id,occurrence_date" }
+        );
+      if (originalError) throw new Error(originalError.message);
+    }
+
+    const { error: occurrenceError } = await admin
+      .from("session_occurrences")
+      .upsert(
+        {
+          client_id: me.id,
+          occurrence_date: request.countered_date,
+          status: "scheduled",
+          notes: request.countered_time
+            ? `Confirmed request — ${request.countered_time}`
+            : "Confirmed request",
+          is_video_session: request.request_type === "video_session",
+        },
+        { onConflict: "client_id,occurrence_date" }
+      );
+    if (occurrenceError) throw new Error(occurrenceError.message);
+  }
+
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/schedule");
+  revalidatePath("/coach/schedule");
+  revalidatePath(`/coach/clients/${me.id}`);
+}
+
 export async function cancelMySession(
   clientScheduleId: string | null,
   occurrenceDate: string,

@@ -9,6 +9,7 @@ import {
   sendMilestoneAchievedEmail,
   sendCoachCancelledSessionEmail,
   sendDayBlockedEmail,
+  sendRequestCounteredEmail,
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -174,6 +175,54 @@ export async function confirmVideoSessionRequest(
 ) {
   await markPaymentPaid(paymentId, clientId);
   await setRequestStatus(requestId, clientId, "confirmed");
+}
+
+// Dragging a pending request to a different slot on the schedule grid
+// proposes that time instead of just accepting or declining -- the ball
+// is back in the client's court to accept it (respondToCounteredRequest,
+// client/actions.ts) or send a fresh request.
+export async function counterRequest(
+  requestId: string,
+  clientId: string,
+  counteredDate: string,
+  counteredTime: string
+) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("requests")
+    .update({
+      status: "countered",
+      countered_date: counteredDate,
+      countered_time: counteredTime,
+    })
+    .eq("id", requestId);
+  if (error) throw new Error(error.message);
+
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name, user_id")
+      .eq("id", clientId)
+      .single();
+    if (client) {
+      const email = await clientLoginEmail(client.user_id);
+      if (email) {
+        await sendRequestCounteredEmail(
+          email,
+          client.name,
+          `${counteredDate} at ${formatTimeOfDay(counteredTime)}`
+        );
+      }
+    }
+  } catch (emailError) {
+    console.error("Failed to send request-countered email", emailError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
 }
 
 export async function logSession(clientId: string, formData: FormData) {

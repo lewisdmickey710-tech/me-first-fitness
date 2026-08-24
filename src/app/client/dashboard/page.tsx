@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
+import { respondToCounteredRequest } from "@/app/client/actions";
+import { Badge, Button, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
@@ -57,7 +58,7 @@ export default async function ClientDashboard() {
       .from("requests")
       .select("*")
       .eq("client_id", me.id)
-      .eq("status", "pending") as unknown as Promise<{
+      .in("status", ["pending", "countered"]) as unknown as Promise<{
       data: SessionRequest[] | null;
     }>,
     me.care_profile_id
@@ -404,17 +405,53 @@ export default async function ClientDashboard() {
             <Heart className="mr-1" />
             Pending requests
           </p>
-          <div className="mt-2 space-y-2">
-            {requests!.map((r) => (
-              <div key={r.id} className="flex items-center justify-between">
-                <p className="text-sm text-ink">
-                  {r.request_type === "checkin_call" ? "Check-in call — " : ""}
-                  {r.preferred_date}
-                  {r.preferred_time ? ` at ${r.preferred_time}` : ""}
-                </p>
-                <Badge tone="gold">pending</Badge>
-              </div>
-            ))}
+          <div className="mt-2 space-y-3">
+            {requests!.map((r) =>
+              r.status === "countered" ? (
+                <div key={r.id} className="rounded-xl bg-purple/10 p-3">
+                  <p className="text-sm text-ink">
+                    Mickey proposed a different time:{" "}
+                    <strong>
+                      {r.countered_date}
+                      {r.countered_time ? ` at ${r.countered_time}` : ""}
+                    </strong>{" "}
+                    <span className="text-gray">
+                      (you asked for {r.preferred_date}
+                      {r.preferred_time ? ` at ${r.preferred_time}` : ""})
+                    </span>
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await respondToCounteredRequest(r.id, "accept");
+                      }}
+                    >
+                      <Button type="submit">Works for me</Button>
+                    </form>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await respondToCounteredRequest(r.id, "decline");
+                      }}
+                    >
+                      <Button type="submit" variant="secondary">
+                        Doesn&apos;t work
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              ) : (
+                <div key={r.id} className="flex items-center justify-between">
+                  <p className="text-sm text-ink">
+                    {r.request_type === "checkin_call" ? "Check-in call — " : ""}
+                    {r.preferred_date}
+                    {r.preferred_time ? ` at ${r.preferred_time}` : ""}
+                  </p>
+                  <Badge tone="gold">pending</Badge>
+                </div>
+              )
+            )}
           </div>
         </Card>
       ) : null}

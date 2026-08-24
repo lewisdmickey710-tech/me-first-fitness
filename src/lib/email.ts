@@ -305,6 +305,30 @@ export async function sendBlockedDatesReminderEmail(
   });
 }
 
+export async function sendRequestCounteredEmail(
+  to: string,
+  clientName: string,
+  proposedText: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping request-countered email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "A different time for your session request",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>Your requested time doesn't quite work — I'd like to propose instead:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${proposedText}</strong>
+      </p>
+      <p>Log in and you'll see it waiting on your dashboard — accept it, or send a new request if it doesn't work.</p>
+    `),
+  });
+}
+
 export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,
