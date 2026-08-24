@@ -249,9 +249,9 @@ export function BlockHoursGrid({
                 const available = isAvailable(day.date, day.dayOfWeek, slot);
                 const selected = isSelected(day.date, slot);
                 const hourLine = slot % SLOTS_PER_HOUR === 0;
-                let bg = available ? "bg-teal/25" : "bg-bg";
+                let bg = available ? "bg-teal/45" : "bg-white";
                 let text = "text-ink";
-                if (booking) bg = "bg-pink/20";
+                if (booking) bg = "bg-pink/30";
                 if (block) {
                   bg = "bg-pink";
                   text = "text-white";
@@ -286,16 +286,16 @@ export function BlockHoursGrid({
 
       <div className="flex flex-wrap gap-3 text-xs text-gray">
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-teal/25" /> Available
+          <span className="h-3 w-3 rounded bg-teal/45" /> Available
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-pink/20" /> Booked
+          <span className="h-3 w-3 rounded bg-pink/30" /> Booked
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-pink" /> Blocked
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-bg" /> Outside hours
+          <span className="h-3 w-3 rounded border border-grayLt bg-white" /> Outside hours
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-rose/50" /> Selected

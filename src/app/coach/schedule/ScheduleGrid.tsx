@@ -253,9 +253,9 @@ export function ScheduleGrid({
                 const isSelected = req?.id === selectedRequestId;
                 const hourLine = slot % SLOTS_PER_HOUR === 0;
 
-                let bg = available ? "bg-teal/25" : "bg-bg";
+                let bg = available ? "bg-teal/45" : "bg-white";
                 let text = "text-ink";
-                if (booking) bg = "bg-pink/20";
+                if (booking) bg = "bg-pink/30";
                 if (req) bg = req.status === "countered" ? "bg-purple/15" : "bg-purple/50";
                 if (block) {
                   bg = "bg-pink";
@@ -307,10 +307,10 @@ export function ScheduleGrid({
 
       <div className="flex flex-wrap gap-3 text-xs text-gray">
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-teal/25" /> Available
+          <span className="h-3 w-3 rounded bg-teal/45" /> Available
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-3 w-3 rounded bg-pink/20" /> Booked
+          <span className="h-3 w-3 rounded bg-pink/30" /> Booked
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-pink" /> Blocked
