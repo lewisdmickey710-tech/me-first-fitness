@@ -8,6 +8,7 @@ import { PaymentMethods } from "@/components/payment-methods";
 import type {
   BusinessSettings,
   CareProfile,
+  CareProfilePacket,
   LeadAssessmentRequest,
   LeadIntake,
   LeadPacketRequest,
@@ -66,24 +67,38 @@ export default async function LeadDashboard() {
     (packetRequests ?? []).map((r) => [r.care_profile_id, r])
   );
 
-  // Signed download links for any already-fulfilled packet request, as a
-  // fallback next to the email that already went out. Generated with the
-  // admin client so no lead-facing storage.objects policy is needed.
-  const packetDownloadUrlByCareProfile = new Map<string, string>();
-  const paidCareProfiles = (packetRequests ?? [])
+  // Signed download links (all 4 phases) for any already-fulfilled packet
+  // request, as a fallback next to the email that already went out.
+  // Generated with the admin client so no lead-facing RLS is needed on
+  // either care_profile_packets or the storage bucket itself.
+  const packetDownloadLinksByCareProfile = new Map<
+    string,
+    { phase: string; url: string }[]
+  >();
+  const paidCareProfileIds = (packetRequests ?? [])
     .filter((r) => r.status === "paid_and_sent")
-    .map((r) => (careProfiles ?? []).find((cp) => cp.id === r.care_profile_id))
-    .filter((cp): cp is CareProfile => !!cp?.phase1_packet_path);
-  if (paidCareProfiles.length > 0) {
+    .map((r) => r.care_profile_id);
+  if (paidCareProfileIds.length > 0) {
     const admin = createAdminClient();
+    const { data: packets } = (await admin
+      .from("care_profile_packets")
+      .select("*")
+      .in("care_profile_id", paidCareProfileIds)) as { data: CareProfilePacket[] | null };
+
     await Promise.all(
-      paidCareProfiles.map(async (cp) => {
+      (packets ?? []).map(async (p) => {
         const { data: signed } = await admin.storage
           .from("packets")
-          .createSignedUrl(cp.phase1_packet_path!, 60 * 60 * 24);
-        if (signed) packetDownloadUrlByCareProfile.set(cp.id, signed.signedUrl);
+          .createSignedUrl(p.storage_path, 60 * 60 * 24);
+        if (!signed) return;
+        const existing = packetDownloadLinksByCareProfile.get(p.care_profile_id) ?? [];
+        existing.push({ phase: p.phase, url: signed.signedUrl });
+        packetDownloadLinksByCareProfile.set(p.care_profile_id, existing);
       })
     );
+    for (const links of packetDownloadLinksByCareProfile.values()) {
+      links.sort((a, b) => a.phase.localeCompare(b.phase));
+    }
   }
 
   return (
@@ -209,8 +224,9 @@ export default async function LeadDashboard() {
             </p>
             <p className="text-xs text-gray">
               Want to get moving before we even meet? Grab your track&apos;s
-              first packet below for $50 — this never replaces your free
-              assessment, it&apos;s just a head start if you want one. I
+              packet below for $50 — all 4 phases included — this never
+              replaces your free assessment, it&apos;s just a head start if
+              you want one. I
               still like to talk before handing you a full program.
             </p>
             {(careProfiles ?? []).map((cp) => {
@@ -227,18 +243,24 @@ export default async function LeadDashboard() {
                         <>
                           <Badge tone="green">packet sent</Badge>
                           <p className="mt-2 text-sm text-gray">
-                            Check your email — or grab it right here.
+                            Check your email — or grab all 4 phases right
+                            here.
                           </p>
-                          {packetDownloadUrlByCareProfile.has(cp.id) ? (
-                            <a
-                              href={packetDownloadUrlByCareProfile.get(cp.id)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="mt-2 inline-block text-sm font-medium text-rose hover:opacity-80"
-                            >
-                              Download your packet →
-                            </a>
-                          ) : null}
+                          <div className="mt-2 flex flex-wrap gap-3">
+                            {(packetDownloadLinksByCareProfile.get(cp.id) ?? []).map(
+                              (l) => (
+                                <a
+                                  key={l.phase}
+                                  href={l.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-sm font-medium text-rose hover:opacity-80"
+                                >
+                                  Phase {l.phase} →
+                                </a>
+                              )
+                            )}
+                          </div>
                         </>
                       ) : (
                         <>
@@ -258,7 +280,7 @@ export default async function LeadDashboard() {
                     >
                       <input type="hidden" name="care_profile_id" value={cp.id} />
                       <Button type="submit" variant="secondary">
-                        Get the packet — $50
+                        Get all 4 phases — $50
                       </Button>
                     </form>
                   )}

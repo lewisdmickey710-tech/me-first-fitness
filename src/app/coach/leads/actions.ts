@@ -24,11 +24,14 @@ export async function setLeadRequestStatus(
   revalidatePath(`/coach/leads/${leadId}`);
 }
 
-// Confirming a paid packet request now actually delivers it -- generates a
-// signed URL for the track's uploaded PDF and emails it through the same
-// Resend pipeline every other app email goes through, then marks the
-// request fulfilled. The signed URL is generated with the admin client so
-// no lead-facing storage.objects policy is needed at all.
+const ALL_PHASES = ["1", "2", "3", "4"] as const;
+
+// Confirming a paid packet request now actually delivers it -- the $50
+// covers all 4 phases of the track, so this requires all 4 PDFs to be
+// uploaded, generates a signed URL for each, and emails the set through
+// the same Resend pipeline every other app email goes through, then marks
+// the request fulfilled. Signed URLs are generated with the admin client
+// so no lead-facing storage.objects policy is needed at all.
 export async function markPacketSent(packetRequestId: string, leadId: string) {
   const supabase = await createClient();
 
@@ -41,13 +44,22 @@ export async function markPacketSent(packetRequestId: string, leadId: string) {
 
   const { data: careProfile, error: careProfileError } = await supabase
     .from("care_profiles")
-    .select("name, phase1_packet_path")
+    .select("name")
     .eq("id", request.care_profile_id)
     .single();
   if (careProfileError || !careProfile) throw new Error("Track not found.");
-  if (!careProfile.phase1_packet_path) {
+
+  const { data: packets, error: packetsError } = await supabase
+    .from("care_profile_packets")
+    .select("phase, storage_path")
+    .eq("care_profile_id", request.care_profile_id);
+  if (packetsError) throw new Error(packetsError.message);
+
+  const packetByPhase = new Map((packets ?? []).map((p) => [p.phase, p.storage_path]));
+  const missingPhases = ALL_PHASES.filter((p) => !packetByPhase.has(p));
+  if (missingPhases.length > 0) {
     throw new Error(
-      "No packet PDF uploaded for this track yet -- upload one from Programs first."
+      `Missing packet PDFs for phase ${missingPhases.join(", ")} -- upload them from this track's Programs page first.`
     );
   }
 
@@ -59,14 +71,19 @@ export async function markPacketSent(packetRequestId: string, leadId: string) {
   if (leadError || !lead) throw new Error("Lead not found.");
 
   const admin = createAdminClient();
-  const { data: signed, error: signError } = await admin.storage
-    .from("packets")
-    .createSignedUrl(careProfile.phase1_packet_path, 60 * 60 * 24 * 7);
-  if (signError || !signed) {
-    throw new Error(signError?.message ?? "Could not generate a download link.");
-  }
+  const phaseLinks = await Promise.all(
+    ALL_PHASES.map(async (phase) => {
+      const { data: signed, error: signError } = await admin.storage
+        .from("packets")
+        .createSignedUrl(packetByPhase.get(phase)!, 60 * 60 * 24 * 7);
+      if (signError || !signed) {
+        throw new Error(signError?.message ?? "Could not generate a download link.");
+      }
+      return { phase, url: signed.signedUrl };
+    })
+  );
 
-  await sendPacketEmail(lead.email, lead.name, careProfile.name, signed.signedUrl);
+  await sendPacketEmail(lead.email, lead.name, careProfile.name, phaseLinks);
 
   const { error } = await supabase
     .from("lead_packet_requests")

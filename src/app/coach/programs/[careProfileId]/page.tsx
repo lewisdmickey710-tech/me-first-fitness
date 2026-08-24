@@ -7,6 +7,7 @@ import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui
 import { PHASES } from "@/lib/constants";
 import type {
   CareProfile,
+  CareProfilePacket,
   CareProfilePhaseNotes,
   Exercise,
   ProgramDayExercise,
@@ -75,36 +76,50 @@ export default async function CareProfileProgramPage({
 
   const supabase = await createClient();
 
-  const [{ data: careProfile }, { data: exercises }, { data: days }, { data: phaseNotes }] =
-    await Promise.all([
-      supabase
-        .from("care_profiles")
-        .select("*")
-        .eq("id", careProfileId)
-        .single() as unknown as Promise<{ data: CareProfile | null }>,
-      supabase.from("exercises").select("*").order("name") as unknown as Promise<{
-        data: Exercise[] | null;
-      }>,
-      supabase
-        .from("program_days")
-        .select("*, program_day_exercises(*)")
-        .eq("care_profile_id", careProfileId)
-        .eq("phase", phase)
-        .order("day_number") as unknown as Promise<{
-        data: ProgramDayWithExercises[] | null;
-      }>,
-      supabase
-        .from("care_profile_phase_notes")
-        .select("*")
-        .eq("care_profile_id", careProfileId)
-        .eq("phase", phase)
-        .maybeSingle() as unknown as Promise<{ data: CareProfilePhaseNotes | null }>,
-    ]);
+  const [
+    { data: careProfile },
+    { data: exercises },
+    { data: days },
+    { data: phaseNotes },
+    { data: packets },
+  ] = await Promise.all([
+    supabase
+      .from("care_profiles")
+      .select("*")
+      .eq("id", careProfileId)
+      .single() as unknown as Promise<{ data: CareProfile | null }>,
+    supabase.from("exercises").select("*").order("name") as unknown as Promise<{
+      data: Exercise[] | null;
+    }>,
+    supabase
+      .from("program_days")
+      .select("*, program_day_exercises(*)")
+      .eq("care_profile_id", careProfileId)
+      .eq("phase", phase)
+      .order("day_number") as unknown as Promise<{
+      data: ProgramDayWithExercises[] | null;
+    }>,
+    supabase
+      .from("care_profile_phase_notes")
+      .select("*")
+      .eq("care_profile_id", careProfileId)
+      .eq("phase", phase)
+      .maybeSingle() as unknown as Promise<{ data: CareProfilePhaseNotes | null }>,
+    supabase
+      .from("care_profile_packets")
+      .select("*")
+      .eq("care_profile_id", careProfileId) as unknown as Promise<{
+      data: CareProfilePacket[] | null;
+    }>,
+  ]);
 
   if (!careProfile) notFound();
 
   const exerciseList = exercises ?? [];
   const daysByNumber = new Map((days ?? []).map((d) => [d.day_number, d]));
+  const packetByPhase = new Map((packets ?? []).map((p) => [p.phase, p]));
+  const uploadedPhaseCount = packetByPhase.size;
+  const currentPhasePacket = packetByPhase.get(phase as CareProfilePacket["phase"]);
 
   return (
     <div className="space-y-6">
@@ -116,30 +131,46 @@ export default async function CareProfileProgramPage({
       </h1>
 
       <Card className="space-y-2">
-        <p className="font-medium text-ink">Phase 1 packet PDF</p>
+        <div className="flex items-center justify-between">
+          <p className="font-medium text-ink">Packet PDFs</p>
+          <span className="text-sm text-gray">{uploadedPhaseCount} of 4 uploaded</span>
+        </div>
         <p className="text-sm text-gray">
-          {careProfile.phase1_packet_path
-            ? "Uploaded — this is what gets emailed when you mark a lead's packet request paid & sent."
-            : "Nothing uploaded yet. Leads can request this track's packet, but you won't be able to confirm one until a PDF is here."}
+          The $50 packet purchase covers all 4 phases — upload one PDF per
+          phase. You won&apos;t be able to confirm a lead&apos;s packet
+          request by email until all 4 are here.
         </p>
-        <form
-          action={async (formData: FormData) => {
-            "use server";
-            await uploadCareProfilePacket(careProfileId, formData);
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            type="file"
-            name="packet"
-            accept="application/pdf"
-            required
-            className="text-sm text-ink"
-          />
-          <Button type="submit" variant="secondary">
-            {careProfile.phase1_packet_path ? "Replace" : "Upload"}
-          </Button>
-        </form>
+        <div className="border-t border-grayLt pt-3">
+          <p className="text-sm font-medium text-ink">
+            Phase {phase}{" "}
+            {currentPhasePacket ? (
+              <span className="font-normal text-gray">— uploaded</span>
+            ) : (
+              <span className="font-normal text-gray">— nothing uploaded</span>
+            )}
+          </p>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await uploadCareProfilePacket(careProfileId, phase, formData);
+            }}
+            className="mt-2 flex items-center gap-2"
+          >
+            <input
+              type="file"
+              name="packet"
+              accept="application/pdf"
+              required
+              className="text-sm text-ink"
+            />
+            <Button type="submit" variant="secondary">
+              {currentPhasePacket ? "Replace" : "Upload"}
+            </Button>
+          </form>
+          <p className="mt-1 text-xs text-gray">
+            Switch phase tabs below to upload the other phases.
+          </p>
+        </div>
       </Card>
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">

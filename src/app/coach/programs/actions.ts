@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function uploadCareProfilePacket(
   careProfileId: string,
+  phase: string,
   formData: FormData
 ) {
   const supabase = await createClient();
@@ -14,16 +15,16 @@ export async function uploadCareProfilePacket(
     throw new Error("A PDF file is required.");
   }
 
-  const path = `${careProfileId}/phase1-${crypto.randomUUID()}-${file.name}`;
+  const path = `${careProfileId}/phase${phase}-${crypto.randomUUID()}-${file.name}`;
   const { error: uploadError } = await supabase.storage
     .from("packets")
     .upload(path, file, { contentType: file.type });
   if (uploadError) throw new Error(uploadError.message);
 
-  const { error } = await supabase
-    .from("care_profiles")
-    .update({ phase1_packet_path: path })
-    .eq("id", careProfileId);
+  const { error } = await supabase.from("care_profile_packets").upsert(
+    { care_profile_id: careProfileId, phase, storage_path: path },
+    { onConflict: "care_profile_id,phase" }
+  );
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/programs/${careProfileId}`);

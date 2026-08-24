@@ -166,7 +166,14 @@ export interface CareProfile {
   name: string;
   description: string | null;
   client_label: string | null;
-  phase1_packet_path: string | null;
+  created_at: string;
+}
+
+export interface CareProfilePacket {
+  id: string;
+  care_profile_id: string;
+  phase: Phase;
+  storage_path: string;
   created_at: string;
 }
 
