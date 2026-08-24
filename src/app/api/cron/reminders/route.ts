@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  sendBlockedDatesReminderEmail,
   sendDocumentsPendingEmail,
   sendInactivityNudgeEmail,
   sendPaymentReminderEmail,
@@ -20,6 +21,7 @@ const PAYMENT_RESEND_COOLDOWN_DAYS = 7;
 const INACTIVITY_NUDGE_COOLDOWN_DAYS = INACTIVITY_DAYS_THRESHOLD;
 const DOCUMENT_NUDGE_COOLDOWN_DAYS = 14;
 const SERVICE_CHECKIN_NUDGE_COOLDOWN_DAYS = 14;
+const BLOCKED_DATE_REMINDER_LOOKAHEAD_DAYS = 3;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -68,6 +70,7 @@ export async function GET(request: Request) {
   let inactivityNudges = 0;
   let documentNudges = 0;
   let serviceCheckinNudges = 0;
+  let blockedDateReminders = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -442,6 +445,86 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Blocked-date reminders: a heads-up as a blocked day approaches,
+  // for any client whose active recurring schedule falls on it -- on top
+  // of the immediate email blockDate already sends when the day is first
+  // blocked. Sent once per (client, date) via blocked_date_reminders_log
+  // so it doesn't repeat every day within the lookahead window, and
+  // consolidated into one email per client covering every qualifying date
+  // found in this run rather than one email per date. ----
+  const blockedDateLookahead = new Date(now);
+  blockedDateLookahead.setUTCDate(
+    blockedDateLookahead.getUTCDate() + BLOCKED_DATE_REMINDER_LOOKAHEAD_DAYS
+  );
+  const blockedDateLookaheadStr = toDateString(blockedDateLookahead);
+
+  const { data: upcomingBlocks } = await supabase
+    .from("coach_blocked_dates")
+    .select("blocked_date, start_time, end_time")
+    .gte("blocked_date", todayDateStr)
+    .lte("blocked_date", blockedDateLookaheadStr);
+
+  if (upcomingBlocks && upcomingBlocks.length > 0) {
+    const { data: allActiveSchedules } = await supabase
+      .from("client_schedules")
+      .select("client_id, day_of_week, time_of_day")
+      .eq("active", true);
+
+    const { data: alreadyRemindedRows } = await supabase
+      .from("blocked_date_reminders_log")
+      .select("client_id, blocked_date");
+    const alreadyReminded = new Set(
+      (alreadyRemindedRows ?? []).map((r) => `${r.client_id}:${r.blocked_date}`)
+    );
+
+    const datesByClient = new Map<string, string[]>();
+    for (const block of upcomingBlocks) {
+      const dayOfWeek = new Date(`${block.blocked_date}T00:00:00Z`).getUTCDay();
+      const isPartial = !!(block.start_time && block.end_time);
+      const startNorm = block.start_time?.slice(0, 5) ?? null;
+      const endNorm = block.end_time?.slice(0, 5) ?? null;
+
+      for (const s of allActiveSchedules ?? []) {
+        if (s.day_of_week !== dayOfWeek) continue;
+        if (isPartial) {
+          const norm = s.time_of_day.slice(0, 5);
+          if (!(norm >= startNorm! && norm < endNorm!)) continue;
+        }
+        const key = `${s.client_id}:${block.blocked_date}`;
+        if (alreadyReminded.has(key)) continue;
+        const list = datesByClient.get(s.client_id) ?? [];
+        list.push(block.blocked_date);
+        datesByClient.set(s.client_id, list);
+      }
+    }
+
+    for (const [clientId, dates] of datesByClient) {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("name, user_id")
+        .eq("id", clientId)
+        .single();
+      if (!client?.user_id) continue;
+
+      const { data: userResult, error: userError } =
+        await supabase.auth.admin.getUserById(client.user_id);
+      if (userError || !userResult?.user?.email) {
+        errors.push(`No email for client ${client.name}`);
+        continue;
+      }
+
+      try {
+        await sendBlockedDatesReminderEmail(userResult.user.email, client.name, dates);
+        await supabase
+          .from("blocked_date_reminders_log")
+          .insert(dates.map((d) => ({ client_id: clientId, blocked_date: d })));
+        blockedDateReminders++;
+      } catch (e) {
+        errors.push(`Blocked-date reminder failed for ${client.name}: ${e}`);
+      }
+    }
+  }
+
   // ---- Weekly retainer billing: rolls a new $10 payment forward for
   // every client currently on hold, one week after their last retainer
   // payment's due date (the first week's payment is created immediately
@@ -492,6 +575,7 @@ export async function GET(request: Request) {
     inactivityNudges,
     documentNudges,
     serviceCheckinNudges,
+    blockedDateReminders,
     retainerPayments,
     errors,
   });

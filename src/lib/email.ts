@@ -6,6 +6,16 @@ const resend = process.env.RESEND_API_KEY
 
 const FROM = process.env.EMAIL_FROM ?? "MeFirstFitness <onboarding@resend.dev>";
 
+const BLOCKED_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+function formatBlockedDate(dateStr: string): string {
+  return BLOCKED_DATE_FMT.format(new Date(`${dateStr}T00:00:00Z`));
+}
+
 function wrapper(bodyHtml: string): string {
   return `
     <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #2B2320;">
@@ -262,6 +272,35 @@ export async function sendPacketEmail(
       <ul style="padding-left: 20px;">${linksHtml}</ul>
       <p style="font-size: 13px; color: #8A8078;">These links expire in a week — if any have stopped working, just let me know and I'll send fresh ones.</p>
       <p>One thing worth saying: this doesn't replace your free assessment. I still like to actually meet before handing over a full program — let's find time for that too.</p>
+    `),
+  });
+}
+
+export async function sendBlockedDatesReminderEmail(
+  to: string,
+  clientName: string,
+  dates: string[]
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping blocked-date reminder email");
+    return;
+  }
+  const sorted = [...dates].sort();
+  const dateListHtml = sorted
+    .map((d) => `<li>${formatBlockedDate(d)}</li>`)
+    .join("");
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject:
+      sorted.length > 1
+        ? "Upcoming dates I won't be in session"
+        : "Upcoming date I won't be in session",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>Just a heads up — don't forget I won't be in session on:</p>
+      <ul style="padding-left: 20px;">${dateListHtml}</ul>
+      <p>Anything that would normally fall on ${sorted.length > 1 ? "these dates" : "this date"} is already taken care of on my end — no action needed from you.</p>
     `),
   });
 }

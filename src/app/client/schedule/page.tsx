@@ -5,6 +5,7 @@ import { getMyClient } from "@/lib/current-client";
 import { cancelMySession } from "@/app/client/actions";
 import { Badge, Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
+import { ConfirmButton } from "@/components/confirm-button";
 import { DAY_NAMES, formatTimeOfDayForClient } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -393,9 +394,12 @@ export default async function ClientSchedulePage({
                       await cancelMySession(scheduleId, selectedCell.date, timeOfDay);
                     }}
                   >
-                    <Button type="submit" variant="danger">
+                    <ConfirmButton
+                      variant="danger"
+                      confirmText="Cancel this session? This can't be undone."
+                    >
                       Cancel
-                    </Button>
+                    </ConfirmButton>
                   </form>
                   <Link href={`/client/request?reschedule_from=${selectedCell.date}`}>
                     <Button type="button" variant="secondary">

@@ -9,14 +9,18 @@ export function Collapsible({
   label,
   children,
   className = "",
+  defaultOpen = false,
+  labelClassName = "text-sm font-medium text-rose",
 }: {
   label: ReactNode;
   children: ReactNode;
   className?: string;
+  defaultOpen?: boolean;
+  labelClassName?: string;
 }) {
   return (
-    <details className={`group ${className}`}>
-      <summary className="cursor-pointer list-none text-sm font-medium text-rose">
+    <details className={`group ${className}`} open={defaultOpen}>
+      <summary className={`cursor-pointer list-none ${labelClassName}`}>
         <span className="inline-flex items-center gap-1">
           {label}
           <span className="text-xs transition-transform group-open:rotate-180">

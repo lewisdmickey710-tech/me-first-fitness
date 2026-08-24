@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { unarchiveClient } from "@/app/coach/actions";
-import { Button, Card, EmptyState, Heart } from "@/components/ui";
+import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import { computeCancellationRisk, RISK_LEVEL_COLOR, RISK_LEVEL_LABEL } from "@/lib/risk";
@@ -616,26 +616,28 @@ export default async function RosterPage({
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-gray">
-              In-Person ({inPersonClients.length})
-            </p>
+          <Collapsible
+            defaultOpen
+            labelClassName="text-base font-semibold text-ink"
+            label={`In-Person (${inPersonClients.length})`}
+          >
             {inPersonClients.length === 0 ? (
               <p className="text-sm text-gray">No in-person clients right now.</p>
             ) : (
               <div className="space-y-3">{inPersonClients.map(renderClientCard)}</div>
             )}
-          </div>
-          <div className="space-y-3">
-            <p className="text-sm font-medium text-gray">
-              Virtual ({virtualClients.length})
-            </p>
+          </Collapsible>
+          <Collapsible
+            defaultOpen
+            labelClassName="text-base font-semibold text-ink"
+            label={`Virtual (${virtualClients.length})`}
+          >
             {virtualClients.length === 0 ? (
               <p className="text-sm text-gray">No virtual clients right now.</p>
             ) : (
               <div className="space-y-3">{virtualClients.map(renderClientCard)}</div>
             )}
-          </div>
+          </Collapsible>
         </div>
       )}
     </div>

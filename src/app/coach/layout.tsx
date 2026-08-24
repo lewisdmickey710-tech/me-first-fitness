@@ -1,4 +1,5 @@
 import { TopNav } from "@/components/nav";
+import { ScrollToTop } from "@/components/scroll-to-top";
 
 export default function CoachLayout({
   children,
@@ -25,6 +26,7 @@ export default function CoachLayout({
         ]}
       />
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>
+      <ScrollToTop />
     </div>
   );
 }
