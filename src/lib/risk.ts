@@ -16,18 +16,36 @@ export interface RiskInput {
   latestServiceCheckinSatisfaction: number | null; // 1-5
 }
 
+export type RiskLevel = "low" | "medium" | "high";
+
 export interface RiskResult {
   score: number;
   reasons: string[];
+  level: RiskLevel;
   isHighRisk: boolean;
 }
 
 const HIGH_RISK_THRESHOLD = 3;
+const MEDIUM_RISK_THRESHOLD = 1;
 // Also the threshold the inactivity-nudge cron uses to decide a client
 // has "gone quiet" -- kept here as the one source of truth for that number.
 export const INACTIVITY_DAYS_THRESHOLD = 14;
 const LOW_CONSISTENCY_THRESHOLD = 50;
 const LOW_SATISFACTION_THRESHOLD = 2;
+
+// Teal/gold/pink so the roster's risk dot uses the same tones as
+// everything else in the app -- no new colors introduced just for this.
+export const RISK_LEVEL_COLOR: Record<RiskLevel, string> = {
+  low: "#4A9A9A",
+  medium: "#C9A96E",
+  high: "#E75480",
+};
+
+export const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
+  low: "Low risk",
+  medium: "Medium risk",
+  high: "High risk",
+};
 
 export function computeCancellationRisk(input: RiskInput): RiskResult {
   let score = 0;
@@ -76,5 +94,12 @@ export function computeCancellationRisk(input: RiskInput): RiskResult {
     );
   }
 
-  return { score, reasons, isHighRisk: score >= HIGH_RISK_THRESHOLD };
+  const level: RiskLevel =
+    score >= HIGH_RISK_THRESHOLD
+      ? "high"
+      : score >= MEDIUM_RISK_THRESHOLD
+        ? "medium"
+        : "low";
+
+  return { score, reasons, level, isHighRisk: level === "high" };
 }

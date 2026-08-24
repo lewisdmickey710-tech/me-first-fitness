@@ -4,7 +4,8 @@ import { unarchiveClient } from "@/app/coach/actions";
 import { Button, Card, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
-import { computeCancellationRisk } from "@/lib/risk";
+import { computeCancellationRisk, RISK_LEVEL_COLOR, RISK_LEVEL_LABEL } from "@/lib/risk";
+import type { RiskLevel } from "@/lib/risk";
 import { toDateString } from "@/lib/timezone";
 import { monthlyPaymentStatus, payAsYouGoStatus } from "@/lib/payment-status";
 import type { Client, OccurrenceStatus } from "@/lib/types";
@@ -24,10 +25,12 @@ function shortDate(dateStr: string): string {
 export default async function RosterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string }>;
+  searchParams: Promise<{ archived?: string; sort?: string }>;
 }) {
-  const { archived: archivedParam } = await searchParams;
+  const { archived: archivedParam, sort: sortParam } = await searchParams;
   const showArchived = archivedParam === "1";
+  const sort: "name" | "risk_asc" | "risk_desc" =
+    sortParam === "risk_asc" || sortParam === "risk_desc" ? sortParam : "name";
 
   const supabase = await createClient();
 
@@ -302,7 +305,7 @@ export default async function RosterPage({
         !loggedThisMonth(serviceCheckinDatesByClient.get(c.id) ?? []))
   ).length;
 
-  const riskByClient = new Map<string, boolean>();
+  const riskByClient = new Map<string, { score: number; level: RiskLevel }>();
   for (const c of clients ?? []) {
     const lastTracked = lastTrackedByClient.get(c.id);
     const daysSince = lastTracked
@@ -319,14 +322,159 @@ export default async function RosterPage({
             Math.round(((sessionCountByClient.get(c.id) ?? 0) / expectedCount) * 100)
           )
         : null;
-    const { isHighRisk } = computeCancellationRisk({
+    const { score, level } = computeCancellationRisk({
       recentOccurrenceStatuses: occurrencesByClient.get(c.id) ?? [],
       daysSinceLastCheckinOrActivity: daysSince,
       hasOverduePayment: overdueByClient.has(c.id),
       consistencyPct,
       latestServiceCheckinSatisfaction: latestSatisfactionByClient.get(c.id) ?? null,
     });
-    riskByClient.set(c.id, isHighRisk);
+    riskByClient.set(c.id, { score, level });
+  }
+
+  // Sorting happens after risk is computed, in JS, since the risk score
+  // itself only exists once every signal it depends on has been fetched
+  // and combined -- it isn't a column the DB query can order by directly.
+  const sortedClients = [...(clients ?? [])];
+  if (sort !== "name") {
+    sortedClients.sort((a, b) => {
+      const diff = (riskByClient.get(a.id)?.score ?? 0) - (riskByClient.get(b.id)?.score ?? 0);
+      return sort === "risk_asc" ? diff : -diff;
+    });
+  }
+  const inPersonClients = sortedClients.filter((c) => c.session_mode !== "virtual");
+  const virtualClients = sortedClients.filter((c) => c.session_mode === "virtual");
+
+  function renderClientCard(client: ClientRow) {
+    const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
+    const reqs = pendingRequestsByClient.get(client.id);
+    const newRequests =
+      (reqs?.total ?? 0) -
+      (reqs?.reschedules ?? 0) -
+      (reqs?.checkinCalls ?? 0) -
+      (reqs?.videoSessions ?? 0);
+    const needsWindow =
+      inWindow &&
+      (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
+        !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []));
+    const risk = riskByClient.get(client.id) ?? { score: 0, level: "low" as RiskLevel };
+    const paymentStatus =
+      client.payment_schedule === "pay_as_you_go"
+        ? payAsYouGoStatus(mostRecentPaymentStatusByClient.get(client.id))
+        : client.payment_schedule === "monthly"
+          ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
+          : null;
+
+    // Purely informational events (a cancellation, a signed
+    // document) only show up while the coach hasn't opened this
+    // client's profile since they happened -- opening it counts
+    // as "seen." Flags that still need an action from her (a
+    // pending request, an unpaid fee, high risk) show regardless.
+    const notYetSeen = (at: string) =>
+      !client.last_viewed_at || client.last_viewed_at < at;
+
+    const flags: string[] = [];
+    if (newRequests > 0) {
+      flags.push(
+        newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`
+      );
+    }
+    if ((reqs?.reschedules ?? 0) > 0) {
+      flags.push(
+        reqs!.reschedules === 1
+          ? "Requested reschedule"
+          : `Requested reschedule (${reqs!.reschedules})`
+      );
+    }
+    if ((reqs?.checkinCalls ?? 0) > 0) {
+      flags.push(
+        reqs!.checkinCalls === 1
+          ? "Check-in call requested"
+          : `Check-in call requested (${reqs!.checkinCalls})`
+      );
+    }
+    if ((reqs?.videoSessions ?? 0) > 0) {
+      flags.push(
+        reqs!.videoSessions === 1
+          ? "Video session requested"
+          : `Video session requested (${reqs!.videoSessions})`
+      );
+    }
+    if (client.hold_started_at) flags.push("On hold");
+    if (risk.level === "high") flags.push("High risk");
+    if (paymentStatus) flags.push(paymentStatus.label);
+    if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
+
+    const lastTracked = lastTrackedByClient.get(client.id);
+    const daysSinceActivity = lastTracked
+      ? Math.floor(
+          (new Date(today).getTime() - new Date(lastTracked).getTime()) /
+            (1000 * 60 * 60 * 24)
+        )
+      : Math.floor(
+          (new Date(today).getTime() - new Date(client.created_at).getTime()) /
+            (1000 * 60 * 60 * 24)
+        );
+    const clientEstablished =
+      new Date(today).getTime() - new Date(client.created_at).getTime() >
+      3 * 24 * 60 * 60 * 1000;
+    if (clientEstablished && daysSinceActivity > 3) {
+      flags.push(`Inactive ${daysSinceActivity}+ days`);
+    }
+
+    const lateCancel = recentLateCancelledByClient.get(client.id);
+    if (lateCancel && notYetSeen(lateCancel.at)) {
+      flags.push(`Late cancellation (${shortDate(lateCancel.date)})`);
+    }
+    const cancel = recentCancelledByClient.get(client.id);
+    if (cancel && notYetSeen(cancel.at)) {
+      flags.push(`Cancelled ${shortDate(cancel.date)} session`);
+    }
+    const documentAt = recentDocumentAtByClient.get(client.id);
+    if (documentAt && notYetSeen(documentAt)) {
+      flags.push("Completed document");
+    }
+    if (needsWindow) flags.push("Needs monthly check-in");
+
+    return (
+      <Link key={client.id} href={`/coach/clients/${client.id}`}>
+        <Card className="transition hover:border-rose/40">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                style={{ backgroundColor: RISK_LEVEL_COLOR[risk.level] }}
+                title={RISK_LEVEL_LABEL[risk.level]}
+              />
+              <div>
+                <p className="font-medium text-ink">{client.name}</p>
+                <p className="mt-0.5 text-sm text-gray">
+                  {client.care_profiles?.name ?? "No care profile set"}
+                </p>
+              </div>
+            </div>
+            <span
+              className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
+              style={{ backgroundColor: phase.color }}
+            >
+              {phase.name}
+            </span>
+          </div>
+          {flags.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+              {flags.map((f) => (
+                <span
+                  key={f}
+                  className="text-sm font-medium text-rose before:mr-1 before:content-['•']"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </Card>
+      </Link>
+    );
   }
 
   return (
@@ -398,6 +546,34 @@ export default async function RosterPage({
         </Card>
       ) : null}
 
+      {!showArchived && clients && clients.length > 0 ? (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="text-gray">Sort:</span>
+          <Link
+            href="/coach/roster"
+            className={sort === "name" ? "font-medium text-rose" : "text-gray hover:text-ink"}
+          >
+            Name
+          </Link>
+          <Link
+            href="/coach/roster?sort=risk_desc"
+            className={
+              sort === "risk_desc" ? "font-medium text-rose" : "text-gray hover:text-ink"
+            }
+          >
+            Risk (high → low)
+          </Link>
+          <Link
+            href="/coach/roster?sort=risk_asc"
+            className={
+              sort === "risk_asc" ? "font-medium text-rose" : "text-gray hover:text-ink"
+            }
+          >
+            Risk (low → high)
+          </Link>
+        </div>
+      ) : null}
+
       {!clients || clients.length === 0 ? (
         <EmptyState
           title={showArchived ? "No archived clients" : "No clients yet"}
@@ -439,131 +615,27 @@ export default async function RosterPage({
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
-          {clients.map((client) => {
-            const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
-            const reqs = pendingRequestsByClient.get(client.id);
-            const newRequests =
-              (reqs?.total ?? 0) -
-              (reqs?.reschedules ?? 0) -
-              (reqs?.checkinCalls ?? 0) -
-              (reqs?.videoSessions ?? 0);
-            const needsWindow =
-              inWindow &&
-              (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
-                !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []));
-            const highRisk = riskByClient.get(client.id) ?? false;
-            const paymentStatus =
-              client.payment_schedule === "pay_as_you_go"
-                ? payAsYouGoStatus(mostRecentPaymentStatusByClient.get(client.id))
-                : client.payment_schedule === "monthly"
-                  ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
-                  : null;
-
-            // Purely informational events (a cancellation, a signed
-            // document) only show up while the coach hasn't opened this
-            // client's profile since they happened -- opening it counts
-            // as "seen." Flags that still need an action from her (a
-            // pending request, an unpaid fee, high risk) show regardless.
-            const notYetSeen = (at: string) =>
-              !client.last_viewed_at || client.last_viewed_at < at;
-
-            const flags: string[] = [];
-            if (newRequests > 0) {
-              flags.push(
-                newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`
-              );
-            }
-            if ((reqs?.reschedules ?? 0) > 0) {
-              flags.push(
-                reqs!.reschedules === 1
-                  ? "Requested reschedule"
-                  : `Requested reschedule (${reqs!.reschedules})`
-              );
-            }
-            if ((reqs?.checkinCalls ?? 0) > 0) {
-              flags.push(
-                reqs!.checkinCalls === 1
-                  ? "Check-in call requested"
-                  : `Check-in call requested (${reqs!.checkinCalls})`
-              );
-            }
-            if ((reqs?.videoSessions ?? 0) > 0) {
-              flags.push(
-                reqs!.videoSessions === 1
-                  ? "Video session requested"
-                  : `Video session requested (${reqs!.videoSessions})`
-              );
-            }
-            if (client.hold_started_at) flags.push("On hold");
-            if (highRisk) flags.push("High risk");
-            if (paymentStatus) flags.push(paymentStatus.label);
-            if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
-
-            const lastTracked = lastTrackedByClient.get(client.id);
-            const daysSinceActivity = lastTracked
-              ? Math.floor(
-                  (new Date(today).getTime() - new Date(lastTracked).getTime()) /
-                    (1000 * 60 * 60 * 24)
-                )
-              : Math.floor(
-                  (new Date(today).getTime() - new Date(client.created_at).getTime()) /
-                    (1000 * 60 * 60 * 24)
-                );
-            const clientEstablished =
-              new Date(today).getTime() - new Date(client.created_at).getTime() >
-              3 * 24 * 60 * 60 * 1000;
-            if (clientEstablished && daysSinceActivity > 3) {
-              flags.push(`Inactive ${daysSinceActivity}+ days`);
-            }
-
-            const lateCancel = recentLateCancelledByClient.get(client.id);
-            if (lateCancel && notYetSeen(lateCancel.at)) {
-              flags.push(`Late cancellation (${shortDate(lateCancel.date)})`);
-            }
-            const cancel = recentCancelledByClient.get(client.id);
-            if (cancel && notYetSeen(cancel.at)) {
-              flags.push(`Cancelled ${shortDate(cancel.date)} session`);
-            }
-            const documentAt = recentDocumentAtByClient.get(client.id);
-            if (documentAt && notYetSeen(documentAt)) {
-              flags.push("Completed document");
-            }
-            if (needsWindow) flags.push("Needs monthly check-in");
-
-            return (
-              <Link key={client.id} href={`/coach/clients/${client.id}`}>
-                <Card className="transition hover:border-rose/40">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-ink">{client.name}</p>
-                      <p className="mt-0.5 text-sm text-gray">
-                        {client.care_profiles?.name ?? "No care profile set"}
-                      </p>
-                    </div>
-                    <span
-                      className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
-                      style={{ backgroundColor: phase.color }}
-                    >
-                      {phase.name}
-                    </span>
-                  </div>
-                  {flags.length > 0 ? (
-                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                      {flags.map((f) => (
-                        <span
-                          key={f}
-                          className="text-sm font-medium text-rose before:mr-1 before:content-['•']"
-                        >
-                          {f}
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-                </Card>
-              </Link>
-            );
-          })}
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray">
+              In-Person ({inPersonClients.length})
+            </p>
+            {inPersonClients.length === 0 ? (
+              <p className="text-sm text-gray">No in-person clients right now.</p>
+            ) : (
+              <div className="space-y-3">{inPersonClients.map(renderClientCard)}</div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-gray">
+              Virtual ({virtualClients.length})
+            </p>
+            {virtualClients.length === 0 ? (
+              <p className="text-sm text-gray">No virtual clients right now.</p>
+            ) : (
+              <div className="space-y-3">{virtualClients.map(renderClientCard)}</div>
+            )}
+          </div>
         </div>
       )}
     </div>

@@ -104,7 +104,7 @@ export function Card({
 }) {
   return (
     <div
-      className={`rounded-2xl border border-grayLt bg-white p-5 shadow-sm ${className}`}
+      className={`rounded-2xl border border-grayLt bg-pink/10 p-5 shadow-sm ${className}`}
     >
       {children}
     </div>
@@ -349,7 +349,7 @@ export function EmptyState({
   body: string;
 }) {
   return (
-    <div className="rounded-2xl border border-dashed border-grayLt bg-white/60 px-5 py-8 text-center">
+    <div className="rounded-2xl border border-dashed border-grayLt bg-pink/5 px-5 py-8 text-center">
       <Heart className="mb-2 inline-block text-lg" />
       <p className="font-medium text-ink">{title}</p>
       <p className="mt-1 text-sm text-gray">{body}</p>

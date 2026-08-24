@@ -14,25 +14,23 @@ export function TopNav({
 }) {
   return (
     <header className="border-b border-grayLt bg-white">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-        <div className="flex items-center gap-4">
-          <a href="/" className="font-semibold text-ink">
-            <Heart className="mr-1.5" />
-            {title}
-          </a>
-          <nav className="hidden gap-3 sm:flex">
-            {links?.map((l) => (
-              <a
-                key={l.href}
-                href={l.href}
-                className="text-sm text-gray hover:text-ink"
-              >
-                {l.label}
-              </a>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <a href="/" className="shrink-0 font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          {title}
+        </a>
+        <nav className="hidden flex-wrap gap-x-5 gap-y-2 sm:flex">
+          {links?.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="text-sm text-gray hover:text-ink"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
+        <div className="flex shrink-0 items-center gap-4">
           {faqHref ? (
             <a href={faqHref} className="text-sm text-gray hover:text-ink">
               FAQ
