@@ -179,15 +179,35 @@ export default function CoachFaqPage() {
       </Section>
 
       <Section title="Virtual Clients &amp; Data">
-        <Q q="What's the 'Fully virtual — async' session mode?">
-          For virtual clients you&apos;d rather manage with programming
-          updates than standing video calls. Set it on their Profile tab. They get
-          no session reminders and no next-session card — their dashboard
-          shows &quot;program last updated&quot; instead, which you control
-          with the &quot;Mark program updated today&quot; button on their
-          Program tab after you actually make their changes. They can
-          still book a 30-minute check-in call any time they want dedicated
-          time with you.
+        <Q q="What's the difference between session mode and the video session add-on?">
+          Session mode (Profile tab) is just in-person vs. virtual — virtual
+          means their program is managed through async updates by default,
+          with no standing calls. The video session add-on is a separate
+          toggle, also on the Profile tab, that works for either mode: it
+          lets a client book and pay for one-off video sessions from their
+          side. So a virtual client can still get occasional video calls
+          with the add-on on, and an in-person client can add video
+          sessions too — what used to be called &quot;mixed.&quot;
+        </Q>
+        <Q q="What happens on a virtual client's dashboard when nothing's booked?">
+          It shows &quot;program last updated&quot; instead of a
+          next-session time, which you control with the &quot;Mark program
+          updated today&quot; button on their Program tab after you
+          actually make their changes. The moment they have any session
+          booked (recurring, or a confirmed video session/check-in call),
+          the dashboard switches back to showing that instead.
+        </Q>
+        <Q q="How do video session requests and payment work?">
+          A client with the add-on enabled requests a time from their
+          side, which creates a pending payment balance ($25) they pay via
+          Cash App or Zelle — your links for both come from Settings. It
+          shows up in their Requests tab labeled &quot;Video session,&quot;
+          with the balance status right on the card. Once they&apos;ve
+          paid, use &quot;Mark paid &amp; confirm&quot; to do both at
+          once — mark the balance paid and put the timeslot on the
+          calendar in one step. Set your Google Meet link in Settings once
+          and it shows up automatically on the client&apos;s side for any
+          confirmed video session.
         </Q>
         <Q q="How do I set a client's timezone?">
           Client profile tab → Timezone. Their schedule, next-session

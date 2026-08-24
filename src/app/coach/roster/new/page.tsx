@@ -50,10 +50,12 @@ export default async function NewClientPage() {
               </label>
               <Select name="session_mode" defaultValue="in_person">
                 <option value="in_person">In-person</option>
-                <option value="virtual">Virtual</option>
-                <option value="mixed">Mixed</option>
-                <option value="virtual_async">Fully virtual — async</option>
+                <option value="virtual">Virtual (async programming)</option>
               </Select>
+              <p className="mt-1 text-xs text-gray">
+                Video sessions are an optional add-on for either mode —
+                turn it on later from their profile once they&apos;re added.
+              </p>
             </div>
           </div>
 

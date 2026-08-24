@@ -9,6 +9,7 @@ import {
   advancePhase,
   archiveClient,
   coachCancelSession,
+  confirmVideoSessionRequest,
   deleteClientNote,
   deleteMilestone,
   endClientHold,
@@ -504,7 +505,7 @@ export default async function ClientDetailPage({
       )}
       {tab === "activity" && <ActivityTab activities={activities ?? []} />}
       {tab === "requests" && (
-        <RequestsTab clientId={id} requests={requests ?? []} />
+        <RequestsTab clientId={id} requests={requests ?? []} payments={payments ?? []} />
       )}
       {tab === "payments" && (
         <PaymentsTab clientId={id} payments={payments ?? []} />
@@ -1051,16 +1052,25 @@ function ProfileTab({
             >
               <option value="">— Choose one —</option>
               <option value="in_person">In-person</option>
-              <option value="virtual">Virtual</option>
-              <option value="mixed">Mixed</option>
-              <option value="virtual_async">
-                Fully virtual — async programming (no standing sessions)
-              </option>
+              <option value="virtual">Virtual (async programming)</option>
             </Select>
             <p className="mt-1 text-xs text-gray">
-              Async clients get a &quot;program last updated&quot; card
-              instead of a next-session card, and no session reminders.
+              Virtual clients get a &quot;program last updated&quot; card
+              when they have no session booked, and no session reminders
+              while none is scheduled. Video sessions below work for
+              either mode.
             </p>
+            <div className="mt-2">
+              <Checkbox
+                name="video_sessions_enabled"
+                label="Video session add-on enabled"
+                defaultChecked={client.video_sessions_enabled}
+              />
+              <p className="mt-1 text-xs text-gray">
+                Lets this client book and pay for one-off video sessions
+                from their side, regardless of session mode.
+              </p>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
@@ -1624,7 +1634,7 @@ function ProgramTab({
 
   return (
     <div className="space-y-4">
-      {sessionMode === "virtual_async" ? (
+      {sessionMode === "virtual" ? (
         <Card className="space-y-2">
           <p className="font-medium text-ink">Async programming</p>
           <p className="text-sm text-gray">
@@ -2513,9 +2523,11 @@ function ActivityTab({ activities }: { activities: Activity[] }) {
 function RequestsTab({
   clientId,
   requests,
+  payments,
 }: {
   clientId: string;
   requests: SessionRequest[];
+  payments: Payment[];
 }) {
   if (requests.length === 0) {
     return (
@@ -2525,55 +2537,83 @@ function RequestsTab({
       />
     );
   }
+  const paymentByRequestId = new Map(
+    payments.filter((p) => p.request_id).map((p) => [p.request_id as string, p])
+  );
   return (
     <div className="space-y-3">
-      {requests.map((r) => (
-        <Card key={r.id}>
-          <div className="flex items-center justify-between">
-            <div>
-              {r.request_type === "checkin_call" ? (
-                <p className="text-xs font-medium text-rose">
-                  30-minute check-in call
+      {requests.map((r) => {
+        const linkedPayment =
+          r.request_type === "video_session" ? paymentByRequestId.get(r.id) : undefined;
+        return (
+          <Card key={r.id}>
+            <div className="flex items-center justify-between">
+              <div>
+                {r.request_type === "video_session" ? (
+                  <p className="text-xs font-medium text-rose">Video session</p>
+                ) : r.request_type === "checkin_call" ? (
+                  <p className="text-xs font-medium text-rose">
+                    30-minute check-in call
+                  </p>
+                ) : r.reschedule_from_date ? (
+                  <p className="text-xs font-medium text-rose">
+                    Reschedule from {r.reschedule_from_date} →
+                  </p>
+                ) : null}
+                <p className="font-medium text-ink">
+                  {r.preferred_date}
+                  {r.preferred_time ? ` at ${r.preferred_time}` : ""}
                 </p>
-              ) : r.reschedule_from_date ? (
-                <p className="text-xs font-medium text-rose">
-                  Reschedule from {r.reschedule_from_date} →
-                </p>
-              ) : null}
-              <p className="font-medium text-ink">
-                {r.preferred_date}
-                {r.preferred_time ? ` at ${r.preferred_time}` : ""}
-              </p>
-              {r.note ? (
-                <p className="mt-1 text-sm text-gray">{r.note}</p>
-              ) : null}
+                {r.note ? (
+                  <p className="mt-1 text-sm text-gray">{r.note}</p>
+                ) : null}
+              </div>
+              <div className="flex flex-col items-end gap-1">
+                <StatusBadge status={r.status} />
+                {linkedPayment ? (
+                  <Badge tone={linkedPayment.paid_on ? "green" : "gold"}>
+                    ${Number(linkedPayment.amount).toFixed(2)}{" "}
+                    {linkedPayment.paid_on ? "paid" : "unpaid"}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
-            <StatusBadge status={r.status} />
-          </div>
-          {r.status === "pending" ? (
-            <div className="mt-3 flex gap-2">
-              <form
-                action={async () => {
-                  "use server";
-                  await setRequestStatus(r.id, clientId, "confirmed");
-                }}
-              >
-                <Button type="submit">Confirm</Button>
-              </form>
-              <form
-                action={async () => {
-                  "use server";
-                  await setRequestStatus(r.id, clientId, "declined");
-                }}
-              >
-                <Button type="submit" variant="danger">
-                  Decline
-                </Button>
-              </form>
-            </div>
-          ) : null}
-        </Card>
-      ))}
+            {r.status === "pending" ? (
+              <div className="mt-3 flex gap-2">
+                {linkedPayment && !linkedPayment.paid_on ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await confirmVideoSessionRequest(r.id, clientId, linkedPayment.id);
+                    }}
+                  >
+                    <Button type="submit">Mark paid &amp; confirm</Button>
+                  </form>
+                ) : (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await setRequestStatus(r.id, clientId, "confirmed");
+                    }}
+                  >
+                    <Button type="submit">Confirm</Button>
+                  </form>
+                )}
+                <form
+                  action={async () => {
+                    "use server";
+                    await setRequestStatus(r.id, clientId, "declined");
+                  }}
+                >
+                  <Button type="submit" variant="danger">
+                    Decline
+                  </Button>
+                </form>
+              </div>
+            ) : null}
+          </Card>
+        );
+      })}
     </div>
   );
 }

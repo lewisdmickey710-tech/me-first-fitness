@@ -13,6 +13,7 @@ import {
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
 import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
+import { VIDEO_SESSION_RATE } from "@/lib/video-session";
 import type { PaymentSchedule } from "@/lib/types";
 
 export async function logCheckin(formData: FormData) {
@@ -169,17 +170,27 @@ export async function submitRequest(formData: FormData) {
   const note = String(formData.get("note") ?? "").trim();
   const reschedule_from_date =
     String(formData.get("reschedule_from_date") ?? "").trim() || null;
+  const requestTypeRaw = String(formData.get("request_type") ?? "session");
   const request_type =
-    String(formData.get("request_type") ?? "session") === "checkin_call"
-      ? "checkin_call"
+    requestTypeRaw === "checkin_call" || requestTypeRaw === "video_session"
+      ? requestTypeRaw
       : "session";
 
   const backTo = (error: string) => {
     const params = new URLSearchParams({ error });
     if (reschedule_from_date) params.set("reschedule_from", reschedule_from_date);
-    const base = request_type === "checkin_call" ? "/client/checkin-call" : "/client/request";
+    const base =
+      request_type === "checkin_call"
+        ? "/client/checkin-call"
+        : request_type === "video_session"
+          ? "/client/video-session"
+          : "/client/request";
     return `${base}?${params.toString()}`;
   };
+
+  if (request_type === "video_session" && !me.video_sessions_enabled) {
+    redirect(backTo("Video sessions aren't enabled on your profile -- ask Mickey."));
+  }
 
   if (!preferred_date) {
     redirect(backTo("Preferred date is required."));
@@ -287,17 +298,38 @@ export async function submitRequest(formData: FormData) {
       }
     }
 
-    const { error } = await supabase.from("requests").insert({
-      client_id: me.id,
-      preferred_date: businessDate,
-      preferred_time: businessTime || null,
-      note: note || null,
-      reschedule_from_date,
-      request_type,
-      status: "pending",
-    });
+    const { data: newRequest, error } = await supabase
+      .from("requests")
+      .insert({
+        client_id: me.id,
+        preferred_date: businessDate,
+        preferred_time: businessTime || null,
+        note: note || null,
+        reschedule_from_date,
+        request_type,
+        status: "pending",
+      })
+      .select("id")
+      .single();
 
     if (error) throw new Error(error.message);
+
+    // A video session isn't invoiced after the fact like a normal session
+    // -- it's paid up front, and the coach only confirms the timeslot once
+    // that balance is marked paid. The RLS policy backing this insert
+    // pins kind/amount/request_id so a client can't create anything else
+    // through this path.
+    if (request_type === "video_session") {
+      const { error: paymentError } = await supabase.from("payments").insert({
+        client_id: me.id,
+        description: `Video session — ${businessDate}${businessTime ? ` at ${businessTime}` : ""}`,
+        amount: VIDEO_SESSION_RATE,
+        due_date: businessDate,
+        kind: "session",
+        request_id: newRequest.id,
+      });
+      if (paymentError) throw new Error(paymentError.message);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong.";
     redirect(backTo(message));

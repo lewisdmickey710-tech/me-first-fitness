@@ -4,7 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
-import { formatScheduleForClient, nextSessionFromSchedules } from "@/lib/schedule";
+import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
 import { toDateString } from "@/lib/timezone";
 import type {
   BusinessSettings,
@@ -17,6 +17,7 @@ import type {
   ClientSchedule,
   LegalDocument,
   Payment,
+  SessionOccurrence,
   SessionRequest,
   TrainingSession,
 } from "@/lib/types";
@@ -41,6 +42,7 @@ export default async function ClientDashboard() {
     { data: careProfile },
     currentPhase,
     { data: schedules },
+    { data: occurrences },
     { data: payments },
     { data: documents },
     { data: acks },
@@ -71,6 +73,10 @@ export default async function ClientDashboard() {
       .select("*")
       .eq("client_id", me.id)
       .eq("active", true) as unknown as Promise<{ data: ClientSchedule[] | null }>,
+    supabase
+      .from("session_occurrences")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{ data: SessionOccurrence[] | null }>,
     supabase
       .from("payments")
       .select("*")
@@ -116,7 +122,7 @@ export default async function ClientDashboard() {
         .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
     ]);
 
-  const nextSession = nextSessionFromSchedules(schedules ?? []);
+  const nextSession = nextSessionForClient(schedules ?? [], occurrences ?? []);
   const nextDue = payments?.[0] ?? null;
   const hasUnpaidLateFee = (payments ?? []).some(
     (p) => p.kind === "late_cancellation_fee"
@@ -215,6 +221,9 @@ export default async function ClientDashboard() {
         <QuickAction href="/client/documents" label="Documents" />
         <QuickAction href="/client/plan" label="Payment plan" />
         <QuickAction href="/client/checkin-call" label="Book a check-in call" />
+        {me.video_sessions_enabled ? (
+          <QuickAction href="/client/video-session" label="Book a video session" />
+        ) : null}
       </div>
 
       {me.hold_started_at ? (
@@ -239,7 +248,39 @@ export default async function ClientDashboard() {
           </p>
           <PaymentMethods settings={businessSettings} />
         </Card>
-      ) : me.session_mode === "virtual_async" ? (
+      ) : nextSession ? (
+        <Card>
+          <p className="text-sm font-medium text-gray">Next session</p>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {nextSession.timeOfDay
+              ? formatScheduleForClient(nextSession.date, nextSession.timeOfDay, me.timezone)
+              : nextSession.date}
+            {nextSession.label ? ` · ${nextSession.label}` : ""}
+          </p>
+          {nextSession.isVideoSession ? (
+            businessSettings?.google_meet_link ? (
+              <a
+                href={businessSettings.google_meet_link}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                Join video call →
+              </a>
+            ) : (
+              <p className="mt-1 text-sm text-gray">
+                This is a video session — Mickey will share the call link.
+              </p>
+            )
+          ) : null}
+          <Link
+            href="/client/schedule"
+            className="mt-2 inline-block text-sm text-rose hover:underline"
+          >
+            View your schedule →
+          </Link>
+        </Card>
+      ) : me.session_mode === "virtual" ? (
         <Card>
           <p className="text-sm font-medium text-gray">Program</p>
           <p className="mt-1 text-lg font-semibold text-ink">
@@ -248,29 +289,17 @@ export default async function ClientDashboard() {
               : "Not updated yet"}
           </p>
           <p className="mt-1 text-sm text-gray">
-            No standing session calls on this plan — Mickey updates your
-            program directly on her own cadence. Need dedicated time to
-            talk something through? Book a check-in call above.
+            No session booked right now — Mickey updates your program
+            directly on her own cadence.
+            {me.video_sessions_enabled
+              ? " Want a video session or a check-in call? Book one above."
+              : " Need dedicated time to talk something through? Book a check-in call above."}
           </p>
           <Link
             href="/client/program"
             className="mt-2 inline-block text-sm text-rose hover:underline"
           >
             View your program →
-          </Link>
-        </Card>
-      ) : nextSession ? (
-        <Card>
-          <p className="text-sm font-medium text-gray">Next session</p>
-          <p className="mt-1 text-lg font-semibold text-ink">
-            {formatScheduleForClient(nextSession.date, nextSession.timeOfDay, me.timezone)}
-            {nextSession.label ? ` · ${nextSession.label}` : ""}
-          </p>
-          <Link
-            href="/client/schedule"
-            className="mt-2 inline-block text-sm text-rose hover:underline"
-          >
-            View your schedule →
           </Link>
         </Card>
       ) : null}

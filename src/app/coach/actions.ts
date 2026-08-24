@@ -109,7 +109,7 @@ export async function setRequestStatus(
     .from("requests")
     .update({ status })
     .eq("id", requestId)
-    .select("preferred_date, preferred_time, reschedule_from_date")
+    .select("preferred_date, preferred_time, reschedule_from_date, request_type")
     .single();
 
   if (error) throw new Error(error.message);
@@ -149,6 +149,7 @@ export async function setRequestStatus(
           notes: request.preferred_time
             ? `Confirmed request — ${request.preferred_time}`
             : "Confirmed request",
+          is_video_session: request.request_type === "video_session",
         },
         { onConflict: "client_id,occurrence_date" }
       );
@@ -160,6 +161,19 @@ export async function setRequestStatus(
   revalidatePath("/coach/schedule");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
+}
+
+// A video session request's timeslot is only meant to be confirmed once
+// its linked payment balance is actually paid -- this just runs the two
+// existing actions together so the coach does it in one motion instead of
+// two separate ones that could be done out of order.
+export async function confirmVideoSessionRequest(
+  requestId: string,
+  clientId: string,
+  paymentId: string
+) {
+  await markPaymentPaid(paymentId, clientId);
+  await setRequestStatus(requestId, clientId, "confirmed");
 }
 
 export async function logSession(clientId: string, formData: FormData) {
@@ -476,6 +490,7 @@ export async function updatePaymentMethods(formData: FormData) {
       cash_app_cashtag: textOrNull("cash_app_cashtag"),
       zelle_info: textOrNull("zelle_info"),
       cash_note: textOrNull("cash_note"),
+      google_meet_link: textOrNull("google_meet_link"),
       updated_at: new Date().toISOString(),
     })
     .eq("id", true);
@@ -701,6 +716,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       start_date: textOrNull("start_date"),
       payment_schedule: payment_schedule || null,
       session_mode: session_mode || null,
+      video_sessions_enabled: formData.get("video_sessions_enabled") === "on",
       primary_goal: textOrNull("primary_goal"),
       secondary_goal: textOrNull("secondary_goal"),
       key_health_notes: textOrNull("key_health_notes"),

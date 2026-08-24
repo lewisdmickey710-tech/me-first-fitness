@@ -125,12 +125,19 @@ export default async function ClientSchedulePage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
-  const { data: monthOccurrences } = await supabase
-    .from("session_occurrences")
-    .select("*")
-    .eq("client_id", me.id)
-    .gte("occurrence_date", firstDateStr)
-    .lte("occurrence_date", lastDateStr);
+  const [{ data: monthOccurrences }, { data: businessSettings }] = await Promise.all([
+    supabase
+      .from("session_occurrences")
+      .select("*")
+      .eq("client_id", me.id)
+      .gte("occurrence_date", firstDateStr)
+      .lte("occurrence_date", lastDateStr),
+    supabase
+      .from("business_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle() as unknown as Promise<{ data: BusinessSettings | null }>,
+  ]);
 
   const occurrenceByDate = new Map<string, SessionOccurrence>();
   for (const o of monthOccurrences ?? []) {
@@ -298,6 +305,24 @@ export default async function ClientSchedulePage({
 
           {selectedCell.status === null ? (
             <p className="text-sm text-gray">Nothing on the schedule this day.</p>
+          ) : null}
+
+          {selectedCell.status === "scheduled" &&
+          (selectedOccurrence?.is_video_session ?? me.session_mode === "virtual") ? (
+            businessSettings?.google_meet_link ? (
+              <a
+                href={businessSettings.google_meet_link}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                Join video call →
+              </a>
+            ) : (
+              <p className="text-sm text-gray">
+                This is a video session — Mickey will share the call link.
+              </p>
+            )
           ) : null}
 
           {selectedCell.status === "cancelled" &&

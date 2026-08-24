@@ -131,9 +131,7 @@ export default async function CoachSignupsPage() {
                       </label>
                       <Select name="session_mode" defaultValue="in_person">
                         <option value="in_person">In-person</option>
-                        <option value="virtual">Virtual</option>
-                        <option value="mixed">Mixed</option>
-                        <option value="virtual_async">Fully virtual — async</option>
+                        <option value="virtual">Virtual (async programming)</option>
                       </Select>
                     </div>
                   </div>

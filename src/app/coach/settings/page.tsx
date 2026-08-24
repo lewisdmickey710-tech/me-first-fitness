@@ -65,6 +65,20 @@ export default async function CoachSettingsPage() {
               placeholder="e.g. In person at your next session"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Google Meet link
+            </label>
+            <Input
+              name="google_meet_link"
+              defaultValue={settings?.google_meet_link ?? ""}
+              placeholder="https://meet.google.com/..."
+            />
+            <p className="mt-1 text-xs text-gray">
+              Your persistent room link — shown to a client once their
+              video session is confirmed, so they can click straight in.
+            </p>
+          </div>
           <Button type="submit">Save</Button>
         </form>
       </Card>

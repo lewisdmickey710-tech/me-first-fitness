@@ -67,51 +67,13 @@ export function formatTimeOfDayForClient(
   return `${formatTimeOfDay(converted.time)} ${timezoneLabel(clientTz)}`;
 }
 
-/**
- * The next date (business-tz "today" counts) on which `dayOfWeek` occurs,
- * as a YYYY-MM-DD string.
- */
-export function nextOccurrenceDate(
-  dayOfWeek: number,
-  from: Date = nowInBusinessTz()
-): string {
-  const daysUntil = (dayOfWeek - from.getUTCDay() + 7) % 7;
-  const next = new Date(from);
-  next.setUTCDate(next.getUTCDate() + daysUntil);
-  return next.toISOString().slice(0, 10);
-}
-
-export interface NextSession {
-  date: string;
-  dayOfWeek: number;
-  timeOfDay: string;
-  label: string | null;
-}
-
-/** Picks the single soonest upcoming occurrence across a client's active schedules. */
-export function nextSessionFromSchedules(
-  schedules: { day_of_week: number; time_of_day: string; label: string | null; active: boolean }[]
-): NextSession | null {
-  const now = nowInBusinessTz();
-  const candidates = schedules
-    .filter((s) => s.active)
-    .map((s) => ({
-      date: nextOccurrenceDate(s.day_of_week, now),
-      dayOfWeek: s.day_of_week,
-      timeOfDay: s.time_of_day,
-      label: s.label,
-    }));
-  if (candidates.length === 0) return null;
-  candidates.sort((a, b) => a.date.localeCompare(b.date));
-  return candidates[0];
-}
-
 export interface NextSessionForClient {
   date: string;
   dayOfWeek: number;
   timeOfDay: string | null;
   label: string | null;
   isOneOff: boolean;
+  isVideoSession: boolean;
 }
 
 /**
@@ -123,7 +85,12 @@ export interface NextSessionForClient {
  */
 export function nextSessionForClient(
   schedules: { day_of_week: number; time_of_day: string; label: string | null; active: boolean }[],
-  occurrences: { occurrence_date: string; status: string; notes?: string | null }[],
+  occurrences: {
+    occurrence_date: string;
+    status: string;
+    notes?: string | null;
+    is_video_session?: boolean;
+  }[],
   from: Date = nowInBusinessTz()
 ): NextSessionForClient | null {
   const todayStr = toDateString(from);
@@ -147,6 +114,7 @@ export function nextSessionForClient(
         timeOfDay: s.time_of_day,
         label: s.label,
         isOneOff: false,
+        isVideoSession: occByDate.get(dateStr)?.is_video_session ?? false,
       });
       break;
     }
@@ -164,6 +132,7 @@ export function nextSessionForClient(
       timeOfDay: timeMatch?.[1] ?? null,
       label: null,
       isOneOff: true,
+      isVideoSession: o.is_video_session ?? false,
     });
   }
 

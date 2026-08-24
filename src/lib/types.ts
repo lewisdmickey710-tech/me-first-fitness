@@ -19,7 +19,8 @@ export interface Client {
   user_id: string | null;
   care_profile_id: string | null;
   days_per_week: number | null;
-  session_mode: "in_person" | "virtual" | "mixed" | "virtual_async" | null;
+  session_mode: "in_person" | "virtual" | null;
+  video_sessions_enabled: boolean;
   last_inactivity_nudge_sent_at: string | null;
   preferred_name: string | null;
   date_of_birth: string | null;
@@ -103,6 +104,7 @@ export interface BusinessSettings {
   cash_app_cashtag: string | null;
   zelle_info: string | null;
   cash_note: string | null;
+  google_meet_link: string | null;
   updated_at: string;
 }
 
@@ -143,7 +145,7 @@ export interface Activity {
 
 export type RequestStatus = "pending" | "confirmed" | "declined";
 
-export type RequestType = "session" | "checkin_call";
+export type RequestType = "session" | "checkin_call" | "video_session";
 
 export interface SessionRequest {
   id: string;
@@ -349,6 +351,7 @@ export interface Payment {
   reminder_sent_at: string | null;
   kind: PaymentKind;
   session_occurrence_id: string | null;
+  request_id: string | null;
   created_at: string;
 }
 
@@ -369,6 +372,7 @@ export interface SessionOccurrence {
   notes: string | null;
   reminder_sent_at: string | null;
   cancelled_by: "coach" | "client" | null;
+  is_video_session: boolean;
   created_at: string;
 }
 

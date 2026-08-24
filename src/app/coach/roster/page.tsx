@@ -132,17 +132,19 @@ export default async function RosterPage({
 
   const pendingRequestsByClient = new Map<
     string,
-    { total: number; reschedules: number; checkinCalls: number }
+    { total: number; reschedules: number; checkinCalls: number; videoSessions: number }
   >();
   for (const r of pendingRequests ?? []) {
     const cur = pendingRequestsByClient.get(r.client_id) ?? {
       total: 0,
       reschedules: 0,
       checkinCalls: 0,
+      videoSessions: 0,
     };
     cur.total += 1;
     if (r.reschedule_from_date) cur.reschedules += 1;
     if (r.request_type === "checkin_call") cur.checkinCalls += 1;
+    if (r.request_type === "video_session") cur.videoSessions += 1;
     pendingRequestsByClient.set(r.client_id, cur);
   }
 
@@ -442,7 +444,10 @@ export default async function RosterPage({
             const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
             const reqs = pendingRequestsByClient.get(client.id);
             const newRequests =
-              (reqs?.total ?? 0) - (reqs?.reschedules ?? 0) - (reqs?.checkinCalls ?? 0);
+              (reqs?.total ?? 0) -
+              (reqs?.reschedules ?? 0) -
+              (reqs?.checkinCalls ?? 0) -
+              (reqs?.videoSessions ?? 0);
             const needsWindow =
               inWindow &&
               (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
@@ -481,6 +486,13 @@ export default async function RosterPage({
                 reqs!.checkinCalls === 1
                   ? "Check-in call requested"
                   : `Check-in call requested (${reqs!.checkinCalls})`
+              );
+            }
+            if ((reqs?.videoSessions ?? 0) > 0) {
+              flags.push(
+                reqs!.videoSessions === 1
+                  ? "Video session requested"
+                  : `Video session requested (${reqs!.videoSessions})`
               );
             }
             if (client.hold_started_at) flags.push("On hold");
