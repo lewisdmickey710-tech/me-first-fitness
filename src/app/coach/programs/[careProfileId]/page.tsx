@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
-import { saveProgramDay, uploadCareProfilePacket } from "@/app/coach/programs/actions";
+import { saveProgramDay } from "@/app/coach/programs/actions";
 import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui";
+import { PacketUploadSlot } from "./PacketUploadSlot";
 import { PHASES } from "@/lib/constants";
 import type {
   CareProfile,
@@ -119,7 +120,6 @@ export default async function CareProfileProgramPage({
   const daysByNumber = new Map((days ?? []).map((d) => [d.day_number, d]));
   const packetByPhase = new Map((packets ?? []).map((p) => [p.phase, p]));
   const uploadedPhaseCount = packetByPhase.size;
-  const currentPhasePacket = packetByPhase.get(phase as CareProfilePacket["phase"]);
 
   return (
     <div className="space-y-6">
@@ -140,36 +140,15 @@ export default async function CareProfileProgramPage({
           phase. You won&apos;t be able to confirm a lead&apos;s packet
           request by email until all 4 are here.
         </p>
-        <div className="border-t border-grayLt pt-3">
-          <p className="text-sm font-medium text-ink">
-            Phase {phase}{" "}
-            {currentPhasePacket ? (
-              <span className="font-normal text-gray">— uploaded</span>
-            ) : (
-              <span className="font-normal text-gray">— nothing uploaded</span>
-            )}
-          </p>
-          <form
-            action={async (formData: FormData) => {
-              "use server";
-              await uploadCareProfilePacket(careProfileId, phase, formData);
-            }}
-            className="mt-2 flex items-center gap-2"
-          >
-            <input
-              type="file"
-              name="packet"
-              accept="application/pdf"
-              required
-              className="text-sm text-ink"
+        <div className="grid grid-cols-2 gap-2 border-t border-grayLt pt-3 sm:grid-cols-4">
+          {(["1", "2", "3", "4"] as const).map((p) => (
+            <PacketUploadSlot
+              key={p}
+              careProfileId={careProfileId}
+              phase={p}
+              uploaded={packetByPhase.has(p)}
             />
-            <Button type="submit" variant="secondary">
-              {currentPhasePacket ? "Replace" : "Upload"}
-            </Button>
-          </form>
-          <p className="mt-1 text-xs text-gray">
-            Switch phase tabs below to upload the other phases.
-          </p>
+          ))}
         </div>
       </Card>
 
