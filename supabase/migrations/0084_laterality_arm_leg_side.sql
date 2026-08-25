@@ -4,12 +4,13 @@
 -- leg-led, e.g. side plank, bird dog). Lets the app append that to a
 -- prescribed rep count automatically instead of a coach retyping it
 -- into every phase of every program that uses the movement.
+-- Drop the old constraint before reclassifying rows -- 'unilateral' isn't
+-- a value the new constraint (below) will allow, so if a check constraint
+-- is in place while the UPDATE runs, Postgres validates every existing
+-- row against it immediately and the whole migration fails before the
+-- data's even been touched.
 alter table public.exercises
   drop constraint if exists exercises_laterality_check;
-
-alter table public.exercises
-  add constraint exercises_laterality_check
-    check (laterality in ('bilateral', 'per_arm', 'per_leg', 'per_side'));
 
 -- Best-effort reclassification of every already-unilateral exercise --
 -- name keywords first (most reliable signal, e.g. "Single Arm", "Split
@@ -31,3 +32,9 @@ set laterality = case
   else 'per_side'
 end
 where laterality = 'unilateral';
+
+-- Now that no row can still be 'unilateral', the new constraint validates
+-- cleanly against the reclassified data.
+alter table public.exercises
+  add constraint exercises_laterality_check
+    check (laterality in ('bilateral', 'per_arm', 'per_leg', 'per_side'));
