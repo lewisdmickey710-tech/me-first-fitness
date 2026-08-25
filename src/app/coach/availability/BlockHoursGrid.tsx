@@ -280,7 +280,7 @@ export function BlockHoursGrid({
                           ? booking.clientName
                           : formatTimeOfDay(BOUNDARIES[slot])
                     }
-                    className={`w-full border-x border-grayLt text-[9px] leading-none ${text} ${bg} ${
+                    className={`block w-full border-x border-grayLt text-[9px] leading-none ${text} ${bg} ${
                       hourLine ? "border-t border-t-grayLt" : "border-t border-t-grayLt/30"
                     }`}
                     style={{ height: 20 }}
