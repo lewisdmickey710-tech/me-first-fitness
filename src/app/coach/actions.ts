@@ -10,6 +10,7 @@ import {
   sendCoachCancelledSessionEmail,
   sendDayBlockedEmail,
   sendRequestCounteredEmail,
+  sendSessionRescheduledEmail,
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -224,6 +225,87 @@ export async function counterRequest(
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/schedule");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
+}
+
+// Dragging an already-booked session to a different slot on the schedule
+// grid moves it -- a one-time exception for that date, same mechanism
+// coachCancelSession already uses, so a client's standing recurring time
+// (client_schedules) is left untouched and this doesn't silently change
+// every future week. If the drop lands on the same date the session was
+// already on, there's no separate "origin" occurrence to mark -- just
+// update that one row's time directly.
+export async function coachRescheduleSession(
+  clientId: string,
+  fromDate: string,
+  toDate: string,
+  toTime: string,
+  durationMinutes: number
+) {
+  const supabase = await createClient();
+
+  if (fromDate === toDate) {
+    const { error } = await supabase.from("session_occurrences").upsert(
+      {
+        client_id: clientId,
+        occurrence_date: toDate,
+        status: "scheduled",
+        notes: `Confirmed request — ${toTime}`,
+        duration_minutes: durationMinutes,
+      },
+      { onConflict: "client_id,occurrence_date" }
+    );
+    if (error) throw new Error(error.message);
+  } else {
+    const { error: fromError } = await supabase.from("session_occurrences").upsert(
+      {
+        client_id: clientId,
+        occurrence_date: fromDate,
+        status: "rescheduled",
+        rescheduled_to_date: toDate,
+      },
+      { onConflict: "client_id,occurrence_date" }
+    );
+    if (fromError) throw new Error(fromError.message);
+
+    const { error: toError } = await supabase.from("session_occurrences").upsert(
+      {
+        client_id: clientId,
+        occurrence_date: toDate,
+        status: "scheduled",
+        notes: `Confirmed request — ${toTime}`,
+        duration_minutes: durationMinutes,
+      },
+      { onConflict: "client_id,occurrence_date" }
+    );
+    if (toError) throw new Error(toError.message);
+  }
+
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name, user_id")
+      .eq("id", clientId)
+      .single();
+    if (client) {
+      const email = await clientLoginEmail(client.user_id);
+      if (email) {
+        await sendSessionRescheduledEmail(
+          email,
+          client.name,
+          fromDate,
+          `${toDate} at ${formatTimeOfDay(toTime)}`
+        );
+      }
+    }
+  } catch (emailError) {
+    console.error("Failed to send session-rescheduled email", emailError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
+  revalidatePath("/coach/availability");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
 }

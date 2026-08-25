@@ -305,6 +305,31 @@ export async function sendBlockedDatesReminderEmail(
   });
 }
 
+export async function sendSessionRescheduledEmail(
+  to: string,
+  clientName: string,
+  fromDateStr: string,
+  toWhenText: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping session-rescheduled email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Your session time has changed",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>I moved your session on <strong>${formatBlockedDate(fromDateStr)}</strong> to:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${toWhenText}</strong>
+      </p>
+      <p>Nothing you need to do — just wanted you to have the new time. Reach out if it doesn't work for you.</p>
+    `),
+  });
+}
+
 export async function sendRequestCounteredEmail(
   to: string,
   clientName: string,

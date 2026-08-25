@@ -3,7 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { setRequestStatus, counterRequest } from "@/app/coach/actions";
+import {
+  setRequestStatus,
+  counterRequest,
+  coachRescheduleSession,
+} from "@/app/coach/actions";
 import { Button } from "@/components/ui";
 import { formatTimeOfDay } from "@/lib/schedule";
 
@@ -21,9 +25,20 @@ const BOUNDARIES: string[] = Array.from({ length: SLOT_COUNT + 1 }, (_, i) => {
 });
 
 interface DayBooking {
+  clientId: string;
   date: string;
   timeOfDay: string;
   clientName: string;
+  durationMinutes: number;
+}
+
+interface PendingReschedule {
+  clientId: string;
+  clientName: string;
+  fromDate: string;
+  fromTime: string;
+  toDate: string;
+  toTime: string;
   durationMinutes: number;
 }
 
@@ -93,6 +108,10 @@ export function ScheduleGrid({
   const [isPending, startTransition] = useTransition();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [dragRequestId, setDragRequestId] = useState<string | null>(null);
+  const [dragBooking, setDragBooking] = useState<DayBooking | null>(null);
+  const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   const norm = (t: string) => t.slice(0, 5);
@@ -201,6 +220,79 @@ export function ScheduleGrid({
     });
   }
 
+  function bookingsForDay(date: string): DayBooking[] {
+    return bookings.filter((b) => b.date === date);
+  }
+
+  // Pixel geometry (in the same 20px-per-15-min-slot units the grid
+  // already uses) for a single merged booking block, clamped to the
+  // visible HOUR_START-HOUR_END window so a session starting or ending
+  // outside it doesn't overflow the day column.
+  function bookingGeometry(b: DayBooking): { top: number; height: number } | null {
+    const startSlot = Math.round((toMinutes(b.timeOfDay) - HOUR_START * 60) / STEP_MIN);
+    const spanSlots = Math.max(1, Math.round(b.durationMinutes / STEP_MIN));
+    const start = Math.max(0, Math.min(startSlot, SLOT_COUNT));
+    const end = Math.max(0, Math.min(startSlot + spanSlots, SLOT_COUNT));
+    if (end <= start) return null;
+    return { top: start * 20, height: (end - start) * 20 };
+  }
+
+  function proposeReschedule(b: DayBooking, date: string, slot: number) {
+    if (date < todayStr) {
+      setError("Can't move a session into the past — pick a date from today onward.");
+      return;
+    }
+    const spanSlots = Math.max(1, Math.round(b.durationMinutes / STEP_MIN));
+    if (slot + spanSlots > SLOT_COUNT) {
+      setError("That session wouldn't fit in the visible hours — pick an earlier start.");
+      return;
+    }
+    for (let i = 0; i < spanSlots; i++) {
+      const blocked = blockAt(date, slot + i);
+      const existing = bookingAt(date, slot + i);
+      const isOwnSlot = existing && existing.clientId === b.clientId && existing.date === b.date;
+      if (blocked || (existing && !isOwnSlot)) {
+        setError("That time is already blocked or booked — pick another slot.");
+        return;
+      }
+    }
+    const toTime = BOUNDARIES[slot];
+    if (date === b.date && toTime === norm(b.timeOfDay)) {
+      setDragBooking(null);
+      return;
+    }
+    setPendingReschedule({
+      clientId: b.clientId,
+      clientName: b.clientName,
+      fromDate: b.date,
+      fromTime: b.timeOfDay,
+      toDate: date,
+      toTime,
+      durationMinutes: b.durationMinutes,
+    });
+    setDragBooking(null);
+  }
+
+  function confirmReschedule() {
+    if (!pendingReschedule) return;
+    const r = pendingReschedule;
+    startTransition(async () => {
+      try {
+        await coachRescheduleSession(
+          r.clientId,
+          r.fromDate,
+          r.toDate,
+          r.toTime,
+          r.durationMinutes
+        );
+        setPendingReschedule(null);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't move that session.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -216,7 +308,9 @@ export function ScheduleGrid({
       <p className="text-xs text-gray">
         Tap a purple request to accept or decline it. Drag it to a different
         slot to propose that time instead — your client can then accept it
-        or send a new request.
+        or send a new request. Drag a booked (pink) session to a different
+        slot to reschedule it — you&apos;ll be asked to confirm before it
+        moves, and your client gets an email with the new time.
       </p>
 
       {unscheduledRequests.length > 0 ? (
@@ -225,7 +319,10 @@ export function ScheduleGrid({
             <div
               key={r.id}
               draggable={r.status === "pending"}
-              onDragStart={() => setDragRequestId(r.id)}
+              onDragStart={() => {
+                setDragRequestId(r.id);
+                setDragBooking(null);
+              }}
               onClick={() => selectRequest(r)}
               title={
                 r.status === "countered"
@@ -277,7 +374,7 @@ export function ScheduleGrid({
             >
               {day.label}
             </div>
-            <div>
+            <div className="relative">
               {Array.from({ length: SLOT_COUNT }, (_, slot) => {
                 const block = blockAt(day.date, slot);
                 const booking = bookingAt(day.date, slot);
@@ -288,7 +385,6 @@ export function ScheduleGrid({
 
                 let bg = available ? "bg-teal/45" : "bg-white";
                 let text = "text-ink";
-                if (booking) bg = "bg-pink/30";
                 if (req) bg = req.status === "countered" ? "bg-purple/15" : "bg-purple/50";
                 if (block) {
                   bg = "bg-pink";
@@ -302,15 +398,24 @@ export function ScheduleGrid({
                     type="button"
                     disabled={isPending}
                     draggable={!!req && req.status === "pending"}
-                    onDragStart={() => req && setDragRequestId(req.id)}
+                    onDragStart={() => {
+                      if (req) {
+                        setDragRequestId(req.id);
+                        setDragBooking(null);
+                      }
+                    }}
                     onDragOver={(e) => {
-                      if (dragRequestId) e.preventDefault();
+                      if (dragRequestId || dragBooking) e.preventDefault();
                     }}
                     onDrop={(e) => {
                       e.preventDefault();
-                      const draggedReq = requests.find((r) => r.id === dragRequestId);
-                      setDragRequestId(null);
-                      if (draggedReq) proposeTime(draggedReq, day.date, slot);
+                      if (dragRequestId) {
+                        const draggedReq = requests.find((r) => r.id === dragRequestId);
+                        setDragRequestId(null);
+                        if (draggedReq) proposeTime(draggedReq, day.date, slot);
+                      } else if (dragBooking) {
+                        proposeReschedule(dragBooking, day.date, slot);
+                      }
                     }}
                     onClick={() => (req ? selectRequest(req) : undefined)}
                     title={
@@ -331,12 +436,35 @@ export function ScheduleGrid({
                   >
                     {block
                       ? ""
-                      : booking && norm(booking.timeOfDay) === BOUNDARIES[slot]
-                        ? initials(booking.clientName)
-                        : req && req.time && norm(req.time) === BOUNDARIES[slot]
-                          ? initials(req.clientName)
-                          : ""}
+                      : req && req.time && norm(req.time) === BOUNDARIES[slot]
+                        ? initials(req.clientName)
+                        : ""}
                   </button>
+                );
+              })}
+
+              {bookingsForDay(day.date).map((b) => {
+                const geometry = bookingGeometry(b);
+                if (!geometry) return null;
+                const movable = day.date >= todayStr;
+                return (
+                  <div
+                    key={`${b.clientId}-${b.timeOfDay}`}
+                    draggable={movable}
+                    onDragStart={() => {
+                      setDragBooking(b);
+                      setDragRequestId(null);
+                    }}
+                    title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
+                      movable ? " · drag to reschedule" : ""
+                    }`}
+                    className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border border-pink/60 bg-pink/40 text-[9px] font-medium leading-none text-ink ${
+                      movable ? "cursor-grab active:cursor-grabbing" : ""
+                    }`}
+                    style={{ top: geometry.top, height: geometry.height }}
+                  >
+                    {initials(b.clientName)}
+                  </div>
                 );
               })}
             </div>
@@ -394,6 +522,32 @@ export function ScheduleGrid({
             Or drag this request to a different slot on the grid to propose
             that time instead.
           </p>
+        </div>
+      ) : null}
+
+      {pendingReschedule ? (
+        <div className="space-y-2 rounded-xl border border-pink/50 bg-pink/10 p-3">
+          <p className="text-sm font-medium text-ink">
+            Move {pendingReschedule.clientName}&apos;s session from{" "}
+            {pendingReschedule.fromDate} at {formatTimeOfDay(pendingReschedule.fromTime)}{" "}
+            to {pendingReschedule.toDate} at {formatTimeOfDay(pendingReschedule.toTime)}?
+          </p>
+          <p className="text-xs text-gray">
+            They&apos;ll get an email letting them know the new time.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" disabled={isPending} onClick={confirmReschedule}>
+              Confirm &amp; email them
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isPending}
+              onClick={() => setPendingReschedule(null)}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       ) : null}
 

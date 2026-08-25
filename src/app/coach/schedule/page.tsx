@@ -131,16 +131,16 @@ export default async function CoachSchedulePage({
     }>,
     supabase
       .from("session_occurrences")
-      .select("client_id, occurrence_date, notes, duration_minutes")
+      .select("client_id, occurrence_date, notes, duration_minutes, status")
       .gte("occurrence_date", weekStartStr)
-      .lte("occurrence_date", weekEndStr)
-      .eq("status", "scheduled") as unknown as Promise<{
+      .lte("occurrence_date", weekEndStr) as unknown as Promise<{
       data:
         | {
             client_id: string;
             occurrence_date: string;
             notes: string | null;
             duration_minutes: number;
+            status: string;
           }[]
         | null;
     }>,
@@ -162,7 +162,12 @@ export default async function CoachSchedulePage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
+  const weekOccByClientDate = new Map(
+    (weekOccurrences ?? []).map((o) => [`${o.client_id}:${o.occurrence_date}`, o])
+  );
+
   const weekBookings: {
+    clientId: string;
     date: string;
     timeOfDay: string;
     clientName: string;
@@ -170,7 +175,19 @@ export default async function CoachSchedulePage({
   }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
+      // A recurring day only shows as booked if nothing's overridden that
+      // specific date away from it -- otherwise a cancelled or rescheduled
+      // occurrence would still render pink here forever, since the
+      // recurring match itself never changes.
+      const override = weekOccByClientDate.get(`${s.client_id}:${day.date}`);
+      if (
+        override &&
+        ["cancelled", "late_cancelled", "rescheduled"].includes(override.status)
+      ) {
+        continue;
+      }
       weekBookings.push({
+        clientId: s.client_id,
         date: day.date,
         timeOfDay: s.time_of_day,
         clientName: s.clients!.name,
@@ -179,9 +196,11 @@ export default async function CoachSchedulePage({
     }
   }
   for (const o of weekOccurrences ?? []) {
+    if (o.status !== "scheduled") continue;
     const timeMatch = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
     if (!timeMatch) continue;
     weekBookings.push({
+      clientId: o.client_id,
       date: o.occurrence_date,
       timeOfDay: timeMatch[1],
       clientName: clientNameById.get(o.client_id) ?? "Client",
