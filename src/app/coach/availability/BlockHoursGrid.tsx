@@ -27,6 +27,12 @@ interface DayBooking {
   date: string;
   timeOfDay: string;
   clientName: string;
+  durationMinutes: number;
+}
+
+function toMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
 }
 
 interface BlockRow {
@@ -94,8 +100,14 @@ export function BlockHoursGrid({
   }
 
   function bookingAt(date: string, slot: number): DayBooking | null {
-    const t = BOUNDARIES[slot];
-    return bookings.find((b) => b.date === date && norm(b.timeOfDay) === t) ?? null;
+    const t = toMinutes(BOUNDARIES[slot]);
+    return (
+      bookings.find((b) => {
+        if (b.date !== date) return false;
+        const start = toMinutes(b.timeOfDay);
+        return t >= start && t < start + b.durationMinutes;
+      }) ?? null
+    );
   }
 
   function initials(name: string): string {
@@ -285,7 +297,9 @@ export function BlockHoursGrid({
                     }`}
                     style={{ height: 20 }}
                   >
-                    {booking && !block ? initials(booking.clientName) : ""}
+                    {booking && !block && norm(booking.timeOfDay) === BOUNDARIES[slot]
+                      ? initials(booking.clientName)
+                      : ""}
                   </button>
                 );
               })}

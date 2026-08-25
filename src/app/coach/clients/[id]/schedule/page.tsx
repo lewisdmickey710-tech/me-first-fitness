@@ -55,6 +55,11 @@ export default async function ClientSchedulePage({
               <div>
                 <p className="font-medium text-ink">
                   {formatSchedule(s.day_of_week, s.time_of_day)}
+                  {s.duration_minutes !== 60 ? (
+                    <span className="ml-2 text-sm font-normal text-rose">
+                      {s.duration_minutes} min
+                    </span>
+                  ) : null}
                 </p>
                 {s.label ? (
                   <p className="text-sm text-gray">{s.label}</p>
@@ -97,6 +102,20 @@ export default async function ClientSchedulePage({
               </label>
               <Input name="time_of_day" type="time" required defaultValue="17:00" />
             </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Length
+            </label>
+            <Select name="duration_minutes" defaultValue="60">
+              <option value="60">60 minutes (standard)</option>
+              <option value="30">30 minutes (negotiated only)</option>
+            </Select>
+            <p className="mt-1 text-xs text-gray">
+              30 minutes is a backup option for a specific arrangement, not
+              something offered by default — only pick it if you&apos;ve
+              actually agreed to it with this client.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">

@@ -87,11 +87,18 @@ export default async function CoachAvailabilityPage({
       .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
     supabase
       .from("session_occurrences")
-      .select("client_id, occurrence_date, notes")
+      .select("client_id, occurrence_date, notes, duration_minutes")
       .gte("occurrence_date", weekStartStr)
       .lte("occurrence_date", weekEndStr)
       .eq("status", "scheduled") as unknown as Promise<{
-      data: { client_id: string; occurrence_date: string; notes: string | null }[] | null;
+      data:
+        | {
+            client_id: string;
+            occurrence_date: string;
+            notes: string | null;
+            duration_minutes: number;
+          }[]
+        | null;
     }>,
     supabase.from("clients").select("id, name") as unknown as Promise<{
       data: { id: string; name: string }[] | null;
@@ -115,13 +122,19 @@ export default async function CoachAvailabilityPage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
-  const bookings: { date: string; timeOfDay: string; clientName: string }[] = [];
+  const bookings: {
+    date: string;
+    timeOfDay: string;
+    clientName: string;
+    durationMinutes: number;
+  }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
       bookings.push({
         date: day.date,
         timeOfDay: s.time_of_day,
         clientName: s.clients!.name,
+        durationMinutes: s.duration_minutes,
       });
     }
   }
@@ -132,6 +145,7 @@ export default async function CoachAvailabilityPage({
       date: o.occurrence_date,
       timeOfDay: timeMatch[1],
       clientName: clientNameById.get(o.client_id) ?? "Client",
+      durationMinutes: o.duration_minutes,
     });
   }
 

@@ -24,6 +24,12 @@ interface DayBooking {
   date: string;
   timeOfDay: string;
   clientName: string;
+  durationMinutes: number;
+}
+
+function toMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
 }
 
 interface BlockRow {
@@ -51,6 +57,7 @@ export interface RequestChip {
   clientName: string;
   date: string | null;
   time: string | null;
+  durationMinutes: number;
   status: "pending" | "countered";
 }
 
@@ -106,14 +113,24 @@ export function ScheduleGrid({
   }
 
   function bookingAt(date: string, slot: number): DayBooking | null {
-    const t = BOUNDARIES[slot];
-    return bookings.find((b) => b.date === date && norm(b.timeOfDay) === t) ?? null;
+    const t = toMinutes(BOUNDARIES[slot]);
+    return (
+      bookings.find((b) => {
+        if (b.date !== date) return false;
+        const start = toMinutes(b.timeOfDay);
+        return t >= start && t < start + b.durationMinutes;
+      }) ?? null
+    );
   }
 
   function requestAt(date: string, slot: number): RequestChip | null {
-    const t = BOUNDARIES[slot];
+    const t = toMinutes(BOUNDARIES[slot]);
     return (
-      requests.find((r) => r.date === date && r.time && norm(r.time) === t) ?? null
+      requests.find((r) => {
+        if (r.date !== date || !r.time) return false;
+        const start = toMinutes(r.time);
+        return t >= start && t < start + r.durationMinutes;
+      }) ?? null
     );
   }
 
@@ -162,9 +179,15 @@ export function ScheduleGrid({
   }
 
   function proposeTime(req: RequestChip, date: string, slot: number) {
-    if (blockAt(date, slot) || bookingAt(date, slot)) {
-      setError("That time is already blocked or booked — pick another slot.");
-      return;
+    // Check every slot the request's own duration would actually cover
+    // from this drop point, not just the one cell dropped on -- a
+    // 30-minute request dropped at 9:00 needs 9:00-9:15 both free.
+    const spanSlots = Math.max(1, Math.round(req.durationMinutes / STEP_MIN));
+    for (let i = 0; i < spanSlots; i++) {
+      if (blockAt(date, slot + i) || bookingAt(date, slot + i)) {
+        setError("That time is already blocked or booked — pick another slot.");
+        return;
+      }
     }
     const time = BOUNDARIES[slot];
     startTransition(async () => {
@@ -306,7 +329,13 @@ export function ScheduleGrid({
                     }`}
                     style={{ height: 20 }}
                   >
-                    {block ? "" : booking ? initials(booking.clientName) : req ? initials(req.clientName) : ""}
+                    {block
+                      ? ""
+                      : booking && norm(booking.timeOfDay) === BOUNDARIES[slot]
+                        ? initials(booking.clientName)
+                        : req && req.time && norm(req.time) === BOUNDARIES[slot]
+                          ? initials(req.clientName)
+                          : ""}
                   </button>
                 );
               })}

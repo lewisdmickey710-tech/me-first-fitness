@@ -110,7 +110,9 @@ export async function setRequestStatus(
     .from("requests")
     .update({ status })
     .eq("id", requestId)
-    .select("preferred_date, preferred_time, reschedule_from_date, request_type")
+    .select(
+      "preferred_date, preferred_time, reschedule_from_date, request_type, duration_minutes"
+    )
     .single();
 
   if (error) throw new Error(error.message);
@@ -151,6 +153,7 @@ export async function setRequestStatus(
             ? `Confirmed request — ${request.preferred_time}`
             : "Confirmed request",
           is_video_session: request.request_type === "video_session",
+          duration_minutes: request.duration_minutes,
         },
         { onConflict: "client_id,occurrence_date" }
       );
@@ -490,6 +493,8 @@ export async function addClientSchedule(clientId: string, formData: FormData) {
   const dayOfWeek = String(formData.get("day_of_week") ?? "");
   const timeOfDay = String(formData.get("time_of_day") ?? "");
   const label = String(formData.get("label") ?? "").trim();
+  const durationRaw = String(formData.get("duration_minutes") ?? "60");
+  const durationMinutes = durationRaw === "30" ? 30 : 60;
 
   if (dayOfWeek === "" || !timeOfDay) {
     throw new Error("Day and time are required.");
@@ -499,6 +504,7 @@ export async function addClientSchedule(clientId: string, formData: FormData) {
     client_id: clientId,
     day_of_week: Number(dayOfWeek),
     time_of_day: timeOfDay,
+    duration_minutes: durationMinutes,
     label: label || null,
   });
 

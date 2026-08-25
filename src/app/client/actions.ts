@@ -13,7 +13,7 @@ import {
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
 import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
-import { VIDEO_SESSION_RATE } from "@/lib/video-session";
+import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import type { PaymentSchedule } from "@/lib/types";
 
 export async function logCheckin(formData: FormData) {
@@ -159,6 +159,21 @@ export async function deleteProgressPhoto(photoId: string) {
   revalidatePath("/client/progress");
 }
 
+function toMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+// True if [aStart, aStart+aDur) overlaps [bStart, bStart+bDur) at all --
+// used everywhere a booking used to only ever check its exact starting
+// minute, which let a longer session get double-booked into any of the
+// slots after its start.
+function overlaps(aStart: string, aDur: number, bStart: string, bDur: number): boolean {
+  const aS = toMinutes(aStart);
+  const bS = toMinutes(bStart);
+  return aS < bS + bDur && bS < aS + aDur;
+}
+
 export async function submitRequest(formData: FormData) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
@@ -271,29 +286,51 @@ export async function submitRequest(formData: FormData) {
       }
     }
 
-    // A recurring or already-confirmed one-off session at the same
-    // day/time belonging to another client isn't visible under this
-    // client's own RLS session, so this narrow cross-client read needs
-    // the service role -- it only checks for an existing conflict, never
-    // exposes another client's details back to the requester.
+    // A session request books for however long this client's own
+    // arrangement normally runs (30 minutes for a negotiated exception
+    // like Sandra, 60 otherwise) -- never a client-facing choice. Calls
+    // are always the fixed call length.
+    let durationMinutes = CALL_DURATION_MINUTES;
+    if (request_type === "session") {
+      const { data: myActiveSchedule } = await supabase
+        .from("client_schedules")
+        .select("duration_minutes")
+        .eq("client_id", me.id)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      durationMinutes = myActiveSchedule?.duration_minutes ?? 60;
+    }
+
+    // A recurring or already-confirmed one-off session belonging to
+    // another client isn't visible under this client's own RLS session,
+    // so this narrow cross-client read needs the service role -- it only
+    // checks for an overlap, never exposes another client's details back
+    // to the requester. Checks the full span each booking actually
+    // occupies, not just whether it starts at the same minute.
     if (businessTime) {
       const admin = createAdminClient();
-      const { data: recurringConflict } = await admin
+      const { data: sameDaySchedules } = await admin
         .from("client_schedules")
-        .select("id")
+        .select("time_of_day, duration_minutes")
         .eq("day_of_week", dayOfWeek)
-        .eq("time_of_day", businessTime)
-        .eq("active", true)
-        .limit(1);
+        .eq("active", true);
+      const recurringConflict = (sameDaySchedules ?? []).some((s) =>
+        overlaps(businessTime!, durationMinutes, s.time_of_day, s.duration_minutes)
+      );
+
       const { data: oneOffScheduled } = await admin
         .from("session_occurrences")
-        .select("id, notes")
+        .select("notes, duration_minutes")
         .eq("occurrence_date", businessDate)
         .eq("status", "scheduled");
-      const oneOffTimeTaken = (oneOffScheduled ?? []).some((o) =>
-        o.notes?.includes(`Confirmed request — ${businessTime}`)
-      );
-      if ((recurringConflict && recurringConflict.length > 0) || oneOffTimeTaken) {
+      const oneOffTimeTaken = (oneOffScheduled ?? []).some((o) => {
+        const match = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+        if (!match) return false;
+        return overlaps(businessTime!, durationMinutes, match[1], o.duration_minutes);
+      });
+
+      if (recurringConflict || oneOffTimeTaken) {
         throw new Error("That time is already taken — please choose a different time.");
       }
     }
@@ -307,6 +344,7 @@ export async function submitRequest(formData: FormData) {
         note: note || null,
         reschedule_from_date,
         request_type,
+        duration_minutes: durationMinutes,
         status: "pending",
       })
       .select("id")
@@ -356,7 +394,9 @@ export async function respondToCounteredRequest(
   const admin = createAdminClient();
   const { data: request, error } = await admin
     .from("requests")
-    .select("countered_date, countered_time, reschedule_from_date, request_type")
+    .select(
+      "countered_date, countered_time, reschedule_from_date, request_type, duration_minutes"
+    )
     .eq("id", requestId)
     .eq("client_id", me.id)
     .eq("status", "countered")
@@ -408,6 +448,7 @@ export async function respondToCounteredRequest(
             ? `Confirmed request — ${request.countered_time}`
             : "Confirmed request",
           is_video_session: request.request_type === "video_session",
+          duration_minutes: request.duration_minutes,
         },
         { onConflict: "client_id,occurrence_date" }
       );

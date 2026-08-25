@@ -131,11 +131,18 @@ export default async function CoachSchedulePage({
     }>,
     supabase
       .from("session_occurrences")
-      .select("client_id, occurrence_date, notes")
+      .select("client_id, occurrence_date, notes, duration_minutes")
       .gte("occurrence_date", weekStartStr)
       .lte("occurrence_date", weekEndStr)
       .eq("status", "scheduled") as unknown as Promise<{
-      data: { client_id: string; occurrence_date: string; notes: string | null }[] | null;
+      data:
+        | {
+            client_id: string;
+            occurrence_date: string;
+            notes: string | null;
+            duration_minutes: number;
+          }[]
+        | null;
     }>,
     supabase
       .from("requests")
@@ -155,13 +162,19 @@ export default async function CoachSchedulePage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
-  const weekBookings: { date: string; timeOfDay: string; clientName: string }[] = [];
+  const weekBookings: {
+    date: string;
+    timeOfDay: string;
+    clientName: string;
+    durationMinutes: number;
+  }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
       weekBookings.push({
         date: day.date,
         timeOfDay: s.time_of_day,
         clientName: s.clients!.name,
+        durationMinutes: s.duration_minutes,
       });
     }
   }
@@ -172,6 +185,7 @@ export default async function CoachSchedulePage({
       date: o.occurrence_date,
       timeOfDay: timeMatch[1],
       clientName: clientNameById.get(o.client_id) ?? "Client",
+      durationMinutes: o.duration_minutes,
     });
   }
 
@@ -181,6 +195,7 @@ export default async function CoachSchedulePage({
     clientName: r.clients?.name ?? clientNameById.get(r.client_id) ?? "Client",
     date: r.status === "countered" ? r.countered_date : r.preferred_date,
     time: r.status === "countered" ? r.countered_time : r.preferred_time,
+    durationMinutes: r.duration_minutes,
     status: r.status as "pending" | "countered",
   }));
 

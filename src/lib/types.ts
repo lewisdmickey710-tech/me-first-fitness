@@ -158,6 +158,7 @@ export interface SessionRequest {
   request_type: RequestType;
   countered_date: string | null;
   countered_time: string | null;
+  duration_minutes: number;
   created_at: string;
 }
 
@@ -344,6 +345,7 @@ export interface ClientSchedule {
   client_id: string;
   day_of_week: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   time_of_day: string;
+  duration_minutes: number;
   label: string | null;
   active: boolean;
   created_at: string;
@@ -383,6 +385,7 @@ export interface SessionOccurrence {
   reminder_sent_at: string | null;
   cancelled_by: "coach" | "client" | null;
   is_video_session: boolean;
+  duration_minutes: number;
   created_at: string;
 }
 
