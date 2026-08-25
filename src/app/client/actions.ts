@@ -14,6 +14,7 @@ import {
 } from "@/lib/cancellation";
 import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
+import { safeFileName } from "@/lib/storage";
 import type { PaymentSchedule } from "@/lib/types";
 
 export async function logCheckin(formData: FormData) {
@@ -127,7 +128,7 @@ export async function addProgressPhoto(formData: FormData) {
 
   const supabase = await createClient();
 
-  const path = `${me.id}/progress-${crypto.randomUUID()}-${photo.name}`;
+  const path = `${me.id}/progress-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
   const { error: uploadError } = await supabase.storage
     .from("form-checks")
     .upload(path, photo, { contentType: photo.type });
@@ -1008,7 +1009,7 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
       let mediaPath: string | null = null;
       const file = formData.get(`file_${pde.id}`);
       if (file instanceof File && file.size > 0) {
-        const path = `${me.id}/${crypto.randomUUID()}-${file.name}`;
+        const path = `${me.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
         const { error: uploadError } = await supabase.storage
           .from("form-checks")
           .upload(path, file, { contentType: file.type });
@@ -1231,7 +1232,7 @@ export async function addNutritionLog(formData: FormData) {
   let photoPath: string | null = null;
   const photo = formData.get("photo");
   if (photo instanceof File && photo.size > 0) {
-    const path = `${me.id}/nutrition-${crypto.randomUUID()}-${photo.name}`;
+    const path = `${me.id}/nutrition-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
     const { error: uploadError } = await supabase.storage
       .from("form-checks")
       .upload(path, photo, { contentType: photo.type });

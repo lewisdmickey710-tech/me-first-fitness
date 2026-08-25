@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { safeFileName } from "@/lib/storage";
 
 export async function uploadCareProfilePacket(
   careProfileId: string,
@@ -15,7 +16,7 @@ export async function uploadCareProfilePacket(
     throw new Error("A PDF file is required.");
   }
 
-  const path = `${careProfileId}/phase${phase}-${crypto.randomUUID()}-${file.name}`;
+  const path = `${careProfileId}/phase${phase}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
   const { error: uploadError } = await supabase.storage
     .from("packets")
     .upload(path, file, { contentType: file.type });

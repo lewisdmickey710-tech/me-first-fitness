@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
+import { safeFileName } from "@/lib/storage";
 
 export async function addCommunityPost(formData: FormData) {
   const me = await getMyClient();
@@ -16,7 +17,7 @@ export async function addCommunityPost(formData: FormData) {
 
   let photoPath: string | null = null;
   if (photo instanceof File && photo.size > 0) {
-    const path = `${me.id}/community-${crypto.randomUUID()}-${photo.name}`;
+    const path = `${me.id}/community-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
     const { error: uploadError } = await supabase.storage
       .from("form-checks")
       .upload(path, photo, { contentType: photo.type });
