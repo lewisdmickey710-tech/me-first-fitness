@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
+import { formatReps } from "@/lib/constants";
 import { mergeLogEntries } from "@/lib/log-entries";
 import type { Activity, Client, TrainingSession } from "@/lib/types";
 import { LogSessionForm, type ProgramDayOption } from "./LogSessionForm";
@@ -16,7 +17,7 @@ interface ProgramDayJoinRow {
     position: number;
     sets: string | null;
     reps: string | null;
-    exercises: { name: string } | null;
+    exercises: { name: string; laterality: string | null } | null;
   }[];
 }
 
@@ -42,7 +43,7 @@ export default async function LogSessionPage({
       client.care_profile_id
         ? (supabase
             .from("program_days")
-            .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name))")
+            .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name, laterality))")
             .eq("care_profile_id", client.care_profile_id)
             .order("phase")
             .order("day_number") as unknown as Promise<{
@@ -94,9 +95,12 @@ export default async function LogSessionPage({
     .map((o) => o.substitute_exercise_id)
     .filter((v): v is string => !!v);
   const { data: substituteExercises } = substituteIds.length
-    ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
-    : { data: [] as { id: string; name: string }[] };
-  const substituteNameById = new Map((substituteExercises ?? []).map((e) => [e.id, e.name]));
+    ? await supabase
+        .from("exercises")
+        .select("id, name, laterality")
+        .in("id", substituteIds)
+    : { data: [] as { id: string; name: string; laterality: string | null }[] };
+  const substituteById = new Map((substituteExercises ?? []).map((e) => [e.id, e]));
 
   const programDayOptions: ProgramDayOption[] = (days ?? []).map((d) => ({
     phase: d.phase,
@@ -112,13 +116,14 @@ export default async function LogSessionPage({
       )
       .map((pde) => {
         const override = overrideByPdeId.get(pde.id);
-        const substituteName = override?.substitute_exercise_id
-          ? substituteNameById.get(override.substitute_exercise_id)
+        const substitute = override?.substitute_exercise_id
+          ? substituteById.get(override.substitute_exercise_id)
           : null;
+        const effectiveLaterality = substitute?.laterality ?? pde.exercises?.laterality ?? null;
         return {
-          exercise: substituteName ?? pde.exercises?.name ?? "",
+          exercise: substitute?.name ?? pde.exercises?.name ?? "",
           sets: override?.sets_override || pde.sets || "",
-          reps: override?.reps_override || pde.reps || "",
+          reps: formatReps(override?.reps_override || pde.reps || "", effectiveLaterality),
         };
       })
       .filter((e) => e.exercise),

@@ -59,6 +59,9 @@ export interface SessionEntry {
   // whichever swap was active, if any) instead of just a typed name.
   exercise_id?: string;
   substitute_exercise_id?: string | null;
+  // Only set (and only differs from `exercise`) when substitute_exercise_id
+  // is set -- the name of the movement actually prescribed at log time.
+  prescribed_exercise?: string;
   notes?: string;
   // Storage object path in the private "form-checks" bucket, e.g.
   // "{client_id}/{uuid}-{filename}" -- not a URL. Generate a short-lived
@@ -209,7 +212,7 @@ export type MuscleGroup =
   | "Balance/Mobility";
 
 export type MovementType = "compound" | "accessory" | "mobility";
-export type Laterality = "bilateral" | "unilateral";
+export type Laterality = "bilateral" | "per_arm" | "per_leg" | "per_side";
 
 export interface Exercise {
   id: string;

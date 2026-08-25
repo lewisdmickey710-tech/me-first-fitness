@@ -5,6 +5,7 @@ import Link from "next/link";
 import { addHabitForClient, addMilestone, logSession } from "@/app/coach/actions";
 import { Badge, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
+import { WeightInput } from "@/components/weight-input";
 import { PHASES } from "@/lib/constants";
 import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
 import type { SessionType } from "@/lib/types";
@@ -350,7 +351,7 @@ export function LogSessionForm({
                     <Input
                       name="exercise"
                       placeholder="Exercise"
-                      className="col-span-6"
+                      className="col-span-5"
                       value={row.exercise}
                       onChange={(e) => updateRow(i, "exercise", e.target.value)}
                     />
@@ -368,13 +369,13 @@ export function LogSessionForm({
                       value={row.reps}
                       onChange={(e) => updateRow(i, "reps", e.target.value)}
                     />
-                    <Input
-                      name="weight"
-                      placeholder="Weight"
-                      className="col-span-2"
-                      value={row.weight}
-                      onChange={(e) => updateRow(i, "weight", e.target.value)}
-                    />
+                    <div className="col-span-3">
+                      <WeightInput
+                        key={`${activeDayKey ?? "free"}-${i}`}
+                        name="weight"
+                        placeholder="Weight"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>

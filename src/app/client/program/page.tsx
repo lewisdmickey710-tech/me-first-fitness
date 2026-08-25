@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
 import { logMyWorkout, setProgramExerciseSwap } from "@/app/client/actions";
+import { WeightInput } from "@/components/weight-input";
 import {
   Button,
   Card,
@@ -13,7 +14,7 @@ import {
   StarRatingInput,
   Textarea,
 } from "@/components/ui";
-import { phaseInfo } from "@/lib/constants";
+import { formatReps, phaseInfo } from "@/lib/constants";
 import { toDateString } from "@/lib/timezone";
 
 interface ProgramDayJoinRow {
@@ -34,6 +35,7 @@ interface ProgramDayJoinRow {
       client_description: string | null;
       regress_to_id: string | null;
       progress_to_id: string | null;
+      laterality: string | null;
     } | null;
   }[];
 }
@@ -58,7 +60,7 @@ export default async function ClientProgramPage() {
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id, laterality))"
           )
           .eq("care_profile_id", me.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -112,9 +114,16 @@ export default async function ClientProgramPage() {
   const { data: extraExercises } = extraIds.size
     ? await supabase
         .from("exercises")
-        .select("id, name, client_description")
+        .select("id, name, client_description, laterality")
         .in("id", [...extraIds])
-    : { data: [] as { id: string; name: string; client_description: string | null }[] };
+    : {
+        data: [] as {
+          id: string;
+          name: string;
+          client_description: string | null;
+          laterality: string | null;
+        }[],
+      };
   const extraById = new Map((extraExercises ?? []).map((e) => [e.id, e]));
 
   const today = toDateString(new Date());
@@ -227,7 +236,10 @@ export default async function ClientProgramPage() {
                       : null;
                     const effective = substitute ?? base;
                     const effectiveSets = override?.sets_override || pde.sets;
-                    const effectiveReps = override?.reps_override || pde.reps;
+                    const effectiveReps = formatReps(
+                      override?.reps_override || pde.reps,
+                      effective?.laterality
+                    );
                     const effectiveTempo = override?.tempo_override || pde.tempo;
                     const regress = base?.regress_to_id
                       ? extraById.get(base.regress_to_id)
@@ -321,7 +333,7 @@ export default async function ClientProgramPage() {
                             the form= attribute) even though they render
                             here, right in this exercise's own box. */}
                         <div className="grid grid-cols-2 gap-3">
-                          <Input
+                          <WeightInput
                             form={logFormId}
                             name={`weight_${pde.id}`}
                             placeholder="Weight used"

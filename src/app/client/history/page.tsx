@@ -103,7 +103,10 @@ export default async function ClientHistoryPage() {
                         {e.exercise} — {e.sets}x{e.reps}
                         {e.weight ? ` @ ${e.weight}` : ""}
                         {e.substitute_exercise_id ? (
-                          <Badge tone="teal">swapped</Badge>
+                          <span className="text-xs text-rose">
+                            {" "}
+                            (swapped from {e.prescribed_exercise || "prescribed movement"})
+                          </span>
                         ) : null}
                         {e.notes ? (
                           <span className="block text-xs text-gray/80">

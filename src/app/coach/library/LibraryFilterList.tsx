@@ -139,7 +139,8 @@ export function LibraryFilterList({ exercises }: { exercises: Exercise[] }) {
                 ) : null}
                 {ex.laterality ? (
                   <span className="rounded-full bg-cream px-2 py-0.5">
-                    {ex.laterality === "unilateral" ? "Single-limb" : "Two-limb"}
+                    {LATERALITIES.find((l) => l.id === ex.laterality)?.label ??
+                      ex.laterality}
                   </span>
                 ) : null}
               </div>

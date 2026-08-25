@@ -1018,6 +1018,11 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
 
       return {
         exercise: effectiveName,
+        // Only ever differs from `exercise` when substituteId is set --
+        // stored as a plain string (not re-derived from exercise_id at
+        // render time) so an old log entry still reads correctly even if
+        // the exercise is later renamed or removed from the library.
+        prescribed_exercise: pde.exercises?.name ?? "",
         exercise_id: pde.exercise_id,
         substitute_exercise_id: substituteId,
         sets: pde.sets ?? "",

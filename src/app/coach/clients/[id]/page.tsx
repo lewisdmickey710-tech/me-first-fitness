@@ -47,7 +47,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
-import { ACTIVITY_TYPES, phaseInfo } from "@/lib/constants";
+import { ACTIVITY_TYPES, formatReps, phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
 import {
@@ -141,7 +141,7 @@ interface ProgramDayWithExercisesRow {
     tempo: string | null;
     superset_group: string | null;
     exercise_id: string;
-    exercises: { id: string; name: string } | null;
+    exercises: { id: string; name: string; laterality: string | null } | null;
   }[];
 }
 
@@ -330,7 +330,7 @@ export default async function ClientDetailPage({
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, laterality))"
           )
           .eq("care_profile_id", client.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -1758,7 +1758,7 @@ function ProgramTab({
               pdeId: pde.id,
               name: pde.exercises?.name ?? "(deleted exercise)",
               sets: pde.sets,
-              reps: pde.reps,
+              reps: formatReps(pde.reps, pde.exercises?.laterality),
               tempo: pde.tempo,
               substituteExerciseId: override?.substitute_exercise_id ?? null,
               setsOverride: override?.sets_override ?? null,
@@ -1922,7 +1922,12 @@ async function LogTab({
                         {e.exercise}
                         {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
                         {e.weight ? ` @ ${e.weight}` : ""}
-                        {e.substitute_exercise_id ? " (swapped)" : ""}
+                        {e.substitute_exercise_id ? (
+                          <span className="text-xs text-rose">
+                            {" "}
+                            (client swapped from {e.prescribed_exercise || "prescribed movement"})
+                          </span>
+                        ) : null}
                         {e.notes ? (
                           <span className="block text-xs text-gray/80">
                             {e.notes}
