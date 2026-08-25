@@ -277,6 +277,12 @@ export async function logSession(clientId: string, formData: FormData) {
     ["paid", "unpaid", "waived"].includes(paymentStatusRaw) ? paymentStatusRaw : null
   ) as "paid" | "unpaid" | "waived" | null;
 
+  // Defaults to coached (checkbox is checked unless she unchecks it) --
+  // she's normally logging a session she actually ran; unchecking it is
+  // for the case of recording something a client told her they did on
+  // their own.
+  const coached = formData.get("coached") === "on";
+
   const { error } = await supabase.from("sessions").insert({
     client_id: clientId,
     day_label,
@@ -288,6 +294,7 @@ export async function logSession(clientId: string, formData: FormData) {
     session_type,
     body_map,
     payment_status,
+    coached,
   });
 
   if (error) throw new Error(error.message);
@@ -301,7 +308,7 @@ export async function logSession(clientId: string, formData: FormData) {
   );
 
   revalidatePath(`/coach/clients/${clientId}`);
-  redirect(`/coach/clients/${clientId}?tab=sessions`);
+  redirect(`/coach/clients/${clientId}?tab=log`);
 }
 
 // Cleans up a mis-logged entry -- e.g. a client using the prescribed-day
@@ -340,6 +347,7 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
     type,
     duration: duration || null,
     notes: notes || null,
+    logged_by: "coach",
   });
   if (error) throw new Error(error.message);
 

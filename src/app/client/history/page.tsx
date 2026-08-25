@@ -2,7 +2,12 @@ import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
-import type { TrainingSession } from "@/lib/types";
+import {
+  LOG_ENTRY_KIND_LABEL,
+  LOG_ENTRY_KIND_TONE,
+  mergeLogEntries,
+} from "@/lib/log-entries";
+import type { Activity, TrainingSession } from "@/lib/types";
 
 export default async function ClientHistoryPage() {
   const me = await getMyClient();
@@ -18,11 +23,24 @@ export default async function ClientHistoryPage() {
 
   const supabase = await createClient();
 
-  const { data: sessions } = (await supabase
-    .from("sessions")
-    .select("*")
-    .eq("client_id", me.id)
-    .order("date", { ascending: false })) as { data: TrainingSession[] | null };
+  const [{ data: sessions }, { data: activities }] = await Promise.all([
+    supabase
+      .from("sessions")
+      .select("*")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: TrainingSession[] | null;
+    }>,
+    supabase
+      .from("activities")
+      .select("*")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false }) as unknown as Promise<{
+      data: Activity[] | null;
+    }>,
+  ]);
+
+  const entries = mergeLogEntries(sessions ?? [], activities ?? []);
 
   return (
     <div className="space-y-6">
@@ -36,48 +54,70 @@ export default async function ClientHistoryPage() {
         Everything you&apos;ve logged, most recent first.
       </p>
 
-      {!sessions || sessions.length === 0 ? (
+      <div className="flex flex-wrap gap-3 text-xs text-gray">
+        {(["coached", "solo", "activity"] as const).map((kind) => (
+          <span key={kind} className="flex items-center gap-1">
+            <Badge tone={LOG_ENTRY_KIND_TONE[kind]}>{LOG_ENTRY_KIND_LABEL[kind]}</Badge>
+          </span>
+        ))}
+      </div>
+
+      {entries.length === 0 ? (
         <EmptyState
           title="Nothing logged yet"
-          body="Once you log a workout from My program, it'll show up here."
+          body="Once you log a workout from My program, or an activity from Activity log, it'll show up here."
         />
       ) : (
         <div className="space-y-3">
-          {sessions.map((s) => (
-            <Card key={s.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-ink">{s.day_label}</p>
-                <p className="text-sm text-gray">{s.date}</p>
-              </div>
-              {s.rating ? (
-                <p className="text-sm text-gold">
-                  {"★".repeat(s.rating)}
-                  {"☆".repeat(5 - s.rating)}
-                </p>
-              ) : null}
-              {s.entries.length > 0 ? (
-                <ul className="space-y-1 text-sm text-gray">
-                  {s.entries.map((e, i) => (
-                    <li key={i}>
-                      {e.exercise} — {e.sets}x{e.reps}
-                      {e.weight ? ` @ ${e.weight}` : ""}
-                      {e.substitute_exercise_id ? (
-                        <Badge tone="teal">swapped</Badge>
-                      ) : null}
-                      {e.notes ? (
-                        <span className="block text-xs text-gray/80">
-                          {e.notes}
-                        </span>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {s.day_notes ? (
-                <p className="text-sm text-ink">{s.day_notes}</p>
-              ) : null}
-            </Card>
-          ))}
+          {entries.map((entry) => {
+            const s = entry.session;
+            const a = entry.activity;
+            return (
+              <Card key={`${entry.kind === "activity" ? "a" : "s"}-${entry.id}`} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-ink">{s ? s.day_label : a!.type}</p>
+                    <Badge tone={LOG_ENTRY_KIND_TONE[entry.kind]}>
+                      {LOG_ENTRY_KIND_LABEL[entry.kind]}
+                    </Badge>
+                    {entry.loggedBy === "coach" ? (
+                      <Badge tone="gray">logged by your coach</Badge>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-gray">{entry.date}</p>
+                </div>
+                {s?.rating ? (
+                  <p className="text-sm text-gold">
+                    {"★".repeat(s.rating)}
+                    {"☆".repeat(5 - s.rating)}
+                  </p>
+                ) : null}
+                {s && s.entries.length > 0 ? (
+                  <ul className="space-y-1 text-sm text-gray">
+                    {s.entries.map((e, i) => (
+                      <li key={i}>
+                        {e.exercise} — {e.sets}x{e.reps}
+                        {e.weight ? ` @ ${e.weight}` : ""}
+                        {e.substitute_exercise_id ? (
+                          <Badge tone="teal">swapped</Badge>
+                        ) : null}
+                        {e.notes ? (
+                          <span className="block text-xs text-gray/80">
+                            {e.notes}
+                          </span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {s?.day_notes ? (
+                  <p className="text-sm text-ink">{s.day_notes}</p>
+                ) : null}
+                {a?.duration ? <p className="text-sm text-gray">{a.duration}</p> : null}
+                {a?.notes ? <p className="text-sm text-ink">{a.notes}</p> : null}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

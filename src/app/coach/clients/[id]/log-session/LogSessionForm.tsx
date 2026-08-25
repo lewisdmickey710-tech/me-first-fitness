@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { addHabitForClient, logSession } from "@/app/coach/actions";
-import { Button, Card, Input, Select, Textarea } from "@/components/ui";
+import { addHabitForClient, addMilestone, logSession } from "@/app/coach/actions";
+import { Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { PHASES } from "@/lib/constants";
 import type { SessionType } from "@/lib/types";
@@ -81,10 +81,12 @@ export function LogSessionForm({
   const [recoveryDescription, setRecoveryDescription] = useState("");
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
   const [habitName, setHabitName] = useState("");
+  const [milestoneTitle, setMilestoneTitle] = useState("");
   const [dayLabelTouched, setDayLabelTouched] = useState(false);
 
   const boundLogSession = logSession.bind(null, clientId);
   const boundAddHabit = addHabitForClient.bind(null, clientId);
+  const boundAddMilestone = addMilestone.bind(null, clientId);
 
   const daysForPhase = programDayOptions.filter((d) => d.phase === phase);
   const showExerciseGrid = sessionType === "program" || sessionType === "freestyle";
@@ -370,6 +372,17 @@ export function LogSessionForm({
             <BodyMapInput name="body_map" />
           </div>
 
+          <Checkbox
+            name="coached"
+            label="This was a session I ran"
+            defaultChecked
+          />
+          <p className="-mt-2 text-xs text-gray">
+            Uncheck this if you&apos;re recording something they did on
+            their own instead — it&apos;ll show as a solo workout, not a
+            coached session.
+          </p>
+
           <Button type="submit">Save session</Button>
         </form>
       </Card>
@@ -396,6 +409,33 @@ export function LogSessionForm({
           <Button type="submit" variant="secondary">
             Add
           </Button>
+        </form>
+      </Card>
+
+      <Card className="space-y-2">
+        <p className="text-sm font-medium text-ink">Add a milestone</p>
+        <p className="text-xs text-gray">
+          Something worth marking as a goal, based on what came up just now.
+        </p>
+        <form
+          action={async (formData: FormData) => {
+            await boundAddMilestone(formData);
+            setMilestoneTitle("");
+          }}
+          className="space-y-2"
+        >
+          <Input
+            name="title"
+            placeholder="e.g. First unassisted pull-up"
+            value={milestoneTitle}
+            onChange={(e) => setMilestoneTitle(e.target.value)}
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <Input name="target_date" type="date" />
+            <Button type="submit" variant="secondary">
+              Add milestone
+            </Button>
+          </div>
         </form>
       </Card>
     </div>

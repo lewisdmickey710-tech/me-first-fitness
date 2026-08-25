@@ -110,7 +110,7 @@ export default async function LogSessionPage({
 
   return (
     <div className="space-y-6">
-      <BackLink href={`/coach/clients/${id}?tab=sessions`} />
+      <BackLink href={`/coach/clients/${id}?tab=log`} />
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

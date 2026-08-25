@@ -69,6 +69,7 @@ export async function logActivity(formData: FormData) {
     type,
     duration: duration || null,
     notes: notes || null,
+    logged_by: "client",
   });
 
   if (error) throw new Error(error.message);
@@ -1028,6 +1029,30 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
     })
   );
 
+  // Auto-detected rather than asked -- coached if this date matches an
+  // actual scheduled/confirmed time (recurring weekly slot, or a
+  // one-off confirmed request), solo otherwise. No extra tap needed
+  // logging a normal session, and a fully self-led client (no standing
+  // schedule at all) correctly lands as solo every time.
+  const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const { data: scheduleMatch } = await supabase
+    .from("client_schedules")
+    .select("id")
+    .eq("client_id", me.id)
+    .eq("day_of_week", dayOfWeek)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  const { data: occurrenceMatch } = await supabase
+    .from("session_occurrences")
+    .select("id")
+    .eq("client_id", me.id)
+    .eq("occurrence_date", date)
+    .in("status", ["scheduled", "completed"])
+    .limit(1)
+    .maybeSingle();
+  const coached = !!(scheduleMatch || occurrenceMatch);
+
   const { error } = await supabase.from("sessions").insert({
     client_id: me.id,
     day_label: `Day ${day.day_number}: ${day.day_label}`,
@@ -1036,6 +1061,7 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
     rating,
     day_notes: dayNotes || null,
     logged_by: "client",
+    coached,
   });
 
   if (error) throw new Error(error.message);

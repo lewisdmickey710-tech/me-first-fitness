@@ -61,6 +61,11 @@ import { payAsYouGoStatus } from "@/lib/payment-status";
 import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { lateCancellationFreeAllotment } from "@/lib/cancellation";
 import { CALL_DURATION_MINUTES } from "@/lib/video-session";
+import {
+  LOG_ENTRY_KIND_LABEL,
+  LOG_ENTRY_KIND_TONE,
+  mergeLogEntries,
+} from "@/lib/log-entries";
 import type {
   Activity,
   CareProfile,
@@ -96,11 +101,10 @@ const TABS = [
   { id: "profile", label: "Profile" },
   { id: "documents", label: "Documents" },
   { id: "program", label: "Program" },
-  { id: "sessions", label: "Sessions" },
+  { id: "log", label: "Log" },
   { id: "attendance", label: "Attendance" },
   { id: "checkins", label: "Check-ins" },
   { id: "measurements", label: "Measurements" },
-  { id: "activity", label: "Activity" },
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
   { id: "habits", label: "Habits" },
@@ -484,8 +488,13 @@ export default async function ClientDetailPage({
           programLastUpdatedAt={client.program_last_updated_at}
         />
       )}
-      {tab === "sessions" && (
-        <SessionsTab clientId={id} sessions={sessions ?? []} supabase={supabase} />
+      {tab === "log" && (
+        <LogTab
+          clientId={id}
+          sessions={sessions ?? []}
+          activities={activities ?? []}
+          supabase={supabase}
+        />
       )}
       {tab === "attendance" && (
         <AttendanceTab
@@ -505,9 +514,6 @@ export default async function ClientDetailPage({
           progressPhotos={progressPhotos ?? []}
           progressPhotoUrlByPath={progressPhotoUrlByPath}
         />
-      )}
-      {tab === "activity" && (
-        <ActivityTab clientId={id} activities={activities ?? []} />
       )}
       {tab === "requests" && (
         <RequestsTab clientId={id} requests={requests ?? []} payments={payments ?? []} />
@@ -569,14 +575,22 @@ function Overview({
 
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+  // Session consistency is specifically about showing up to coached
+  // time -- solo workouts and other self-driven activity are tracked
+  // separately below, not folded into this number.
   const recentCount = allSessions.filter(
-    (s) => new Date(s.date) >= fourWeeksAgo
+    (s) => s.coached && new Date(s.date) >= fourWeeksAgo
   ).length;
   const expectedCount = (client.days_per_week ?? 3) * 4;
   const consistencyPct =
     expectedCount > 0
       ? Math.min(100, Math.round((recentCount / expectedCount) * 100))
       : null;
+
+  const selfDrivenCount =
+    allSessions.filter((s) => !s.coached && new Date(s.date) >= fourWeeksAgo)
+      .length +
+    activities.filter((a) => new Date(a.date) >= fourWeeksAgo).length;
 
   const latestMeasurement = measurements[0] ?? null;
   const previousMeasurement = measurements[1] ?? null;
@@ -809,8 +823,9 @@ function Overview({
 
       <Card>
         <p className="text-sm font-medium text-gray">
-          Consistency (last 4 weeks)
+          Session consistency (last 4 weeks)
         </p>
+        <p className="text-xs text-gray">Showing up to coached time</p>
         {consistencyPct !== null ? (
           <>
             <p className="mt-1 text-2xl font-semibold text-ink">
@@ -818,7 +833,7 @@ function Overview({
             </p>
             <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-grayLt">
               <div
-                className="h-full rounded-full bg-teal"
+                className="h-full rounded-full bg-rose"
                 style={{ width: `${consistencyPct}%` }}
               />
             </div>
@@ -828,6 +843,18 @@ function Overview({
             Set a weekly schedule to track this.
           </p>
         )}
+      </Card>
+
+      <Card>
+        <p className="text-sm font-medium text-gray">
+          Self-driven consistency (last 4 weeks)
+        </p>
+        <p className="text-xs text-gray">
+          Solo workouts and other activity they logged on their own
+        </p>
+        <p className="mt-1 text-2xl font-semibold text-ink">
+          {selfDrivenCount} logged
+        </p>
       </Card>
 
       <Card>
@@ -1767,13 +1794,15 @@ function ProgramTab({
   );
 }
 
-async function SessionsTab({
+async function LogTab({
   clientId,
   sessions,
+  activities,
   supabase,
 }: {
   clientId: string;
   sessions: TrainingSession[];
+  activities: Activity[];
   supabase: Awaited<ReturnType<typeof createClient>>;
 }) {
   const mediaPaths = [
@@ -1794,100 +1823,167 @@ async function SessionsTab({
     );
   }
 
+  const boundAddActivity = addActivityAsCoach.bind(null, clientId);
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = mergeLogEntries(sessions, activities);
+
   return (
     <div className="space-y-4">
-      <Link
-        href={`/coach/clients/${clientId}/log-session`}
-        className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-      >
-        + Log session
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/coach/clients/${clientId}/log-session`}
+          className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          + Log session
+        </Link>
+      </div>
 
-      {sessions.length === 0 ? (
+      <Card>
+        <Collapsible label="+ Log activity for this client">
+          <form action={boundAddActivity} className="mt-2 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink">Date</label>
+                <Input name="date" type="date" required defaultValue={today} />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink">Type</label>
+                <Select name="type" required defaultValue="">
+                  <option value="" disabled>
+                    Choose one
+                  </option>
+                  {ACTIVITY_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+            <Input name="duration" placeholder="Duration (optional) -- e.g. 30 min" />
+            <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
+            <Button type="submit" variant="secondary">
+              Log activity
+            </Button>
+          </form>
+        </Collapsible>
+      </Card>
+
+      <div className="flex flex-wrap gap-3 text-xs text-gray">
+        {(["coached", "solo", "activity"] as const).map((kind) => (
+          <span key={kind} className="flex items-center gap-1">
+            <Badge tone={LOG_ENTRY_KIND_TONE[kind]}>{LOG_ENTRY_KIND_LABEL[kind]}</Badge>
+          </span>
+        ))}
+      </div>
+
+      {entries.length === 0 ? (
         <EmptyState
-          title="No sessions yet"
-          body="Log a session to start building this client's history."
+          title="Nothing logged yet"
+          body="Log a session, or log an activity above, to start building this client's history."
         />
       ) : (
         <div className="space-y-3">
-          {sessions.map((s) => (
-            <Card key={s.id}>
-              <div className="flex items-center justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-ink">{s.day_label}</p>
-                  {s.session_type && s.session_type !== "freestyle" ? (
-                    <Badge tone="gray">
-                      {SESSION_TYPE_LABEL[s.session_type]}
+          {entries.map((entry) => {
+            const s = entry.session;
+            const a = entry.activity;
+            return (
+              <Card key={`${entry.kind === "activity" ? "a" : "s"}-${entry.id}`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-ink">
+                      {s ? s.day_label : a!.type}
+                    </p>
+                    <Badge tone={LOG_ENTRY_KIND_TONE[entry.kind]}>
+                      {LOG_ENTRY_KIND_LABEL[entry.kind]}
                     </Badge>
-                  ) : null}
-                  {s.logged_by === "client" ? (
-                    <Badge tone="teal">logged by client</Badge>
-                  ) : null}
-                  {s.payment_status === "paid" ? (
-                    <Badge tone="teal">paid</Badge>
-                  ) : s.payment_status === "unpaid" ? (
-                    <Badge tone="pink">not paid</Badge>
-                  ) : s.payment_status === "waived" ? (
-                    <Badge tone="gray">waived</Badge>
-                  ) : null}
+                    {s?.session_type && s.session_type !== "freestyle" ? (
+                      <Badge tone="gray">{SESSION_TYPE_LABEL[s.session_type]}</Badge>
+                    ) : null}
+                    {entry.loggedBy === "client" ? (
+                      <Badge tone="gray">logged by client</Badge>
+                    ) : null}
+                    {s?.payment_status === "paid" ? (
+                      <Badge tone="teal">paid</Badge>
+                    ) : s?.payment_status === "unpaid" ? (
+                      <Badge tone="pink">not paid</Badge>
+                    ) : s?.payment_status === "waived" ? (
+                      <Badge tone="gray">waived</Badge>
+                    ) : null}
+                  </div>
+                  <p className="text-sm text-gray">{entry.date}</p>
                 </div>
-                <p className="text-sm text-gray">{s.date}</p>
-              </div>
-              {s.entries.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-sm text-gray">
-                  {s.entries.map((e, i) => (
-                    <li key={i}>
-                      {e.exercise}
-                      {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
-                      {e.weight ? ` @ ${e.weight}` : ""}
-                      {e.substitute_exercise_id ? " (swapped)" : ""}
-                      {e.notes ? (
-                        <span className="block text-xs text-gray/80">
-                          {e.notes}
-                        </span>
-                      ) : null}
-                      {e.media_path && mediaUrlByPath.has(e.media_path) ? (
-                        <a
-                          href={mediaUrlByPath.get(e.media_path)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="block text-xs text-rose hover:underline"
-                        >
-                          View photo/video →
-                        </a>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {s.rating ? (
-                <p className="mt-2 text-sm text-gray">Rating: {s.rating}/5</p>
-              ) : null}
-              {s.day_notes ? (
-                <p className="mt-1 text-sm text-ink">{s.day_notes}</p>
-              ) : null}
-              {s.body_map && s.body_map.length > 0 ? (
-                <Collapsible label="View body map" className="mt-2">
-                  <BodyMapInput defaultValue={s.body_map} readOnly />
-                </Collapsible>
-              ) : null}
-              <form
-                action={async () => {
-                  "use server";
-                  await deleteLoggedSession(clientId, s.id);
-                }}
-                className="mt-2"
-              >
-                <ConfirmButton
-                  variant="ghost"
-                  confirmText="Delete this logged session? This can't be undone -- if it was really out-of-session activity, log it as one from the Activity tab instead."
-                  className="text-xs text-gray hover:text-pink"
-                >
-                  Delete
-                </ConfirmButton>
-              </form>
-            </Card>
-          ))}
+
+                {s && s.entries.length > 0 ? (
+                  <ul className="mt-2 space-y-1 text-sm text-gray">
+                    {s.entries.map((e, i) => (
+                      <li key={i}>
+                        {e.exercise}
+                        {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
+                        {e.weight ? ` @ ${e.weight}` : ""}
+                        {e.substitute_exercise_id ? " (swapped)" : ""}
+                        {e.notes ? (
+                          <span className="block text-xs text-gray/80">
+                            {e.notes}
+                          </span>
+                        ) : null}
+                        {e.media_path && mediaUrlByPath.has(e.media_path) ? (
+                          <a
+                            href={mediaUrlByPath.get(e.media_path)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block text-xs text-rose hover:underline"
+                          >
+                            View photo/video →
+                          </a>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                {s?.rating ? (
+                  <p className="mt-2 text-sm text-gray">Rating: {s.rating}/5</p>
+                ) : null}
+                {s?.day_notes ? (
+                  <p className="mt-1 text-sm text-ink">{s.day_notes}</p>
+                ) : null}
+                {s?.body_map && s.body_map.length > 0 ? (
+                  <Collapsible label="View body map" className="mt-2">
+                    <BodyMapInput defaultValue={s.body_map} readOnly />
+                  </Collapsible>
+                ) : null}
+
+                {a ? (
+                  <>
+                    {a.duration ? (
+                      <p className="mt-2 text-sm text-gray">{a.duration}</p>
+                    ) : null}
+                    {a.notes ? (
+                      <p className="mt-1 text-sm text-ink">{a.notes}</p>
+                    ) : null}
+                  </>
+                ) : null}
+
+                {s ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteLoggedSession(clientId, s.id);
+                    }}
+                    className="mt-2"
+                  >
+                    <ConfirmButton
+                      variant="ghost"
+                      confirmText="Delete this logged session? This can't be undone -- if it was really out-of-session activity, log it as one from the form above instead."
+                      className="text-xs text-gray hover:text-pink"
+                    >
+                      Delete
+                    </ConfirmButton>
+                  </form>
+                ) : null}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
@@ -2561,72 +2657,6 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActivityTab({
-  clientId,
-  activities,
-}: {
-  clientId: string;
-  activities: Activity[];
-}) {
-  const boundAdd = addActivityAsCoach.bind(null, clientId);
-  const today = new Date().toISOString().slice(0, 10);
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <p className="mb-2 text-sm font-medium text-ink">Log activity for this client</p>
-        <form action={boundAdd} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink">Date</label>
-              <Input name="date" type="date" required defaultValue={today} />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-ink">Type</label>
-              <Select name="type" required defaultValue="">
-                <option value="" disabled>
-                  Choose one
-                </option>
-                {ACTIVITY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-          <Input name="duration" placeholder="Duration (optional) -- e.g. 30 min" />
-          <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
-          <Button type="submit" variant="secondary">
-            Log activity
-          </Button>
-        </form>
-      </Card>
-
-      {activities.length === 0 ? (
-        <EmptyState
-          title="No activity logged yet"
-          body="Out-of-session activity you or this client log will show up here."
-        />
-      ) : (
-        <div className="space-y-3">
-          {activities.map((a) => (
-            <Card key={a.id}>
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-ink">{a.type}</p>
-                <p className="text-sm text-gray">{a.date}</p>
-              </div>
-              {a.duration ? (
-                <p className="mt-1 text-sm text-gray">{a.duration}</p>
-              ) : null}
-              {a.notes ? <p className="mt-1 text-sm text-ink">{a.notes}</p> : null}
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 function RequestsTab({
   clientId,
