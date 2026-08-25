@@ -190,15 +190,17 @@ export async function GET(request: Request) {
   // ---- Payment reminders: due soon or overdue, not recently reminded ----
   const { data: payments } = await supabase
     .from("payments")
-    .select("id, description, amount, due_date, reminder_sent_at, clients(name, user_id)")
+    .select(
+      "id, description, amount, due_date, reminder_sent_at, clients(name, user_id, pro_bono)"
+    )
     .is("paid_on", null)
     .lte("due_date", paymentLookaheadStr);
 
   for (const payment of payments ?? []) {
     const client = (payment as unknown as {
-      clients: { name: string; user_id: string | null } | null;
+      clients: { name: string; user_id: string | null; pro_bono: boolean } | null;
     }).clients;
-    if (!client?.user_id) continue;
+    if (!client?.user_id || client.pro_bono) continue;
 
     if (
       payment.reminder_sent_at &&

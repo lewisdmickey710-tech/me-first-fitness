@@ -780,6 +780,28 @@ function Overview({
         )}
       </Card>
 
+      {client.pro_bono ? (
+        <Card className="border-rose/30 bg-rose/5">
+          <p className="text-sm font-medium text-gray">
+            <Heart className="mr-1" />
+            Pro bono value
+          </p>
+          {client.pro_bono_rate ? (
+            <p className="mt-1 text-2xl font-semibold text-ink">
+              ${(sessionsUsed * client.pro_bono_rate).toFixed(2)}
+              <span className="ml-2 text-sm font-normal text-gray">
+                {sessionsUsed} sessions × ${client.pro_bono_rate.toFixed(2)}
+              </span>
+            </p>
+          ) : (
+            <p className="mt-1 text-sm text-gray">
+              Set a value per session on this client&apos;s Profile tab to
+              see the total value of this work.
+            </p>
+          )}
+        </Card>
+      ) : null}
+
       <Card>
         <p className="text-sm font-medium text-gray">
           Consistency (last 4 weeks)
@@ -1122,6 +1144,32 @@ function ProfileTab({
             label="Enable the optional symptom tracker for this client"
             defaultChecked={client.symptom_tracker_enabled}
           />
+
+          <div>
+            <Checkbox
+              name="pro_bono"
+              label="Pro bono client (charity work)"
+              defaultChecked={client.pro_bono}
+            />
+            <p className="mt-1 text-xs text-gray">
+              Stops payment reminder emails and late-cancellation fees for
+              this client entirely. Set a per-session value below to track
+              what this work is worth even though nothing&apos;s charged.
+            </p>
+            <div className="mt-2 max-w-[10rem]">
+              <label className="mb-1 block text-xs font-medium text-ink">
+                Value per session
+              </label>
+              <Input
+                name="pro_bono_rate"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g. 90"
+                defaultValue={client.pro_bono_rate ?? ""}
+              />
+            </div>
+          </div>
 
           <Button type="submit">Save</Button>
         </form>

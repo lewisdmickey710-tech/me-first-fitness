@@ -753,6 +753,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   const care_profile_id = String(formData.get("care_profile_id") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
   const timezone = String(formData.get("timezone") ?? "").trim();
+  const pro_bono_rate_raw = String(formData.get("pro_bono_rate") ?? "").trim();
 
   const { error } = await supabase
     .from("clients")
@@ -776,6 +777,8 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       secondary_goal: textOrNull("secondary_goal"),
       key_health_notes: textOrNull("key_health_notes"),
       symptom_tracker_enabled: formData.get("symptom_tracker_enabled") === "on",
+      pro_bono: formData.get("pro_bono") === "on",
+      pro_bono_rate: pro_bono_rate_raw ? Number(pro_bono_rate_raw) : null,
     })
     .eq("id", clientId);
 

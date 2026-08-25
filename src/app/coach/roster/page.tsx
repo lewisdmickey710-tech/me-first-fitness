@@ -297,6 +297,20 @@ export default async function RosterPage({
     (p) => !linkedUserIds.has(p.id)
   ).length;
 
+  const sessionCountByClientId = new Map<string, number>();
+  for (const row of sessionRows ?? []) {
+    sessionCountByClientId.set(
+      row.client_id,
+      (sessionCountByClientId.get(row.client_id) ?? 0) + 1
+    );
+  }
+  const proBonoClients = (clients ?? []).filter((c) => c.pro_bono);
+  const proBonoTotalValue = proBonoClients.reduce(
+    (sum, c) =>
+      sum + (sessionCountByClientId.get(c.id) ?? 0) * (c.pro_bono_rate ?? 0),
+    0
+  );
+
   const inWindow = isFirstWeekOfMonth();
   const clientsNeedingWindow = (clients ?? []).filter(
     (c) =>
@@ -515,6 +529,22 @@ export default async function RosterPage({
         >
           View archived clients →
         </Link>
+      ) : null}
+
+      {!showArchived && proBonoClients.length > 0 ? (
+        <Card className="border-rose/30 bg-rose/5">
+          <p className="text-sm font-medium text-gray">
+            <Heart className="mr-1" />
+            Pro bono impact
+          </p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            ${proBonoTotalValue.toFixed(2)}
+            <span className="ml-2 text-sm font-normal text-gray">
+              across {proBonoClients.length} client
+              {proBonoClients.length > 1 ? "s" : ""}
+            </span>
+          </p>
+        </Card>
       ) : null}
 
       {pendingSignupCount > 0 ? (

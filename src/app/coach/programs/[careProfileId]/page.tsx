@@ -205,6 +205,7 @@ export default async function CareProfileProgramPage({
                       key={i}
                       className="space-y-1.5 rounded-xl border border-grayLt p-2"
                     >
+                      <input type="hidden" name="pde_id" value={row?.id ?? ""} />
                       <Select
                         name="exercise_id"
                         defaultValue={row?.exercise_id ?? ""}

@@ -519,7 +519,7 @@ export async function cancelMySession(
 
   if (error) throw new Error(error.message);
 
-  if (isNewLateCancellation) {
+  if (isNewLateCancellation && !me.pro_bono) {
     const remaining = effectiveFreeRemaining(
       me.late_cancel_free_remaining,
       priorLateCancellationCount > 0,
