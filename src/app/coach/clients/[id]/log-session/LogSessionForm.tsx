@@ -3,9 +3,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { addHabitForClient, addMilestone, logSession } from "@/app/coach/actions";
-import { Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
+import { Badge, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { PHASES } from "@/lib/constants";
+import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
 import type { SessionType } from "@/lib/types";
 
 export interface ProgramDayOption {
@@ -54,11 +55,13 @@ export function LogSessionForm({
   today,
   programDayOptions,
   defaultPhase,
+  lastEntry,
 }: {
   clientId: string;
   today: string;
   programDayOptions: ProgramDayOption[];
   defaultPhase: string;
+  lastEntry: LogEntry | null;
 }) {
   const availablePhases = useMemo(
     () =>
@@ -106,6 +109,21 @@ export function LogSessionForm({
     setRows([...filled, ...blankRows(2)]);
   }
 
+  function applyLastEntry() {
+    if (!lastEntry?.session) return;
+    setSessionType("program");
+    setActiveDayKey(null);
+    setDayLabel(lastEntry.session.day_label);
+    setDayLabelTouched(true);
+    const filled = lastEntry.session.entries.map((e) => ({
+      exercise: e.exercise,
+      sets: e.sets,
+      reps: e.reps,
+      weight: "",
+    }));
+    setRows([...filled, ...blankRows(2)]);
+  }
+
   function clearTemplate() {
     setActiveDayKey(null);
     setDayLabel("");
@@ -133,6 +151,53 @@ export function LogSessionForm({
 
   return (
     <div className="space-y-4">
+      {lastEntry ? (
+        <Card className="space-y-2 border-rose/30 bg-rose/5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-ink">
+              Last time{" "}
+              <span className="ml-1">
+                <Badge tone={LOG_ENTRY_KIND_TONE[lastEntry.kind]}>
+                  {LOG_ENTRY_KIND_LABEL[lastEntry.kind]}
+                </Badge>
+              </span>
+            </p>
+            <p className="text-sm text-gray">{lastEntry.date}</p>
+          </div>
+          <p className="text-sm font-medium text-ink">
+            {lastEntry.session ? lastEntry.session.day_label : lastEntry.activity!.type}
+          </p>
+          {lastEntry.session && lastEntry.session.entries.length > 0 ? (
+            <ul className="space-y-0.5 text-sm text-gray">
+              {lastEntry.session.entries.map((e, i) => (
+                <li key={i}>
+                  {e.exercise}
+                  {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
+                  {e.weight ? ` @ ${e.weight}` : ""}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          {lastEntry.session?.day_notes ? (
+            <p className="text-sm text-ink">{lastEntry.session.day_notes}</p>
+          ) : null}
+          {lastEntry.activity?.notes ? (
+            <p className="text-sm text-ink">{lastEntry.activity.notes}</p>
+          ) : null}
+          {lastEntry.session?.coach_notes || lastEntry.activity?.coach_notes ? (
+            <p className="rounded-lg bg-white px-2 py-1.5 text-sm text-ink">
+              <span className="font-medium">Your note: </span>
+              {lastEntry.session?.coach_notes ?? lastEntry.activity?.coach_notes}
+            </p>
+          ) : null}
+          {lastEntry.session && lastEntry.session.entries.length > 0 ? (
+            <Button type="button" variant="secondary" onClick={applyLastEntry}>
+              Use as starting point
+            </Button>
+          ) : null}
+        </Card>
+      ) : null}
+
       <Card className="space-y-3">
         <p className="text-sm font-medium text-ink">
           What&apos;s today&apos;s session?

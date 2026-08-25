@@ -19,6 +19,7 @@ import {
   markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
+  setLogEntryCoachNotes,
   setRequestStatus,
   startClientHold,
   touchProgramUpdated,
@@ -1963,6 +1964,38 @@ async function LogTab({
                     ) : null}
                   </>
                 ) : null}
+
+                <Collapsible
+                  label={
+                    (s?.coach_notes ?? a?.coach_notes)
+                      ? "Coach notes (only you see this)"
+                      : "+ Add a coach note (only you see this)"
+                  }
+                  className="mt-2"
+                >
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      await setLogEntryCoachNotes(
+                        clientId,
+                        s ? "session" : "activity",
+                        entry.id,
+                        formData
+                      );
+                    }}
+                    className="mt-2 space-y-2"
+                  >
+                    <Textarea
+                      name="coach_notes"
+                      rows={2}
+                      placeholder="What should shape the next session -- what to repeat, what to address..."
+                      defaultValue={s?.coach_notes ?? a?.coach_notes ?? ""}
+                    />
+                    <Button type="submit" variant="secondary">
+                      Save note
+                    </Button>
+                  </form>
+                </Collapsible>
 
                 {s ? (
                   <form

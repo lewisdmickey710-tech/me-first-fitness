@@ -354,6 +354,31 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Private planning notes on a logged workout or activity -- never exposed
+// to the client (every client-facing query explicitly omits this column;
+// see migration 0083). Meant for things like "favored the left knee,
+// check in on that" or "skipped the accessory work again" that shape the
+// next session without going in the client-visible notes.
+export async function setLogEntryCoachNotes(
+  clientId: string,
+  entryKind: "session" | "activity",
+  entryId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+  const coach_notes = String(formData.get("coach_notes") ?? "").trim() || null;
+
+  const table = entryKind === "session" ? "sessions" : "activities";
+  const { error } = await supabase
+    .from(table)
+    .update({ coach_notes })
+    .eq("id", entryId)
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 // Per-client edits to a prescribed exercise (swap it, change sets/reps, or
 // drop it entirely) without touching the shared care-profile template
 // everyone else on that track follows. One row per client + exercise slot

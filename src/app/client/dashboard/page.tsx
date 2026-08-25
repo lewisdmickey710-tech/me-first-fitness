@@ -50,7 +50,10 @@ export default async function ClientDashboard() {
   ] = await Promise.all([
     supabase
       .from("sessions")
-      .select("*")
+      // coach_notes is deliberately excluded -- coach's-eyes-only.
+      .select(
+        "id, client_id, day_label, date, entries, rating, day_notes, logged_by, session_type, body_map, payment_status, coached, created_at"
+      )
       .eq("client_id", me.id)
       .order("date", { ascending: false })
       .limit(5) as unknown as Promise<{ data: TrainingSession[] | null }>,

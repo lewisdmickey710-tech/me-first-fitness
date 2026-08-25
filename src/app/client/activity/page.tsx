@@ -31,7 +31,8 @@ export default async function ClientActivityPage() {
 
   const { data: activities } = (await supabase
     .from("activities")
-    .select("*")
+    // coach_notes is deliberately excluded -- coach's-eyes-only.
+    .select("id, client_id, date, type, duration, notes, logged_by, created_at")
     .eq("client_id", me.id)
     .order("date", { ascending: false })) as { data: Activity[] | null };
 

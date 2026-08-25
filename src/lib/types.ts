@@ -92,6 +92,7 @@ export interface TrainingSession {
   body_map: BodyMapMarker[] | null;
   payment_status: "paid" | "unpaid" | "waived" | null;
   coached: boolean;
+  coach_notes: string | null;
   created_at: string;
 }
 
@@ -150,6 +151,7 @@ export interface Activity {
   duration: string | null;
   notes: string | null;
   logged_by: "coach" | "client";
+  coach_notes: string | null;
   created_at: string;
 }
 

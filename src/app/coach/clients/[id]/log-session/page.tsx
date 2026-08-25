@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
-import type { Client } from "@/lib/types";
+import { mergeLogEntries } from "@/lib/log-entries";
+import type { Activity, Client, TrainingSession } from "@/lib/types";
 import { LogSessionForm, type ProgramDayOption } from "./LogSessionForm";
 
 interface ProgramDayJoinRow {
@@ -36,19 +37,34 @@ export default async function LogSessionPage({
 
   if (!client) notFound();
 
-  const [{ data: days }, currentPhase] = await Promise.all([
-    client.care_profile_id
-      ? (supabase
-          .from("program_days")
-          .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name))")
-          .eq("care_profile_id", client.care_profile_id)
-          .order("phase")
-          .order("day_number") as unknown as Promise<{
-          data: ProgramDayJoinRow[] | null;
-        }>)
-      : Promise.resolve({ data: null }),
-    getCurrentPhase(supabase, id),
-  ]);
+  const [{ data: days }, currentPhase, { data: lastSessions }, { data: lastActivities }] =
+    await Promise.all([
+      client.care_profile_id
+        ? (supabase
+            .from("program_days")
+            .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name))")
+            .eq("care_profile_id", client.care_profile_id)
+            .order("phase")
+            .order("day_number") as unknown as Promise<{
+            data: ProgramDayJoinRow[] | null;
+          }>)
+        : Promise.resolve({ data: null }),
+      getCurrentPhase(supabase, id),
+      supabase
+        .from("sessions")
+        .select("*")
+        .eq("client_id", id)
+        .order("date", { ascending: false })
+        .limit(1) as unknown as Promise<{ data: TrainingSession[] | null }>,
+      supabase
+        .from("activities")
+        .select("*")
+        .eq("client_id", id)
+        .order("date", { ascending: false })
+        .limit(1) as unknown as Promise<{ data: Activity[] | null }>,
+    ]);
+
+  const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
 
   const allPdeIds = (days ?? []).flatMap((d) =>
     d.program_day_exercises.map((pde) => pde.id)
@@ -122,6 +138,7 @@ export default async function LogSessionPage({
         today={today}
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
+        lastEntry={lastEntry}
       />
     </div>
   );
