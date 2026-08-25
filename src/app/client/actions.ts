@@ -73,9 +73,9 @@ export async function logActivity(formData: FormData) {
 
   if (error) throw new Error(error.message);
 
-  revalidatePath("/client/program");
+  revalidatePath("/client/activity");
   revalidatePath("/client/dashboard");
-  redirect("/client/program");
+  redirect("/client/activity");
 }
 
 export async function submitServiceCheckin(formData: FormData) {

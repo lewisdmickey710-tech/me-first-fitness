@@ -2,11 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
-import {
-  logActivity,
-  logMyWorkout,
-  setProgramExerciseSwap,
-} from "@/app/client/actions";
+import { logMyWorkout, setProgramExerciseSwap } from "@/app/client/actions";
 import {
   Button,
   Card,
@@ -14,11 +10,10 @@ import {
   EmptyState,
   Input,
   PhaseBanner,
-  Select,
   StarRatingInput,
   Textarea,
 } from "@/components/ui";
-import { ACTIVITY_TYPES, phaseInfo } from "@/lib/constants";
+import { phaseInfo } from "@/lib/constants";
 import { toDateString } from "@/lib/timezone";
 
 interface ProgramDayJoinRow {
@@ -388,49 +383,20 @@ export default async function ClientProgramPage() {
       )}
 
       <Card>
-        <Collapsible label="Did something else active? Log it">
-          <p className="mb-3 text-sm text-gray">
-            A class, a walk, a workout with friends — anything active outside
-            what&apos;s prescribed above.
-          </p>
-          <form action={logActivity} className="space-y-4">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                Date
-              </label>
-              <Input name="date" type="date" required defaultValue={today} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                Type
-              </label>
-              <Select name="type" required defaultValue="">
-                <option value="" disabled>
-                  Choose one
-                </option>
-                {ACTIVITY_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                Duration{" "}
-                <span className="font-normal text-gray">(optional)</span>
-              </label>
-              <Input name="duration" placeholder="e.g. 30 min" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                Notes
-              </label>
-              <Textarea name="notes" rows={3} />
-            </div>
-            <Button type="submit">Save activity</Button>
-          </form>
-        </Collapsible>
+        <p className="text-sm font-medium text-ink">
+          Did something else active?
+        </p>
+        <p className="mt-1 text-sm text-gray">
+          A class, a walk, a workout with friends — log it from the Activity
+          tab instead of here, so it doesn&apos;t get counted as one of your
+          prescribed program days.
+        </p>
+        <Link
+          href="/client/activity"
+          className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          Go to Activity log →
+        </Link>
       </Card>
     </div>
   );

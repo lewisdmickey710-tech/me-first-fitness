@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CareProfilePicker } from "@/app/coach/roster/new/CareProfilePicker";
 import {
+  addActivityAsCoach,
   addClientNote,
   addMilestone,
   advancePhase,
@@ -11,6 +12,7 @@ import {
   coachCancelSession,
   confirmVideoSessionRequest,
   deleteClientNote,
+  deleteLoggedSession,
   deleteMilestone,
   endClientHold,
   logSessionOccurrence,
@@ -25,6 +27,7 @@ import {
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { BackLink } from "@/components/back-link";
+import { ConfirmButton } from "@/components/confirm-button";
 import { MarkViewed } from "./MarkViewed";
 import {
   Badge,
@@ -43,7 +46,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
-import { phaseInfo } from "@/lib/constants";
+import { ACTIVITY_TYPES, phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
 import {
@@ -503,7 +506,9 @@ export default async function ClientDetailPage({
           progressPhotoUrlByPath={progressPhotoUrlByPath}
         />
       )}
-      {tab === "activity" && <ActivityTab activities={activities ?? []} />}
+      {tab === "activity" && (
+        <ActivityTab clientId={id} activities={activities ?? []} />
+      )}
       {tab === "requests" && (
         <RequestsTab clientId={id} requests={requests ?? []} payments={payments ?? []} />
       )}
@@ -1866,6 +1871,21 @@ async function SessionsTab({
                   <BodyMapInput defaultValue={s.body_map} readOnly />
                 </Collapsible>
               ) : null}
+              <form
+                action={async () => {
+                  "use server";
+                  await deleteLoggedSession(clientId, s.id);
+                }}
+                className="mt-2"
+              >
+                <ConfirmButton
+                  variant="ghost"
+                  confirmText="Delete this logged session? This can't be undone -- if it was really out-of-session activity, log it as one from the Activity tab instead."
+                  className="text-xs text-gray hover:text-pink"
+                >
+                  Delete
+                </ConfirmButton>
+              </form>
             </Card>
           ))}
         </div>
@@ -2541,29 +2561,69 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ActivityTab({ activities }: { activities: Activity[] }) {
-  if (activities.length === 0) {
-    return (
-      <EmptyState
-        title="No activity logged yet"
-        body="Out-of-session activity your client logs will show up here."
-      />
-    );
-  }
+function ActivityTab({
+  clientId,
+  activities,
+}: {
+  clientId: string;
+  activities: Activity[];
+}) {
+  const boundAdd = addActivityAsCoach.bind(null, clientId);
+  const today = new Date().toISOString().slice(0, 10);
+
   return (
-    <div className="space-y-3">
-      {activities.map((a) => (
-        <Card key={a.id}>
-          <div className="flex items-center justify-between">
-            <p className="font-medium text-ink">{a.type}</p>
-            <p className="text-sm text-gray">{a.date}</p>
+    <div className="space-y-4">
+      <Card>
+        <p className="mb-2 text-sm font-medium text-ink">Log activity for this client</p>
+        <form action={boundAdd} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink">Date</label>
+              <Input name="date" type="date" required defaultValue={today} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink">Type</label>
+              <Select name="type" required defaultValue="">
+                <option value="" disabled>
+                  Choose one
+                </option>
+                {ACTIVITY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </div>
-          {a.duration ? (
-            <p className="mt-1 text-sm text-gray">{a.duration}</p>
-          ) : null}
-          {a.notes ? <p className="mt-1 text-sm text-ink">{a.notes}</p> : null}
-        </Card>
-      ))}
+          <Input name="duration" placeholder="Duration (optional) -- e.g. 30 min" />
+          <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
+          <Button type="submit" variant="secondary">
+            Log activity
+          </Button>
+        </form>
+      </Card>
+
+      {activities.length === 0 ? (
+        <EmptyState
+          title="No activity logged yet"
+          body="Out-of-session activity you or this client log will show up here."
+        />
+      ) : (
+        <div className="space-y-3">
+          {activities.map((a) => (
+            <Card key={a.id}>
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">{a.type}</p>
+                <p className="text-sm text-gray">{a.date}</p>
+              </div>
+              {a.duration ? (
+                <p className="mt-1 text-sm text-gray">{a.duration}</p>
+              ) : null}
+              {a.notes ? <p className="mt-1 text-sm text-ink">{a.notes}</p> : null}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

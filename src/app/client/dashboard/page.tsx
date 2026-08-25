@@ -208,6 +208,7 @@ export default async function ClientDashboard() {
 
       <div className="grid grid-cols-3 gap-3">
         <QuickAction href="/client/program" label="My program" />
+        <QuickAction href="/client/activity" label="Activity log" />
         <QuickAction href="/client/schedule" label="My schedule" />
         <QuickAction href="/client/checkin" label="Log check-in" />
         <QuickAction href="/client/habits" label="Habits" />

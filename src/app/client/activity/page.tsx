@@ -1,0 +1,123 @@
+import { BackLink } from "@/components/back-link";
+import { createClient } from "@/lib/supabase/server";
+import { getMyClient } from "@/lib/current-client";
+import { logActivity } from "@/app/client/actions";
+import {
+  Button,
+  Card,
+  EmptyState,
+  Heart,
+  Input,
+  Select,
+  Textarea,
+} from "@/components/ui";
+import { ACTIVITY_TYPES } from "@/lib/constants";
+import { toDateString } from "@/lib/timezone";
+import type { Activity } from "@/lib/types";
+
+export default async function ClientActivityPage() {
+  const me = await getMyClient();
+
+  if (!me) {
+    return (
+      <EmptyState
+        title="No profile linked yet"
+        body="Your coach hasn't linked your login to a client profile yet. Check back soon, or reach out."
+      />
+    );
+  }
+
+  const supabase = await createClient();
+
+  const { data: activities } = (await supabase
+    .from("activities")
+    .select("*")
+    .eq("client_id", me.id)
+    .order("date", { ascending: false })) as { data: Activity[] | null };
+
+  const today = toDateString(new Date());
+
+  return (
+    <div className="space-y-6">
+      <BackLink href="/client/dashboard" />
+
+      <h1 className="text-xl font-semibold text-ink">
+        <Heart className="mr-1.5" />
+        Activity log
+      </h1>
+      <p className="text-sm text-gray">
+        A class, a walk, a workout with friends — anything active that
+        wasn&apos;t one of your prescribed program days. Log a prescribed
+        workout from{" "}
+        <a href="/client/program" className="text-rose hover:underline">
+          My program
+        </a>{" "}
+        instead, so it counts toward that.
+      </p>
+
+      <Card>
+        <form action={logActivity} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Date
+            </label>
+            <Input name="date" type="date" required defaultValue={today} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Type
+            </label>
+            <Select name="type" required defaultValue="">
+              <option value="" disabled>
+                Choose one
+              </option>
+              {ACTIVITY_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Duration{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Input name="duration" placeholder="e.g. 30 min" />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Notes
+            </label>
+            <Textarea name="notes" rows={3} />
+          </div>
+          <Button type="submit">Save activity</Button>
+        </form>
+      </Card>
+
+      {!activities || activities.length === 0 ? (
+        <EmptyState
+          title="Nothing logged yet"
+          body="Once you log an activity above, it'll show up here."
+        />
+      ) : (
+        <div className="space-y-3">
+          {activities.map((a) => (
+            <Card key={a.id}>
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">{a.type}</p>
+                <p className="text-sm text-gray">{a.date}</p>
+              </div>
+              {a.duration ? (
+                <p className="mt-1 text-sm text-gray">{a.duration}</p>
+              ) : null}
+              {a.notes ? (
+                <p className="mt-1 text-sm text-ink">{a.notes}</p>
+              ) : null}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

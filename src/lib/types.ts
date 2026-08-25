@@ -110,6 +110,12 @@ export interface BusinessSettings {
   updated_at: string;
 }
 
+export interface BusinessFinanceSettings {
+  id: true;
+  estimated_tax_rate: number | null;
+  updated_at: string;
+}
+
 export interface ClientMilestone {
   id: string;
   client_id: string;

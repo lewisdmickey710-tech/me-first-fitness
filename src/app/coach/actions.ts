@@ -304,6 +304,48 @@ export async function logSession(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=sessions`);
 }
 
+// Cleans up a mis-logged entry -- e.g. a client using the prescribed-day
+// log form for something that was actually out-of-session activity. The
+// clientId check is just defense against a stale/tampered id from an old
+// page load, not a real cross-client risk (this is coach-only already).
+export async function deleteLoggedSession(clientId: string, sessionId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Lets the coach log an out-of-session activity on a client's behalf --
+// e.g. re-recording something they mistakenly logged as a prescribed
+// session, or something they mentioned in person, without needing the
+// client to do it themselves.
+export async function addActivityAsCoach(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  const type = String(formData.get("type") ?? "").trim();
+  const duration = String(formData.get("duration") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!date || !type) throw new Error("Date and type are required.");
+
+  const { error } = await supabase.from("activities").insert({
+    client_id: clientId,
+    date,
+    type,
+    duration: duration || null,
+    notes: notes || null,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 // Per-client edits to a prescribed exercise (swap it, change sets/reps, or
 // drop it entirely) without touching the shared care-profile template
 // everyone else on that track follows. One row per client + exercise slot
@@ -555,6 +597,24 @@ export async function updatePaymentMethods(formData: FormData) {
   revalidatePath("/coach/settings");
   revalidatePath("/client/dashboard");
   revalidatePath("/client/schedule");
+}
+
+export async function updateBusinessFinanceSettings(formData: FormData) {
+  const supabase = await createClient();
+
+  const rateRaw = String(formData.get("estimated_tax_rate") ?? "").trim();
+
+  const { error } = await supabase
+    .from("business_finance_settings")
+    .update({
+      estimated_tax_rate: rateRaw ? Number(rateRaw) : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", true);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
 }
 
 export async function addPayment(clientId: string, formData: FormData) {
