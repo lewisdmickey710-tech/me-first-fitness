@@ -14,22 +14,11 @@ export function TopNav({
 }) {
   return (
     <header className="border-b border-grayLt bg-pink/15">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <a href="/" className="shrink-0 font-semibold text-ink">
           <Heart className="mr-1.5" />
           {title}
         </a>
-        <nav className="hidden flex-wrap gap-2 sm:flex">
-          {links?.map((l) => (
-            <a
-              key={l.href}
-              href={l.href}
-              className="rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
-            >
-              {l.label}
-            </a>
-          ))}
-        </nav>
         <div className="flex shrink-0 items-center gap-2">
           {faqHref ? (
             <a
@@ -42,6 +31,24 @@ export function TopNav({
           <SignOutButton />
         </div>
       </div>
+      {links && links.length > 0 ? (
+        // A narrow phone screen can't fit every link on one line the way
+        // a desktop can -- rather than hiding the whole nav below some
+        // breakpoint with nothing to replace it (the previous behavior),
+        // this scrolls horizontally on any screen too narrow to show it
+        // all at once, so the nav is always reachable.
+        <nav className="mx-auto flex max-w-5xl gap-2 overflow-x-auto px-4 pb-3">
+          {links.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="shrink-0 rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
+      ) : null}
     </header>
   );
 }
