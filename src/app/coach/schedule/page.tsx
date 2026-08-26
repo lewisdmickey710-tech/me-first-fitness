@@ -305,6 +305,7 @@ export default async function CoachSchedulePage({
           }))}
           bookings={weekBookings}
           requests={requestChips}
+          clients={[...(allClients ?? [])].sort((a, b) => a.name.localeCompare(b.name))}
           prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
           nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
           weekLabel={weekLabel}

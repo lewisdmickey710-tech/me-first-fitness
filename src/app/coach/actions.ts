@@ -11,10 +11,12 @@ import {
   sendDayBlockedEmail,
   sendRequestCounteredEmail,
   sendSessionRescheduledEmail,
+  sendSessionBookedEmail,
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
+import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
@@ -306,6 +308,158 @@ export async function coachRescheduleSession(
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/schedule");
   revalidatePath("/coach/availability");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
+}
+
+function timeToMinutes(t: string): number {
+  const [h, m] = t.slice(0, 5).split(":").map(Number);
+  return h * 60 + m;
+}
+
+function timesOverlap(
+  aStart: string,
+  aDurationMinutes: number,
+  bStart: string,
+  bDurationMinutes: number
+): boolean {
+  const aS = timeToMinutes(aStart);
+  const bS = timeToMinutes(bStart);
+  return aS < bS + bDurationMinutes && bS < aS + aDurationMinutes;
+}
+
+// Clicking an open slot on the schedule grid books it directly -- no
+// request/accept round trip, since the coach is the one initiating this.
+// Mirrors submitRequest's own conflict checks (client/actions.ts) so a
+// slot that looks open on the grid can't silently double-book someone.
+export async function coachBookSession(
+  clientId: string,
+  date: string,
+  time: string,
+  requestType: "session" | "checkin_call" | "video_session"
+) {
+  const supabase = await createClient();
+
+  let durationMinutes = CALL_DURATION_MINUTES;
+  if (requestType === "session") {
+    const { data: mySchedule } = await supabase
+      .from("client_schedules")
+      .select("duration_minutes")
+      .eq("client_id", clientId)
+      .eq("active", true)
+      .limit(1)
+      .maybeSingle();
+    durationMinutes = mySchedule?.duration_minutes ?? 60;
+  }
+
+  const { data: blockedRows } = await supabase
+    .from("coach_blocked_dates")
+    .select("start_time, end_time")
+    .eq("blocked_date", date);
+  for (const b of blockedRows ?? []) {
+    if (!b.start_time || !b.end_time) {
+      throw new Error("That whole day is blocked off.");
+    }
+    const blockStart = b.start_time.slice(0, 5);
+    const blockDurationMinutes = timeToMinutes(b.end_time.slice(0, 5)) - timeToMinutes(blockStart);
+    if (timesOverlap(time, durationMinutes, blockStart, blockDurationMinutes)) {
+      throw new Error("That time is blocked off.");
+    }
+  }
+
+  const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const [{ data: recurring }, { data: dateOccurrences }] = await Promise.all([
+    supabase
+      .from("client_schedules")
+      .select("client_id, time_of_day, duration_minutes")
+      .eq("day_of_week", dayOfWeek)
+      .eq("active", true),
+    supabase
+      .from("session_occurrences")
+      .select("client_id, status, notes, duration_minutes")
+      .eq("occurrence_date", date),
+  ]);
+
+  const overrideStatusByClient = new Map(
+    (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
+  );
+  const recurringConflict = (recurring ?? []).some((s) => {
+    const overridden = ["cancelled", "late_cancelled", "rescheduled"].includes(
+      overrideStatusByClient.get(s.client_id) ?? ""
+    );
+    return !overridden && timesOverlap(time, durationMinutes, s.time_of_day, s.duration_minutes);
+  });
+  const oneOffConflict = (dateOccurrences ?? []).some((o) => {
+    if (o.status !== "scheduled") return false;
+    const match = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    if (!match) return false;
+    return timesOverlap(time, durationMinutes, match[1], o.duration_minutes);
+  });
+  if (recurringConflict || oneOffConflict) {
+    throw new Error("That time is already booked — pick another slot.");
+  }
+
+  const { error } = await supabase.from("session_occurrences").upsert(
+    {
+      client_id: clientId,
+      occurrence_date: date,
+      status: "scheduled",
+      notes: `Confirmed request — ${time}`,
+      duration_minutes: durationMinutes,
+      is_video_session: requestType === "video_session",
+    },
+    { onConflict: "client_id,occurrence_date" }
+  );
+  if (error) throw new Error(error.message);
+
+  // A video session is normally paid up front through the client's own
+  // request flow (submitRequest, client/actions.ts) -- booking one
+  // directly here still needs that payment record to exist so it shows up
+  // correctly in Finances, it's just left unpaid/due rather than gating
+  // the booking on payment first, since the coach is creating this herself.
+  if (requestType === "video_session") {
+    const { error: paymentError } = await supabase.from("payments").insert({
+      client_id: clientId,
+      description: `Video session — ${date} at ${formatTimeOfDay(time)}`,
+      amount: VIDEO_SESSION_RATE,
+      due_date: date,
+      kind: "session",
+    });
+    if (paymentError) throw new Error(paymentError.message);
+  }
+
+  const kindLabel =
+    requestType === "video_session"
+      ? "video session"
+      : requestType === "checkin_call"
+        ? "check-in call"
+        : "session";
+
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("name, user_id")
+      .eq("id", clientId)
+      .single();
+    if (client) {
+      const email = await clientLoginEmail(client.user_id);
+      if (email) {
+        await sendSessionBookedEmail(
+          email,
+          client.name,
+          `${date} at ${formatTimeOfDay(time)}`,
+          kindLabel
+        );
+      }
+    }
+  } catch (emailError) {
+    console.error("Failed to send session-booked email", emailError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
+  revalidatePath("/coach/availability");
+  revalidatePath("/coach/finances");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
 }

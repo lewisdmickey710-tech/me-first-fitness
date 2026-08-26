@@ -330,6 +330,31 @@ export async function sendSessionRescheduledEmail(
   });
 }
 
+export async function sendSessionBookedEmail(
+  to: string,
+  clientName: string,
+  whenText: string,
+  kindLabel: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping session-booked email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "You're booked!",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>I went ahead and got you booked in for a <strong>${kindLabel}</strong>:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${whenText}</strong>
+      </p>
+      <p>See you then! Reach out if this time doesn't work for you.</p>
+    `),
+  });
+}
+
 export async function sendRequestCounteredEmail(
   to: string,
   clientName: string,

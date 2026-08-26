@@ -7,9 +7,17 @@ import {
   setRequestStatus,
   counterRequest,
   coachRescheduleSession,
+  coachBookSession,
 } from "@/app/coach/actions";
-import { Button } from "@/components/ui";
+import { Button, Select } from "@/components/ui";
 import { formatTimeOfDay } from "@/lib/schedule";
+
+const BOOKING_TYPES = [
+  { id: "session", label: "In-person session" },
+  { id: "checkin_call", label: "Check-in call" },
+  { id: "video_session", label: "Video session" },
+] as const;
+type BookingType = (typeof BOOKING_TYPES)[number]["id"];
 
 const HOUR_START = 6; // 6:00 AM
 const HOUR_END = 21; // 9:00 PM
@@ -89,6 +97,7 @@ export function ScheduleGrid({
   blocks,
   bookings,
   requests,
+  clients,
   prevWeekHref,
   nextWeekHref,
   weekLabel,
@@ -99,6 +108,7 @@ export function ScheduleGrid({
   blocks: BlockRow[];
   bookings: DayBooking[];
   requests: RequestChip[];
+  clients: { id: string; name: string }[];
   prevWeekHref: string;
   nextWeekHref: string;
   weekLabel: string;
@@ -112,6 +122,11 @@ export function ScheduleGrid({
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(
     null
   );
+  const [newBookingSlot, setNewBookingSlot] = useState<{ date: string; time: string } | null>(
+    null
+  );
+  const [newBookingClientId, setNewBookingClientId] = useState("");
+  const [newBookingType, setNewBookingType] = useState<BookingType>("session");
   const [error, setError] = useState<string | null>(null);
 
   const norm = (t: string) => t.slice(0, 5);
@@ -293,6 +308,29 @@ export function ScheduleGrid({
     });
   }
 
+  function openNewBooking(date: string, slot: number) {
+    setError(null);
+    setSelectedRequestId(null);
+    setPendingReschedule(null);
+    setNewBookingClientId("");
+    setNewBookingType("session");
+    setNewBookingSlot({ date, time: BOUNDARIES[slot] });
+  }
+
+  function confirmNewBooking() {
+    if (!newBookingSlot || !newBookingClientId) return;
+    const { date, time } = newBookingSlot;
+    startTransition(async () => {
+      try {
+        await coachBookSession(newBookingClientId, date, time, newBookingType);
+        setNewBookingSlot(null);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't book that slot.");
+      }
+    });
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -306,11 +344,11 @@ export function ScheduleGrid({
       </div>
 
       <p className="text-xs text-gray">
-        Tap a purple request to accept or decline it. Drag it to a different
-        slot to propose that time instead — your client can then accept it
-        or send a new request. Drag a booked (pink) session to a different
-        slot to reschedule it — you&apos;ll be asked to confirm before it
-        moves, and your client gets an email with the new time.
+        Tap an open slot to book someone in right there. Tap a purple
+        request to accept or decline it, or drag it to a different slot to
+        propose that time instead. Drag a booked (pink) session to a
+        different slot to reschedule it — you&apos;ll be asked to confirm
+        before it moves. Client emails go out automatically either way.
       </p>
 
       {unscheduledRequests.length > 0 ? (
@@ -417,7 +455,14 @@ export function ScheduleGrid({
                         proposeReschedule(dragBooking, day.date, slot);
                       }
                     }}
-                    onClick={() => (req ? selectRequest(req) : undefined)}
+                    onClick={() => {
+                      if (req) {
+                        selectRequest(req);
+                        return;
+                      }
+                      if (block || booking || day.date < todayStr) return;
+                      openNewBooking(day.date, slot);
+                    }}
                     title={
                       block
                         ? `Blocked${block.reason ? `: ${block.reason}` : ""}`
@@ -544,6 +589,54 @@ export function ScheduleGrid({
               variant="secondary"
               disabled={isPending}
               onClick={() => setPendingReschedule(null)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : null}
+
+      {newBookingSlot ? (
+        <div className="space-y-2 rounded-xl border border-teal/50 bg-teal/10 p-3">
+          <p className="text-sm font-medium text-ink">
+            Book {newBookingSlot.date} at {formatTimeOfDay(newBookingSlot.time)}
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Select
+              value={newBookingClientId}
+              onChange={(e) => setNewBookingClientId(e.target.value)}
+            >
+              <option value="">Select client…</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={newBookingType}
+              onChange={(e) => setNewBookingType(e.target.value as BookingType)}
+            >
+              {BOOKING_TYPES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              disabled={isPending || !newBookingClientId}
+              onClick={confirmNewBooking}
+            >
+              Book &amp; email them
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isPending}
+              onClick={() => setNewBookingSlot(null)}
             >
               Cancel
             </Button>
