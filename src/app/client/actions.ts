@@ -1222,6 +1222,17 @@ export async function addNutritionLog(formData: FormData) {
     const raw = String(formData.get(key) ?? "").trim();
     return raw ? Number(raw) : null;
   };
+  // hunger_before/fullness_after/satisfaction have a check constraint
+  // (1-10, 1-10, 1-5) -- the form's min/max attributes are only a
+  // suggestion to the browser, not something it always enforces (pasted
+  // values, some mobile keyboards, autofill), so an out-of-range number
+  // reaching the insert below would violate the constraint and crash
+  // instead of saving. Clamp into range rather than trust the browser.
+  const clampedIntOrNull = (key: string, min: number, max: number) => {
+    const n = numOrNull(key);
+    if (n === null || !Number.isFinite(n)) return null;
+    return Math.min(max, Math.max(min, Math.round(n)));
+  };
   const textOrNull = (key: string) => {
     const raw = String(formData.get(key) ?? "").trim();
     return raw || null;
@@ -1245,9 +1256,9 @@ export async function addNutritionLog(formData: FormData) {
     log_date: logDate,
     meal_label: textOrNull("meal_label"),
     description: textOrNull("description"),
-    hunger_before: numOrNull("hunger_before"),
-    fullness_after: numOrNull("fullness_after"),
-    satisfaction: numOrNull("satisfaction"),
+    hunger_before: clampedIntOrNull("hunger_before", 1, 10),
+    fullness_after: clampedIntOrNull("fullness_after", 1, 10),
+    satisfaction: clampedIntOrNull("satisfaction", 1, 5),
     calories: numOrNull("calories"),
     protein_g: numOrNull("protein_g"),
     carbs_g: numOrNull("carbs_g"),
