@@ -55,6 +55,13 @@ export default async function LeadIntakePage() {
         &quot;right.&quot;
       </p>
 
+      <div className="rounded-xl border border-rose/30 bg-rose/5 p-3 text-sm text-ink">
+        <strong>Heads up:</strong> this takes most people about 15–20
+        minutes. Set aside a quiet block of time so you can answer
+        thoroughly — the more I know going in, the better I can build
+        around you.
+      </div>
+
       <form action={submitLeadIntake} className="space-y-6">
         <Card className="space-y-4">
           <SectionTitle>You</SectionTitle>
