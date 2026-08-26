@@ -32,9 +32,26 @@ export default async function ClientActivityPage() {
   const { data: activities } = (await supabase
     .from("activities")
     // coach_notes is deliberately excluded -- coach's-eyes-only.
-    .select("id, client_id, date, type, duration, notes, logged_by, created_at")
+    .select(
+      "id, client_id, date, type, duration, notes, logged_by, photo_path, created_at"
+    )
     .eq("client_id", me.id)
     .order("date", { ascending: false })) as { data: Activity[] | null };
+
+  const photoUrlByPath = new Map<string, string>();
+  const photoPaths = [
+    ...new Set((activities ?? []).map((a) => a.photo_path).filter(Boolean)),
+  ] as string[];
+  if (photoPaths.length > 0) {
+    await Promise.all(
+      photoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) photoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
 
   const today = toDateString(new Date());
 
@@ -92,6 +109,19 @@ export default async function ClientActivityPage() {
             </label>
             <Textarea name="notes" rows={3} />
           </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Photo{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <input
+              type="file"
+              name="photo"
+              accept="image/*"
+              capture="environment"
+              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+            />
+          </div>
           <Button type="submit">Save activity</Button>
         </form>
       </Card>
@@ -111,6 +141,14 @@ export default async function ClientActivityPage() {
               </div>
               {a.duration ? (
                 <p className="mt-1 text-sm text-gray">{a.duration}</p>
+              ) : null}
+              {a.photo_path && photoUrlByPath.has(a.photo_path) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrlByPath.get(a.photo_path)}
+                  alt="Activity photo"
+                  className="mt-2 max-h-64 w-full rounded-xl object-cover"
+                />
               ) : null}
               {a.notes ? (
                 <p className="mt-1 text-sm text-ink">{a.notes}</p>

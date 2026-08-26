@@ -155,6 +155,7 @@ export interface Activity {
   notes: string | null;
   logged_by: "coach" | "client";
   coach_notes: string | null;
+  photo_path: string | null;
   created_at: string;
 }
 

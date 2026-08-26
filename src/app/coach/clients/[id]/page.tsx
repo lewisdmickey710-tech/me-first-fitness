@@ -1808,9 +1808,10 @@ async function LogTab({
   symptomTrackerEnabled: boolean;
 }) {
   const mediaPaths = [
-    ...new Set(
-      sessions.flatMap((s) => s.entries.map((e) => e.media_path).filter(Boolean))
-    ),
+    ...new Set([
+      ...sessions.flatMap((s) => s.entries.map((e) => e.media_path).filter(Boolean)),
+      ...activities.map((a) => a.photo_path).filter(Boolean),
+    ]),
   ] as string[];
 
   const mediaUrlByPath = new Map<string, string>();
@@ -1864,6 +1865,12 @@ async function LogTab({
             </div>
             <Input name="duration" placeholder="Duration (optional) -- e.g. 30 min" />
             <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
+            <input
+              type="file"
+              name="photo"
+              accept="image/*"
+              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+            />
             <Button type="submit" variant="secondary">
               Log activity
             </Button>
@@ -1964,6 +1971,14 @@ async function LogTab({
                   <>
                     {a.duration ? (
                       <p className="mt-2 text-sm text-gray">{a.duration}</p>
+                    ) : null}
+                    {a.photo_path && mediaUrlByPath.has(a.photo_path) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={mediaUrlByPath.get(a.photo_path)}
+                        alt="Activity photo"
+                        className="mt-2 max-h-64 w-full rounded-xl object-cover"
+                      />
                     ) : null}
                     {a.notes ? (
                       <p className="mt-1 text-sm text-ink">{a.notes}</p>

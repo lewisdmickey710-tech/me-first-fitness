@@ -37,7 +37,9 @@ export default async function ClientHistoryPage() {
     supabase
       .from("activities")
       // coach_notes is deliberately excluded -- coach's-eyes-only.
-      .select("id, client_id, date, type, duration, notes, logged_by, created_at")
+      .select(
+        "id, client_id, date, type, duration, notes, logged_by, photo_path, created_at"
+      )
       .eq("client_id", me.id)
       .order("date", { ascending: false }) as unknown as Promise<{
       data: Activity[] | null;
@@ -45,6 +47,21 @@ export default async function ClientHistoryPage() {
   ]);
 
   const entries = mergeLogEntries(sessions ?? [], activities ?? []);
+
+  const photoUrlByPath = new Map<string, string>();
+  const photoPaths = [
+    ...new Set((activities ?? []).map((a) => a.photo_path).filter(Boolean)),
+  ] as string[];
+  if (photoPaths.length > 0) {
+    await Promise.all(
+      photoPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) photoUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -121,6 +138,14 @@ export default async function ClientHistoryPage() {
                   <p className="text-sm text-ink">{s.day_notes}</p>
                 ) : null}
                 {a?.duration ? <p className="text-sm text-gray">{a.duration}</p> : null}
+                {a?.photo_path && photoUrlByPath.has(a.photo_path) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={photoUrlByPath.get(a.photo_path)}
+                    alt="Activity photo"
+                    className="max-h-64 w-full rounded-xl object-cover"
+                  />
+                ) : null}
                 {a?.notes ? <p className="text-sm text-ink">{a.notes}</p> : null}
               </Card>
             );

@@ -64,6 +64,17 @@ export async function logActivity(formData: FormData) {
 
   if (!date || !type) throw new Error("Date and type are required.");
 
+  let photoPath: string | null = null;
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    const path = `${me.id}/activity-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
+    const { error: uploadError } = await supabase.storage
+      .from("form-checks")
+      .upload(path, photo, { contentType: photo.type });
+    if (uploadError) throw new Error(uploadError.message);
+    photoPath = path;
+  }
+
   const { error } = await supabase.from("activities").insert({
     client_id: me.id,
     date,
@@ -71,6 +82,7 @@ export async function logActivity(formData: FormData) {
     duration: duration || null,
     notes: notes || null,
     logged_by: "client",
+    photo_path: photoPath,
   });
 
   if (error) throw new Error(error.message);

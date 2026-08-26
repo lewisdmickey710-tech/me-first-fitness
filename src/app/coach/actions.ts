@@ -17,6 +17,7 @@ import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
+import { safeFileName } from "@/lib/storage";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
@@ -553,15 +554,36 @@ export async function logSession(clientId: string, formData: FormData) {
   const sets = formData.getAll("sets") as string[];
   const reps = formData.getAll("reps") as string[];
   const weights = formData.getAll("weight") as string[];
+  const files = formData.getAll("file");
 
-  const entries: SessionEntry[] = exercises
-    .map((exercise, i) => ({
-      exercise: exercise?.trim() ?? "",
-      sets: sets[i] ?? "",
-      reps: reps[i] ?? "",
-      weight: weights[i] ?? "",
-    }))
-    .filter((e) => e.exercise.length > 0);
+  const entries: SessionEntry[] = (
+    await Promise.all(
+      exercises.map(async (exercise, i) => {
+        const trimmed = exercise?.trim() ?? "";
+        if (!trimmed) return null;
+
+        let media_path: string | null = null;
+        const file = files[i];
+        if (file instanceof File && file.size > 0) {
+          const path = `${clientId}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
+          const { error: uploadError } = await supabase.storage
+            .from("form-checks")
+            .upload(path, file, { contentType: file.type });
+          if (uploadError) throw new Error(uploadError.message);
+          media_path = path;
+        }
+
+        const entry: SessionEntry = {
+          exercise: trimmed,
+          sets: sets[i] ?? "",
+          reps: reps[i] ?? "",
+          weight: weights[i] ?? "",
+        };
+        if (media_path) entry.media_path = media_path;
+        return entry;
+      })
+    )
+  ).filter((e): e is SessionEntry => e !== null);
 
   if (!day_label || !date) {
     throw new Error("Day label and date are required.");
@@ -636,6 +658,17 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
 
   if (!date || !type) throw new Error("Date and type are required.");
 
+  let photoPath: string | null = null;
+  const photo = formData.get("photo");
+  if (photo instanceof File && photo.size > 0) {
+    const path = `${clientId}/activity-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
+    const { error: uploadError } = await supabase.storage
+      .from("form-checks")
+      .upload(path, photo, { contentType: photo.type });
+    if (uploadError) throw new Error(uploadError.message);
+    photoPath = path;
+  }
+
   const { error } = await supabase.from("activities").insert({
     client_id: clientId,
     date,
@@ -643,6 +676,7 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
     duration: duration || null,
     notes: notes || null,
     logged_by: "coach",
+    photo_path: photoPath,
   });
   if (error) throw new Error(error.message);
 

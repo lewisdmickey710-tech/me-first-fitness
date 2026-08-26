@@ -60,8 +60,8 @@ export function formatReps(
 
 export const ACTIVITY_TYPES = [
   "Class",
-  "Coaching session",
   "Workout with friends",
+  "Mobility",
   "Active recovery / walk",
   "Other",
 ] as const;

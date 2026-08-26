@@ -345,42 +345,51 @@ export function LogSessionForm({
               <label className="mb-2 block text-sm font-medium text-ink">
                 Exercises
               </label>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {rows.map((row, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2">
-                    <Input
-                      name="exercise"
-                      placeholder="Exercise"
-                      className="col-span-5"
-                      value={row.exercise}
-                      onChange={(e) => updateRow(i, "exercise", e.target.value)}
-                    />
-                    <Input
-                      name="sets"
-                      placeholder="Sets"
-                      className="col-span-2"
-                      value={row.sets}
-                      onChange={(e) => updateRow(i, "sets", e.target.value)}
-                    />
-                    <Input
-                      name="reps"
-                      placeholder="Reps"
-                      className="col-span-2"
-                      value={row.reps}
-                      onChange={(e) => updateRow(i, "reps", e.target.value)}
-                    />
-                    <div className="col-span-3">
-                      <WeightInput
-                        key={`${activeDayKey ?? "free"}-${i}`}
-                        name="weight"
-                        placeholder="Weight"
+                  <div key={i} className="space-y-1">
+                    <div className="grid grid-cols-12 gap-2">
+                      <Input
+                        name="exercise"
+                        placeholder="Exercise"
+                        className="col-span-5"
+                        value={row.exercise}
+                        onChange={(e) => updateRow(i, "exercise", e.target.value)}
                       />
+                      <Input
+                        name="sets"
+                        placeholder="Sets"
+                        className="col-span-2"
+                        value={row.sets}
+                        onChange={(e) => updateRow(i, "sets", e.target.value)}
+                      />
+                      <Input
+                        name="reps"
+                        placeholder="Reps"
+                        className="col-span-2"
+                        value={row.reps}
+                        onChange={(e) => updateRow(i, "reps", e.target.value)}
+                      />
+                      <div className="col-span-3">
+                        <WeightInput
+                          key={`${activeDayKey ?? "free"}-${i}`}
+                          name="weight"
+                          placeholder="Weight"
+                        />
+                      </div>
                     </div>
+                    <input
+                      type="file"
+                      name="file"
+                      accept="image/*,video/*"
+                      className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+                    />
                   </div>
                 ))}
               </div>
               <p className="mt-1 text-xs text-gray">
-                Leave a row blank to skip it.
+                Leave a row blank to skip it. Attach a photo or video of
+                their form if it&apos;s worth keeping.
               </p>
             </div>
           ) : null}
