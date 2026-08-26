@@ -21,15 +21,14 @@ type BookingType = (typeof BOOKING_TYPES)[number]["id"];
 
 const HOUR_START = 6; // 6:00 AM
 const HOUR_END = 21; // 9:00 PM
-// Every real session length in this app (30 or 60 minutes -- see
-// client_schedules/CALL_DURATION_MINUTES) is a multiple of 30, so a
-// half-hour grid loses no real precision while roughly halving the
-// number of rows (and how far you have to scroll) compared to 15-minute
-// steps. Columns are wider too, so the grid is shorter and easier to tap.
-const STEP_MIN = 30;
+// Real sessions here start on the :15 and :45 too, not just the hour and
+// half-hour, so the grid needs true 15-minute precision -- rows just run
+// a bit shorter than before to keep the total height reasonable, and
+// columns are wider for easier tapping.
+const STEP_MIN = 15;
 const SLOTS_PER_HOUR = 60 / STEP_MIN;
 const SLOT_COUNT = (HOUR_END - HOUR_START) * SLOTS_PER_HOUR;
-const SLOT_HEIGHT = 28;
+const SLOT_HEIGHT = 18;
 const DAY_COL_WIDTH = 92;
 const GUTTER_WIDTH = 44;
 
@@ -273,7 +272,7 @@ export function ScheduleGrid({
   function proposeTime(req: RequestChip, date: string, slot: number) {
     // Check every slot the request's own duration would actually cover
     // from this drop point, not just the one cell dropped on -- a
-    // 30-minute request dropped at 9:00 needs 9:00-9:30 both free.
+    // 30-minute request dropped at 9:00 needs 9:00-9:15 both free.
     const spanSlots = Math.max(1, Math.round(req.durationMinutes / STEP_MIN));
     for (let i = 0; i < spanSlots; i++) {
       if (blockAt(date, slot + i) || bookingAt(date, slot + i)) {
