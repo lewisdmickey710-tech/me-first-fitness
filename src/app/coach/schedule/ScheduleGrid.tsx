@@ -448,6 +448,15 @@ export function ScheduleGrid({
         </div>
       ) : null}
 
+      {/* Only relevant when nothing else is open -- when a popup is open,
+          the same error shows inside it instead, since this banner would
+          otherwise sit hidden behind the popup's backdrop. */}
+      {error && !selected && !pendingReschedule && !newBookingSlot ? (
+        <p className="rounded-xl border border-pink/50 bg-pink/10 px-3 py-2 text-sm text-pink">
+          {error}
+        </p>
+      ) : null}
+
       {unscheduledRequests.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {unscheduledRequests.map((r) => (
@@ -669,6 +678,7 @@ export function ScheduleGrid({
                 Close
               </Button>
             </div>
+            {error ? <p className="text-sm text-pink">{error}</p> : null}
           </div>
         </Modal>
       ) : null}
@@ -719,6 +729,7 @@ export function ScheduleGrid({
                 Cancel
               </Button>
             </div>
+            {error ? <p className="text-sm text-pink">{error}</p> : null}
           </div>
         </Modal>
       ) : null}
@@ -793,11 +804,10 @@ export function ScheduleGrid({
                 Cancel
               </Button>
             </div>
+            {error ? <p className="text-sm text-pink">{error}</p> : null}
           </div>
         </Modal>
       ) : null}
-
-      {error ? <p className="text-sm text-pink">{error}</p> : null}
     </div>
   );
 }

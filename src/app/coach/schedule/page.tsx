@@ -288,30 +288,37 @@ export default async function CoachSchedulePage({
         dark pink is blocked, and purple is a time request waiting on you.
       </p>
 
-      <Card className="space-y-3">
-        <p className="font-medium text-ink">This week</p>
-        <ScheduleGrid
-          weekDays={weekDays}
-          availability={(availability ?? []).map((a) => ({
-            dayOfWeek: a.day_of_week,
-            startTime: a.start_time,
-            endTime: a.end_time,
-          }))}
-          blocks={(weekBlocks ?? []).map((b) => ({
-            date: b.blocked_date,
-            startTime: b.start_time,
-            endTime: b.end_time,
-            reason: b.reason,
-          }))}
-          bookings={weekBookings}
-          requests={requestChips}
-          clients={[...(allClients ?? [])].sort((a, b) => a.name.localeCompare(b.name))}
-          prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
-          nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
-          weekLabel={weekLabel}
-          todayStr={todayStr}
-        />
-      </Card>
+      {/* Breaks out of the page's centered max-w-3xl column -- that width
+          cap is meant for comfortable text reading, but on a wide-enough
+          screen (a phone in landscape, a tablet, a desktop) it leaves the
+          calendar with unused margins on both sides instead of using the
+          space it actually benefits from. */}
+      <div className="relative left-1/2 right-1/2 -mx-[50vw] w-screen px-2">
+        <Card className="mx-auto max-w-5xl space-y-3">
+          <p className="font-medium text-ink">This week</p>
+          <ScheduleGrid
+            weekDays={weekDays}
+            availability={(availability ?? []).map((a) => ({
+              dayOfWeek: a.day_of_week,
+              startTime: a.start_time,
+              endTime: a.end_time,
+            }))}
+            blocks={(weekBlocks ?? []).map((b) => ({
+              date: b.blocked_date,
+              startTime: b.start_time,
+              endTime: b.end_time,
+              reason: b.reason,
+            }))}
+            bookings={weekBookings}
+            requests={requestChips}
+            clients={[...(allClients ?? [])].sort((a, b) => a.name.localeCompare(b.name))}
+            prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
+            nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
+            weekLabel={weekLabel}
+            todayStr={todayStr}
+          />
+        </Card>
+      </div>
 
       <p className="text-sm font-medium text-gray">Full month</p>
 
