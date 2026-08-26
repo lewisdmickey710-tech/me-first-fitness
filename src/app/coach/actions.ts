@@ -337,20 +337,25 @@ export async function coachBookSession(
   date: string,
   time: string,
   requestType: "session" | "checkin_call" | "video_session",
-  recurring = false
+  recurring = false,
+  durationMinutesOverride?: number
 ) {
   const supabase = await createClient();
 
   let durationMinutes = CALL_DURATION_MINUTES;
   if (requestType === "session") {
-    const { data: mySchedule } = await supabase
-      .from("client_schedules")
-      .select("duration_minutes")
-      .eq("client_id", clientId)
-      .eq("active", true)
-      .limit(1)
-      .maybeSingle();
-    durationMinutes = mySchedule?.duration_minutes ?? 60;
+    if (recurring && durationMinutesOverride) {
+      durationMinutes = durationMinutesOverride === 30 ? 30 : 60;
+    } else {
+      const { data: mySchedule } = await supabase
+        .from("client_schedules")
+        .select("duration_minutes")
+        .eq("client_id", clientId)
+        .eq("active", true)
+        .limit(1)
+        .maybeSingle();
+      durationMinutes = mySchedule?.duration_minutes ?? 60;
+    }
   }
 
   const { data: blockedRows } = await supabase

@@ -117,8 +117,8 @@ export function ScheduleGrid({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
-  const [dragRequestId, setDragRequestId] = useState<string | null>(null);
-  const [dragBooking, setDragBooking] = useState<DayBooking | null>(null);
+  const [pickedUpRequestId, setPickedUpRequestId] = useState<string | null>(null);
+  const [pickedUpBooking, setPickedUpBooking] = useState<DayBooking | null>(null);
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(
     null
   );
@@ -128,7 +128,21 @@ export function ScheduleGrid({
   const [newBookingClientId, setNewBookingClientId] = useState("");
   const [newBookingType, setNewBookingType] = useState<BookingType>("session");
   const [newBookingRecurring, setNewBookingRecurring] = useState(false);
+  const [newBookingDuration, setNewBookingDuration] = useState<30 | 60>(60);
   const [error, setError] = useState<string | null>(null);
+
+  // Tapping a booking or a request to "pick it up" and then tapping a
+  // slot to "drop" it there -- native HTML5 drag-and-drop never fires on
+  // a touch screen, so this is the only version of this interaction that
+  // actually works on a phone.
+  function clearPickups() {
+    setSelectedRequestId(null);
+    setPickedUpRequestId(null);
+    setPickedUpBooking(null);
+    setPendingReschedule(null);
+    setNewBookingSlot(null);
+    setError(null);
+  }
 
   const norm = (t: string) => t.slice(0, 5);
 
@@ -185,8 +199,21 @@ export function ScheduleGrid({
 
   function selectRequest(req: RequestChip) {
     if (req.status !== "pending") return;
-    setSelectedRequestId(req.id === selectedRequestId ? null : req.id);
-    setError(null);
+    const next = req.id === selectedRequestId ? null : req.id;
+    clearPickups();
+    setSelectedRequestId(next);
+  }
+
+  function pickUpRequest(req: RequestChip) {
+    clearPickups();
+    setPickedUpRequestId(req.id);
+  }
+
+  function pickUpBooking(b: DayBooking) {
+    const same =
+      pickedUpBooking?.clientId === b.clientId && pickedUpBooking?.date === b.date;
+    clearPickups();
+    if (!same) setPickedUpBooking(b);
   }
 
   function accept(req: RequestChip) {
@@ -225,6 +252,7 @@ export function ScheduleGrid({
       }
     }
     const time = BOUNDARIES[slot];
+    setPickedUpRequestId(null);
     startTransition(async () => {
       try {
         await counterRequest(req.id, req.clientId, date, time);
@@ -274,7 +302,7 @@ export function ScheduleGrid({
     }
     const toTime = BOUNDARIES[slot];
     if (date === b.date && toTime === norm(b.timeOfDay)) {
-      setDragBooking(null);
+      setPickedUpBooking(null);
       return;
     }
     setPendingReschedule({
@@ -286,7 +314,7 @@ export function ScheduleGrid({
       toTime,
       durationMinutes: b.durationMinutes,
     });
-    setDragBooking(null);
+    setPickedUpBooking(null);
   }
 
   function confirmReschedule() {
@@ -310,18 +338,18 @@ export function ScheduleGrid({
   }
 
   function openNewBooking(date: string, slot: number) {
-    setError(null);
-    setSelectedRequestId(null);
-    setPendingReschedule(null);
+    clearPickups();
     setNewBookingClientId("");
     setNewBookingType("session");
     setNewBookingRecurring(false);
+    setNewBookingDuration(60);
     setNewBookingSlot({ date, time: BOUNDARIES[slot] });
   }
 
   function confirmNewBooking() {
     if (!newBookingSlot || !newBookingClientId) return;
     const { date, time } = newBookingSlot;
+    const recurring = newBookingType === "session" && newBookingRecurring;
     startTransition(async () => {
       try {
         await coachBookSession(
@@ -329,7 +357,8 @@ export function ScheduleGrid({
           date,
           time,
           newBookingType,
-          newBookingType === "session" && newBookingRecurring
+          recurring,
+          recurring ? newBookingDuration : undefined
         );
         setNewBookingSlot(null);
         router.refresh();
@@ -353,22 +382,45 @@ export function ScheduleGrid({
 
       <p className="text-xs text-gray">
         Tap an open slot to book someone in right there. Tap a purple
-        request to accept or decline it, or drag it to a different slot to
-        propose that time instead. Drag a booked (pink) session to a
-        different slot to reschedule it — you&apos;ll be asked to confirm
+        request to accept or decline it. Tap a booked (pink) session, then
+        tap a new slot, to reschedule it — you&apos;ll be asked to confirm
         before it moves. Client emails go out automatically either way.
       </p>
+
+      {pickedUpBooking ? (
+        <div className="flex items-center justify-between rounded-xl border border-pink/50 bg-pink/10 px-3 py-2 text-sm text-ink">
+          <span>
+            Moving {pickedUpBooking.clientName}&apos;s session — tap the new
+            slot.
+          </span>
+          <button
+            type="button"
+            className="text-xs font-medium text-gray hover:text-ink"
+            onClick={clearPickups}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
+
+      {pickedUpRequestId ? (
+        <div className="flex items-center justify-between rounded-xl border border-purple/50 bg-purple/10 px-3 py-2 text-sm text-ink">
+          <span>Proposing a new time — tap a slot.</span>
+          <button
+            type="button"
+            className="text-xs font-medium text-gray hover:text-ink"
+            onClick={clearPickups}
+          >
+            Cancel
+          </button>
+        </div>
+      ) : null}
 
       {unscheduledRequests.length > 0 ? (
         <div className="flex flex-wrap gap-2">
           {unscheduledRequests.map((r) => (
             <div
               key={r.id}
-              draggable={r.status === "pending"}
-              onDragStart={() => {
-                setDragRequestId(r.id);
-                setDragBooking(null);
-              }}
               onClick={() => selectRequest(r)}
               title={
                 r.status === "countered"
@@ -443,29 +495,27 @@ export function ScheduleGrid({
                     key={slot}
                     type="button"
                     disabled={isPending}
-                    draggable={!!req && req.status === "pending"}
-                    onDragStart={() => {
-                      if (req) {
-                        setDragRequestId(req.id);
-                        setDragBooking(null);
-                      }
-                    }}
-                    onDragOver={(e) => {
-                      if (dragRequestId || dragBooking) e.preventDefault();
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      if (dragRequestId) {
-                        const draggedReq = requests.find((r) => r.id === dragRequestId);
-                        setDragRequestId(null);
-                        if (draggedReq) proposeTime(draggedReq, day.date, slot);
-                      } else if (dragBooking) {
-                        proposeReschedule(dragBooking, day.date, slot);
-                      }
-                    }}
                     onClick={() => {
                       if (req) {
                         selectRequest(req);
+                        return;
+                      }
+                      if (pickedUpBooking) {
+                        if (block || booking) {
+                          setError("That time is already blocked or booked — pick another slot.");
+                          return;
+                        }
+                        proposeReschedule(pickedUpBooking, day.date, slot);
+                        return;
+                      }
+                      if (pickedUpRequestId) {
+                        const pickedReq = requests.find((r) => r.id === pickedUpRequestId);
+                        if (!pickedReq) return;
+                        if (block || booking) {
+                          setError("That time is already blocked or booked — pick another slot.");
+                          return;
+                        }
+                        proposeTime(pickedReq, day.date, slot);
                         return;
                       }
                       if (block || booking || day.date < todayStr) return;
@@ -500,20 +550,20 @@ export function ScheduleGrid({
                 const geometry = bookingGeometry(b);
                 if (!geometry) return null;
                 const movable = day.date >= todayStr;
+                const isPickedUp =
+                  pickedUpBooking?.clientId === b.clientId && pickedUpBooking?.date === b.date;
                 return (
                   <div
                     key={`${b.clientId}-${b.timeOfDay}`}
-                    draggable={movable}
-                    onDragStart={() => {
-                      setDragBooking(b);
-                      setDragRequestId(null);
-                    }}
+                    onClick={() => movable && pickUpBooking(b)}
                     title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
-                      movable ? " · drag to reschedule" : ""
+                      movable ? " · tap to reschedule" : ""
                     }`}
-                    className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border border-pink/60 bg-pink/40 text-[9px] font-medium leading-none text-ink ${
-                      movable ? "cursor-grab active:cursor-grabbing" : ""
-                    }`}
+                    className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[9px] font-medium leading-none text-ink ${
+                      isPickedUp
+                        ? "border-rose bg-rose/50 ring-2 ring-rose"
+                        : "border-pink/60 bg-pink/40"
+                    } ${movable ? "cursor-pointer" : ""}`}
                     style={{ top: geometry.top, height: geometry.height }}
                   >
                     {initials(b.clientName)}
@@ -566,15 +616,19 @@ export function ScheduleGrid({
               type="button"
               variant="secondary"
               disabled={isPending}
+              onClick={() => pickUpRequest(selected)}
+            >
+              Propose a different time
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={isPending}
               onClick={() => setSelectedRequestId(null)}
             >
               Close
             </Button>
           </div>
-          <p className="text-xs text-gray">
-            Or drag this request to a different slot on the grid to propose
-            that time instead.
-          </p>
         </div>
       ) : null}
 
@@ -646,6 +700,15 @@ export function ScheduleGrid({
               />
               Make this a weekly recurring session (unchecked = just this one time)
             </label>
+          ) : null}
+          {newBookingType === "session" && newBookingRecurring ? (
+            <Select
+              value={newBookingDuration}
+              onChange={(e) => setNewBookingDuration(Number(e.target.value) === 30 ? 30 : 60)}
+            >
+              <option value={60}>60 minutes (standard)</option>
+              <option value={30}>30 minutes</option>
+            </Select>
           ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
