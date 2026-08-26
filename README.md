@@ -104,8 +104,10 @@ deploy:
    client reminders won't go out. Once verified, set `EMAIL_FROM` to an
    address at that domain, e.g. `MeFirstFitness <reminders@mefirstfitness.com>`.
 5. **Redeploy.** Vercel reads `vercel.json` and automatically schedules the
-   `/api/cron/reminders` route to run once a day (13:00 UTC — roughly
-   morning Eastern time). No manual cron setup needed on Vercel's end.
+   `/api/cron/reminders` route to run once a day (12:30 UTC — 7:30 AM
+   Central during daylight time, 6:30 AM once standard time starts, since
+   Vercel cron schedules are fixed UTC and don't shift for DST). No manual
+   cron setup needed on Vercel's end.
 
 To use it: on a client's page, use the **Manage** link next to "Next
 session" on Overview to set their recurring weekly session time(s), and the
