@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -94,6 +95,7 @@ export async function sendSessionReminderEmail(
     html: wrapper(`
       <p>Hi ${clientName},</p>
       <p>Just a heads up — your next session is <strong>${whenText}</strong>. See you then!</p>
+      <p style="font-size: 13px; color: #8A8078;">Need to cancel? Just a reminder that under ${LATE_CANCEL_NOTICE_HOURS} hours' notice counts as a late cancellation under our policy.</p>
     `),
   });
 }
