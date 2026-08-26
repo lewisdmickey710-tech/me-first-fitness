@@ -127,6 +127,7 @@ export function ScheduleGrid({
   );
   const [newBookingClientId, setNewBookingClientId] = useState("");
   const [newBookingType, setNewBookingType] = useState<BookingType>("session");
+  const [newBookingRecurring, setNewBookingRecurring] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const norm = (t: string) => t.slice(0, 5);
@@ -314,6 +315,7 @@ export function ScheduleGrid({
     setPendingReschedule(null);
     setNewBookingClientId("");
     setNewBookingType("session");
+    setNewBookingRecurring(false);
     setNewBookingSlot({ date, time: BOUNDARIES[slot] });
   }
 
@@ -322,7 +324,13 @@ export function ScheduleGrid({
     const { date, time } = newBookingSlot;
     startTransition(async () => {
       try {
-        await coachBookSession(newBookingClientId, date, time, newBookingType);
+        await coachBookSession(
+          newBookingClientId,
+          date,
+          time,
+          newBookingType,
+          newBookingType === "session" && newBookingRecurring
+        );
         setNewBookingSlot(null);
         router.refresh();
       } catch (err) {
@@ -615,7 +623,11 @@ export function ScheduleGrid({
             </Select>
             <Select
               value={newBookingType}
-              onChange={(e) => setNewBookingType(e.target.value as BookingType)}
+              onChange={(e) => {
+                const type = e.target.value as BookingType;
+                setNewBookingType(type);
+                if (type !== "session") setNewBookingRecurring(false);
+              }}
             >
               {BOOKING_TYPES.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -624,6 +636,17 @@ export function ScheduleGrid({
               ))}
             </Select>
           </div>
+          {newBookingType === "session" ? (
+            <label className="flex items-center gap-2 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={newBookingRecurring}
+                onChange={(e) => setNewBookingRecurring(e.target.checked)}
+                className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
+              />
+              Make this a weekly recurring session (unchecked = just this one time)
+            </label>
+          ) : null}
           <div className="flex flex-wrap gap-2">
             <Button
               type="button"

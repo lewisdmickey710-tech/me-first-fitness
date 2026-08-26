@@ -336,7 +336,8 @@ export async function coachBookSession(
   clientId: string,
   date: string,
   time: string,
-  requestType: "session" | "checkin_call" | "video_session"
+  requestType: "session" | "checkin_call" | "video_session",
+  recurring = false
 ) {
   const supabase = await createClient();
 
@@ -368,7 +369,7 @@ export async function coachBookSession(
   }
 
   const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
-  const [{ data: recurring }, { data: dateOccurrences }] = await Promise.all([
+  const [{ data: recurringSchedules }, { data: dateOccurrences }] = await Promise.all([
     supabase
       .from("client_schedules")
       .select("client_id, time_of_day, duration_minutes")
@@ -383,7 +384,7 @@ export async function coachBookSession(
   const overrideStatusByClient = new Map(
     (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
   );
-  const recurringConflict = (recurring ?? []).some((s) => {
+  const recurringConflict = (recurringSchedules ?? []).some((s) => {
     const overridden = ["cancelled", "late_cancelled", "rescheduled"].includes(
       overrideStatusByClient.get(s.client_id) ?? ""
     );
@@ -399,18 +400,33 @@ export async function coachBookSession(
     throw new Error("That time is already booked — pick another slot.");
   }
 
-  const { error } = await supabase.from("session_occurrences").upsert(
-    {
+  // Recurring only makes sense for a standard training session -- video
+  // and check-in calls have no representation in client_schedules, so
+  // this is always a one-off for those regardless of what was passed in.
+  const isRecurring = recurring && requestType === "session";
+
+  if (isRecurring) {
+    const { error } = await supabase.from("client_schedules").insert({
       client_id: clientId,
-      occurrence_date: date,
-      status: "scheduled",
-      notes: `Confirmed request — ${time}`,
+      day_of_week: dayOfWeek,
+      time_of_day: time,
       duration_minutes: durationMinutes,
-      is_video_session: requestType === "video_session",
-    },
-    { onConflict: "client_id,occurrence_date" }
-  );
-  if (error) throw new Error(error.message);
+    });
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from("session_occurrences").upsert(
+      {
+        client_id: clientId,
+        occurrence_date: date,
+        status: "scheduled",
+        notes: `Confirmed request — ${time}`,
+        duration_minutes: durationMinutes,
+        is_video_session: requestType === "video_session",
+      },
+      { onConflict: "client_id,occurrence_date" }
+    );
+    if (error) throw new Error(error.message);
+  }
 
   // A video session is normally paid up front through the client's own
   // request flow (submitRequest, client/actions.ts) -- booking one
@@ -435,6 +451,10 @@ export async function coachBookSession(
         ? "check-in call"
         : "session";
 
+  const whenText = isRecurring
+    ? `every ${DAY_NAMES[dayOfWeek]} at ${formatTimeOfDay(time)}, starting ${date}`
+    : `${date} at ${formatTimeOfDay(time)}`;
+
   try {
     const { data: client } = await supabase
       .from("clients")
@@ -444,12 +464,7 @@ export async function coachBookSession(
     if (client) {
       const email = await clientLoginEmail(client.user_id);
       if (email) {
-        await sendSessionBookedEmail(
-          email,
-          client.name,
-          `${date} at ${formatTimeOfDay(time)}`,
-          kindLabel
-        );
+        await sendSessionBookedEmail(email, client.name, whenText, kindLabel);
       }
     }
   } catch (emailError) {
@@ -457,6 +472,7 @@ export async function coachBookSession(
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath(`/coach/clients/${clientId}/schedule`);
   revalidatePath("/coach/schedule");
   revalidatePath("/coach/availability");
   revalidatePath("/coach/finances");
