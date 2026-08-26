@@ -49,6 +49,7 @@ export interface Client {
   pro_bono_rate: number | null;
   calorie_goal_enabled: boolean;
   daily_calorie_goal: number | null;
+  is_test: boolean;
 }
 
 export interface SessionEntry {

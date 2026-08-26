@@ -45,11 +45,11 @@ export default async function FinancesPage({
         .single() as unknown as Promise<{ data: BusinessFinanceSettings | null }>,
       supabase
         .from("payments")
-        .select("amount, paid_on")
+        .select("client_id, amount, paid_on")
         .not("paid_on", "is", null)
         .gte("paid_on", yearStart)
         .lte("paid_on", yearEnd) as unknown as Promise<{
-        data: { amount: number; paid_on: string }[] | null;
+        data: { client_id: string | null; amount: number; paid_on: string }[] | null;
       }>,
       supabase
         .from("sessions")
@@ -60,19 +60,27 @@ export default async function FinancesPage({
       }>,
       supabase
         .from("clients")
-        .select("id, pro_bono, pro_bono_rate") as unknown as Promise<{
-        data: { id: string; pro_bono: boolean; pro_bono_rate: number | null }[] | null;
+        .select("id, pro_bono, pro_bono_rate, is_test") as unknown as Promise<{
+        data:
+          | { id: string; pro_bono: boolean; pro_bono_rate: number | null; is_test: boolean }[]
+          | null;
       }>,
     ]);
 
+  // Test profiles' payments/sessions are excluded so QA/demo activity never
+  // shows up as real income or pro bono value.
+  const testClientIds = new Set(
+    (clients ?? []).filter((c) => c.is_test).map((c) => c.id)
+  );
   const proBonoRateByClientId = new Map(
     (clients ?? [])
-      .filter((c) => c.pro_bono)
+      .filter((c) => c.pro_bono && !c.is_test)
       .map((c) => [c.id, c.pro_bono_rate ?? 0])
   );
 
   const incomeByMonth = Array(12).fill(0) as number[];
   for (const p of payments ?? []) {
+    if (p.client_id && testClientIds.has(p.client_id)) continue;
     const month = Number(p.paid_on.slice(5, 7)) - 1;
     incomeByMonth[month] += Number(p.amount);
   }

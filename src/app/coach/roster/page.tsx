@@ -356,7 +356,11 @@ export default async function RosterPage({
       (sessionCountByClientId.get(row.client_id) ?? 0) + 1
     );
   }
-  const proBonoClients = (clients ?? []).filter((c) => c.pro_bono);
+  // Test profiles are still full clients in every other respect -- they
+  // just shouldn't skew aggregate numbers the coach uses to make decisions.
+  const statsClients = (clients ?? []).filter((c) => !c.is_test);
+
+  const proBonoClients = statsClients.filter((c) => c.pro_bono);
   const proBonoTotalValue = proBonoClients.reduce(
     (sum, c) =>
       sum + (sessionCountByClientId.get(c.id) ?? 0) * (c.pro_bono_rate ?? 0),
@@ -364,7 +368,7 @@ export default async function RosterPage({
   );
 
   const inWindow = isFirstWeekOfMonth();
-  const clientsNeedingWindow = (clients ?? []).filter(
+  const clientsNeedingWindow = statsClients.filter(
     (c) =>
       inWindow &&
       (!loggedThisMonth(measurementDatesByClient.get(c.id) ?? []) ||
@@ -551,7 +555,14 @@ export default async function RosterPage({
                 title={RISK_LEVEL_LABEL[risk.level]}
               />
               <div>
-                <p className="font-medium text-ink">{client.name}</p>
+                <p className="font-medium text-ink">
+                  {client.name}
+                  {client.is_test ? (
+                    <span className="ml-1.5 text-xs font-normal text-gray">
+                      (test)
+                    </span>
+                  ) : null}
+                </p>
                 <p className="mt-0.5 text-sm text-gray">
                   {client.care_profiles?.name ?? "No care profile set"}
                 </p>

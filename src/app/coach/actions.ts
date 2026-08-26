@@ -1204,6 +1204,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       pro_bono_rate: pro_bono_rate_raw ? Number(pro_bono_rate_raw) : null,
       calorie_goal_enabled: formData.get("calorie_goal_enabled") === "on",
       daily_calorie_goal: daily_calorie_goal_raw ? Number(daily_calorie_goal_raw) : null,
+      is_test: formData.get("is_test") === "on",
     })
     .eq("id", clientId);
 

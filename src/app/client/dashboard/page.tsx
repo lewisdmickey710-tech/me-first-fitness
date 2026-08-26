@@ -485,6 +485,14 @@ export default async function ClientDashboard() {
           </div>
         )}
       </div>
+
+      {me.pro_bono ? (
+        <p className="pt-2 text-center text-xs text-gray">
+          <Link href="/client/tip" className="hover:text-ink hover:underline">
+            Want to support the work?
+          </Link>
+        </p>
+      ) : null}
     </div>
   );
 }

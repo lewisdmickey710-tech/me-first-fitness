@@ -415,7 +415,7 @@ export default async function ClientDetailPage({
 
       <PhaseBanner
         phase={currentPhase?.phase ?? "n/a"}
-        title={client.name}
+        title={client.is_test ? `${client.name} (TEST)` : client.name}
         subtitle={client.care_profiles?.name ?? "No care profile set"}
       />
 
@@ -1199,6 +1199,19 @@ function ProfileTab({
                 defaultValue={client.pro_bono_rate ?? ""}
               />
             </div>
+          </div>
+
+          <div>
+            <Checkbox
+              name="is_test"
+              label="Test profile"
+              defaultChecked={client.is_test}
+            />
+            <p className="mt-1 text-xs text-gray">
+              For your own QA/demo use. Excluded from roster and finances
+              stats (pro bono impact, monthly check-in nudges, etc.) —
+              everything else about the profile still works normally.
+            </p>
           </div>
 
           <Button type="submit">Save</Button>
