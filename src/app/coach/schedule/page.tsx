@@ -176,14 +176,14 @@ export default async function CoachSchedulePage({
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
       // A recurring day only shows as booked if nothing's overridden that
-      // specific date away from it -- otherwise a cancelled or rescheduled
-      // occurrence would still render pink here forever, since the
-      // recurring match itself never changes.
+      // specific date away from it -- any occurrence override for this
+      // date (cancelled, rescheduled, or a "scheduled" one-off time from
+      // a same-day reschedule) supersedes the recurring default, or it'd
+      // render pink at both its old and new time. "Completed" doesn't
+      // supersede it -- that's just a marker that the recurring slot as
+      // scheduled actually happened.
       const override = weekOccByClientDate.get(`${s.client_id}:${day.date}`);
-      if (
-        override &&
-        ["cancelled", "late_cancelled", "rescheduled"].includes(override.status)
-      ) {
+      if (override && override.status !== "completed") {
         continue;
       }
       weekBookings.push({

@@ -231,23 +231,59 @@ export async function counterRequest(
   revalidatePath("/client/dashboard");
 }
 
-// Dragging an already-booked session to a different slot on the schedule
-// grid moves it -- a one-time exception for that date, same mechanism
-// coachCancelSession already uses, so a client's standing recurring time
-// (client_schedules) is left untouched and this doesn't silently change
-// every future week. If the drop lands on the same date the session was
-// already on, there's no separate "origin" occurrence to mark -- just
-// update that one row's time directly.
+// Dragging (tapping-and-dropping) an already-booked session to a
+// different slot on the schedule grid moves it. Two modes:
+//  - one-time (default): a per-date exception, same mechanism
+//    coachCancelSession already uses -- the client's standing recurring
+//    time (client_schedules) is left untouched, only this one date moves.
+//  - permanent: the client's actual standing weekly time changes. If the
+//    original slot came from a client_schedules row, that row itself gets
+//    moved (which automatically covers this date too, since it now
+//    matches the new day-of-week); otherwise a new recurring row is
+//    created starting now.
 export async function coachRescheduleSession(
   clientId: string,
   fromDate: string,
+  fromTime: string,
   toDate: string,
   toTime: string,
-  durationMinutes: number
+  durationMinutes: number,
+  permanent = false
 ) {
   const supabase = await createClient();
+  const toDayOfWeek = new Date(`${toDate}T00:00:00Z`).getUTCDay();
 
-  if (fromDate === toDate) {
+  if (permanent) {
+    const fromDayOfWeek = new Date(`${fromDate}T00:00:00Z`).getUTCDay();
+    const { data: existingSchedule } = await supabase
+      .from("client_schedules")
+      .select("id")
+      .eq("client_id", clientId)
+      .eq("day_of_week", fromDayOfWeek)
+      .eq("time_of_day", fromTime)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (existingSchedule) {
+      const { error } = await supabase
+        .from("client_schedules")
+        .update({
+          day_of_week: toDayOfWeek,
+          time_of_day: toTime,
+          duration_minutes: durationMinutes,
+        })
+        .eq("id", existingSchedule.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase.from("client_schedules").insert({
+        client_id: clientId,
+        day_of_week: toDayOfWeek,
+        time_of_day: toTime,
+        duration_minutes: durationMinutes,
+      });
+      if (error) throw new Error(error.message);
+    }
+  } else if (fromDate === toDate) {
     const { error } = await supabase.from("session_occurrences").upsert(
       {
         client_id: clientId,
@@ -284,6 +320,10 @@ export async function coachRescheduleSession(
     if (toError) throw new Error(toError.message);
   }
 
+  const whenText = permanent
+    ? `every ${DAY_NAMES[toDayOfWeek]} at ${formatTimeOfDay(toTime)}, starting ${toDate}`
+    : `${toDate} at ${formatTimeOfDay(toTime)}`;
+
   try {
     const { data: client } = await supabase
       .from("clients")
@@ -293,12 +333,7 @@ export async function coachRescheduleSession(
     if (client) {
       const email = await clientLoginEmail(client.user_id);
       if (email) {
-        await sendSessionRescheduledEmail(
-          email,
-          client.name,
-          fromDate,
-          `${toDate} at ${formatTimeOfDay(toTime)}`
-        );
+        await sendSessionRescheduledEmail(email, client.name, fromDate, whenText);
       }
     }
   } catch (emailError) {
@@ -306,6 +341,7 @@ export async function coachRescheduleSession(
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath(`/coach/clients/${clientId}/schedule`);
   revalidatePath("/coach/schedule");
   revalidatePath("/coach/availability");
   revalidatePath("/client/schedule");
@@ -390,9 +426,11 @@ export async function coachBookSession(
     (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
   );
   const recurringConflict = (recurringSchedules ?? []).some((s) => {
-    const overridden = ["cancelled", "late_cancelled", "rescheduled"].includes(
-      overrideStatusByClient.get(s.client_id) ?? ""
-    );
+    // Any override for this client on this date (including a same-day
+    // reschedule's new "scheduled" time) supersedes their recurring
+    // default -- only "completed" leaves the default's own time in play.
+    const overrideStatus = overrideStatusByClient.get(s.client_id);
+    const overridden = overrideStatus !== undefined && overrideStatus !== "completed";
     return !overridden && timesOverlap(time, durationMinutes, s.time_of_day, s.duration_minutes);
   });
   const oneOffConflict = (dateOccurrences ?? []).some((o) => {

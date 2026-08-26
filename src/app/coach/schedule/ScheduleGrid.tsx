@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,9 +21,17 @@ type BookingType = (typeof BOOKING_TYPES)[number]["id"];
 
 const HOUR_START = 6; // 6:00 AM
 const HOUR_END = 21; // 9:00 PM
-const STEP_MIN = 15;
+// Every real session length in this app (30 or 60 minutes -- see
+// client_schedules/CALL_DURATION_MINUTES) is a multiple of 30, so a
+// half-hour grid loses no real precision while roughly halving the
+// number of rows (and how far you have to scroll) compared to 15-minute
+// steps. Columns are wider too, so the grid is shorter and easier to tap.
+const STEP_MIN = 30;
 const SLOTS_PER_HOUR = 60 / STEP_MIN;
 const SLOT_COUNT = (HOUR_END - HOUR_START) * SLOTS_PER_HOUR;
+const SLOT_HEIGHT = 28;
+const DAY_COL_WIDTH = 92;
+const GUTTER_WIDTH = 44;
 
 const BOUNDARIES: string[] = Array.from({ length: SLOT_COUNT + 1 }, (_, i) => {
   const totalMin = HOUR_START * 60 + i * STEP_MIN;
@@ -91,6 +99,25 @@ function initials(name: string): string {
     : name.slice(0, 2).toUpperCase();
 }
 
+// A centered popup instead of a panel at the bottom of a long, scrollable
+// page -- so a confirmation is visible the moment it appears, not just
+// after scrolling all the way down to find it.
+function Modal({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white p-4 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function ScheduleGrid({
   weekDays,
   availability,
@@ -122,6 +149,9 @@ export function ScheduleGrid({
   const [pendingReschedule, setPendingReschedule] = useState<PendingReschedule | null>(
     null
   );
+  const [pendingRescheduleMode, setPendingRescheduleMode] = useState<
+    "one_time" | "permanent"
+  >("one_time");
   const [newBookingSlot, setNewBookingSlot] = useState<{ date: string; time: string } | null>(
     null
   );
@@ -243,7 +273,7 @@ export function ScheduleGrid({
   function proposeTime(req: RequestChip, date: string, slot: number) {
     // Check every slot the request's own duration would actually cover
     // from this drop point, not just the one cell dropped on -- a
-    // 30-minute request dropped at 9:00 needs 9:00-9:15 both free.
+    // 30-minute request dropped at 9:00 needs 9:00-9:30 both free.
     const spanSlots = Math.max(1, Math.round(req.durationMinutes / STEP_MIN));
     for (let i = 0; i < spanSlots; i++) {
       if (blockAt(date, slot + i) || bookingAt(date, slot + i)) {
@@ -268,7 +298,7 @@ export function ScheduleGrid({
     return bookings.filter((b) => b.date === date);
   }
 
-  // Pixel geometry (in the same 20px-per-15-min-slot units the grid
+  // Pixel geometry (in the same SLOT_HEIGHT-per-slot units the grid
   // already uses) for a single merged booking block, clamped to the
   // visible HOUR_START-HOUR_END window so a session starting or ending
   // outside it doesn't overflow the day column.
@@ -278,7 +308,7 @@ export function ScheduleGrid({
     const start = Math.max(0, Math.min(startSlot, SLOT_COUNT));
     const end = Math.max(0, Math.min(startSlot + spanSlots, SLOT_COUNT));
     if (end <= start) return null;
-    return { top: start * 20, height: (end - start) * 20 };
+    return { top: start * SLOT_HEIGHT, height: (end - start) * SLOT_HEIGHT };
   }
 
   function proposeReschedule(b: DayBooking, date: string, slot: number) {
@@ -305,6 +335,7 @@ export function ScheduleGrid({
       setPickedUpBooking(null);
       return;
     }
+    setPendingRescheduleMode("one_time");
     setPendingReschedule({
       clientId: b.clientId,
       clientName: b.clientName,
@@ -320,14 +351,17 @@ export function ScheduleGrid({
   function confirmReschedule() {
     if (!pendingReschedule) return;
     const r = pendingReschedule;
+    const permanent = pendingRescheduleMode === "permanent";
     startTransition(async () => {
       try {
         await coachRescheduleSession(
           r.clientId,
           r.fromDate,
+          r.fromTime,
           r.toDate,
           r.toTime,
-          r.durationMinutes
+          r.durationMinutes,
+          permanent
         );
         setPendingReschedule(null);
         router.refresh();
@@ -441,7 +475,7 @@ export function ScheduleGrid({
       ) : null}
 
       <div className="flex gap-1 overflow-x-auto pb-1">
-        <div className="shrink-0" style={{ width: 44 }}>
+        <div className="shrink-0" style={{ width: GUTTER_WIDTH }}>
           {/* Invisible but real header, sized/spaced exactly like the day
               columns' header pill -- a hardcoded pt-* here previously
               only approximated that height, so the time labels slowly
@@ -454,17 +488,21 @@ export function ScheduleGrid({
           </div>
           {BOUNDARIES.slice(0, SLOT_COUNT).map((t, slot) =>
             slot % SLOTS_PER_HOUR === 0 ? (
-              <div key={t} className="text-right text-[10px] text-gray" style={{ height: 20 }}>
+              <div
+                key={t}
+                className="text-right text-[10px] text-gray"
+                style={{ height: SLOT_HEIGHT }}
+              >
                 {formatTimeOfDay(t)}
               </div>
             ) : (
-              <div key={t} style={{ height: 20 }} />
+              <div key={t} style={{ height: SLOT_HEIGHT }} />
             )
           )}
         </div>
 
         {weekDays.map((day) => (
-          <div key={day.date} className="shrink-0" style={{ width: 68 }}>
+          <div key={day.date} className="shrink-0" style={{ width: DAY_COL_WIDTH }}>
             <div
               className={`sticky top-0 rounded-t-lg py-1 text-center text-xs font-medium ${
                 day.date === todayStr ? "bg-rose text-white" : "bg-bg text-ink"
@@ -535,7 +573,7 @@ export function ScheduleGrid({
                     className={`block w-full border-x border-grayLt text-[9px] leading-none ${text} ${bg} ${
                       hourLine ? "border-t border-t-grayLt" : "border-t border-t-grayLt/30"
                     }`}
-                    style={{ height: 20 }}
+                    style={{ height: SLOT_HEIGHT }}
                   >
                     {block
                       ? ""
@@ -559,7 +597,7 @@ export function ScheduleGrid({
                     title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
                       movable ? " · tap to reschedule" : ""
                     }`}
-                    className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[9px] font-medium leading-none text-ink ${
+                    className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[10px] font-medium leading-none text-ink ${
                       isPickedUp
                         ? "border-rose bg-rose/50 ring-2 ring-rose"
                         : "border-pink/60 bg-pink/40"
@@ -594,140 +632,168 @@ export function ScheduleGrid({
       </div>
 
       {selected ? (
-        <div className="space-y-2 rounded-xl border border-purple/40 bg-purple/5 p-3">
-          <p className="text-sm font-medium text-ink">
-            {selected.clientName} requested{" "}
-            {selected.date ?? "a time — no date given yet"}
-            {selected.time ? ` at ${formatTimeOfDay(selected.time)}` : ""}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={isPending} onClick={() => accept(selected)}>
-              Accept
-            </Button>
-            <Button
-              type="button"
-              variant="danger"
-              disabled={isPending}
-              onClick={() => decline(selected)}
-            >
-              Decline
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isPending}
-              onClick={() => pickUpRequest(selected)}
-            >
-              Propose a different time
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isPending}
-              onClick={() => setSelectedRequestId(null)}
-            >
-              Close
-            </Button>
+        <Modal onClose={() => setSelectedRequestId(null)}>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-ink">
+              {selected.clientName} requested{" "}
+              {selected.date ?? "a time — no date given yet"}
+              {selected.time ? ` at ${formatTimeOfDay(selected.time)}` : ""}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={isPending} onClick={() => accept(selected)}>
+                Accept
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                disabled={isPending}
+                onClick={() => decline(selected)}
+              >
+                Decline
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => pickUpRequest(selected)}
+              >
+                Propose a different time
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => setSelectedRequestId(null)}
+              >
+                Close
+              </Button>
+            </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {pendingReschedule ? (
-        <div className="space-y-2 rounded-xl border border-pink/50 bg-pink/10 p-3">
-          <p className="text-sm font-medium text-ink">
-            Move {pendingReschedule.clientName}&apos;s session from{" "}
-            {pendingReschedule.fromDate} at {formatTimeOfDay(pendingReschedule.fromTime)}{" "}
-            to {pendingReschedule.toDate} at {formatTimeOfDay(pendingReschedule.toTime)}?
-          </p>
-          <p className="text-xs text-gray">
-            They&apos;ll get an email letting them know the new time.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" disabled={isPending} onClick={confirmReschedule}>
-              Confirm &amp; email them
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isPending}
-              onClick={() => setPendingReschedule(null)}
-            >
-              Cancel
-            </Button>
+        <Modal onClose={() => setPendingReschedule(null)}>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-ink">
+              Move {pendingReschedule.clientName}&apos;s session from{" "}
+              {pendingReschedule.fromDate} at {formatTimeOfDay(pendingReschedule.fromTime)}{" "}
+              to {pendingReschedule.toDate} at {formatTimeOfDay(pendingReschedule.toTime)}?
+            </p>
+            <div className="space-y-1.5 rounded-xl border border-grayLt p-2.5">
+              <label className="flex items-start gap-2 text-sm text-ink">
+                <input
+                  type="radio"
+                  name="reschedule_mode"
+                  className="mt-0.5"
+                  checked={pendingRescheduleMode === "one_time"}
+                  onChange={() => setPendingRescheduleMode("one_time")}
+                />
+                Just this once — their standing weekly time stays the same
+              </label>
+              <label className="flex items-start gap-2 text-sm text-ink">
+                <input
+                  type="radio"
+                  name="reschedule_mode"
+                  className="mt-0.5"
+                  checked={pendingRescheduleMode === "permanent"}
+                  onChange={() => setPendingRescheduleMode("permanent")}
+                />
+                Permanently — change their standing weekly time to this
+              </label>
+            </div>
+            <p className="text-xs text-gray">
+              They&apos;ll get an email letting them know the new time.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" disabled={isPending} onClick={confirmReschedule}>
+                Confirm &amp; email them
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => setPendingReschedule(null)}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       {newBookingSlot ? (
-        <div className="space-y-2 rounded-xl border border-teal/50 bg-teal/10 p-3">
-          <p className="text-sm font-medium text-ink">
-            Book {newBookingSlot.date} at {formatTimeOfDay(newBookingSlot.time)}
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <Select
-              value={newBookingClientId}
-              onChange={(e) => setNewBookingClientId(e.target.value)}
-            >
-              <option value="">Select client…</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              value={newBookingType}
-              onChange={(e) => {
-                const type = e.target.value as BookingType;
-                setNewBookingType(type);
-                if (type !== "session") setNewBookingRecurring(false);
-              }}
-            >
-              {BOOKING_TYPES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
+        <Modal onClose={() => setNewBookingSlot(null)}>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-ink">
+              Book {newBookingSlot.date} at {formatTimeOfDay(newBookingSlot.time)}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Select
+                value={newBookingClientId}
+                onChange={(e) => setNewBookingClientId(e.target.value)}
+              >
+                <option value="">Select client…</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={newBookingType}
+                onChange={(e) => {
+                  const type = e.target.value as BookingType;
+                  setNewBookingType(type);
+                  if (type !== "session") setNewBookingRecurring(false);
+                }}
+              >
+                {BOOKING_TYPES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            {newBookingType === "session" ? (
+              <label className="flex items-center gap-2 text-sm text-ink">
+                <input
+                  type="checkbox"
+                  checked={newBookingRecurring}
+                  onChange={(e) => setNewBookingRecurring(e.target.checked)}
+                  className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
+                />
+                Make this a weekly recurring session (unchecked = just this one time)
+              </label>
+            ) : null}
+            {newBookingType === "session" && newBookingRecurring ? (
+              <Select
+                value={newBookingDuration}
+                onChange={(e) => setNewBookingDuration(Number(e.target.value) === 30 ? 30 : 60)}
+              >
+                <option value={60}>60 minutes (standard)</option>
+                <option value={30}>30 minutes</option>
+              </Select>
+            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                disabled={isPending || !newBookingClientId}
+                onClick={confirmNewBooking}
+              >
+                Book &amp; email them
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => setNewBookingSlot(null)}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-          {newBookingType === "session" ? (
-            <label className="flex items-center gap-2 text-sm text-ink">
-              <input
-                type="checkbox"
-                checked={newBookingRecurring}
-                onChange={(e) => setNewBookingRecurring(e.target.checked)}
-                className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
-              />
-              Make this a weekly recurring session (unchecked = just this one time)
-            </label>
-          ) : null}
-          {newBookingType === "session" && newBookingRecurring ? (
-            <Select
-              value={newBookingDuration}
-              onChange={(e) => setNewBookingDuration(Number(e.target.value) === 30 ? 30 : 60)}
-            >
-              <option value={60}>60 minutes (standard)</option>
-              <option value={30}>30 minutes</option>
-            </Select>
-          ) : null}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              disabled={isPending || !newBookingClientId}
-              onClick={confirmNewBooking}
-            >
-              Book &amp; email them
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={isPending}
-              onClick={() => setNewBookingSlot(null)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
+        </Modal>
       ) : null}
 
       {error ? <p className="text-sm text-pink">{error}</p> : null}
