@@ -20,7 +20,7 @@ const BOOKING_TYPES = [
 type BookingType = (typeof BOOKING_TYPES)[number]["id"];
 
 const HOUR_START = 6; // 6:00 AM
-const HOUR_END = 21; // 9:00 PM
+const HOUR_END = 17; // 5:00 PM
 // Real sessions here start on the :15 and :45 too, not just the hour and
 // half-hour, so the grid needs true 15-minute precision -- rows just run
 // a bit shorter than before to keep the total height reasonable, and
@@ -29,7 +29,6 @@ const STEP_MIN = 15;
 const SLOTS_PER_HOUR = 60 / STEP_MIN;
 const SLOT_COUNT = (HOUR_END - HOUR_START) * SLOTS_PER_HOUR;
 const SLOT_HEIGHT = 18;
-const DAY_COL_WIDTH = 92;
 const GUTTER_WIDTH = 44;
 
 const BOUNDARIES: string[] = Array.from({ length: SLOT_COUNT + 1 }, (_, i) => {
@@ -473,8 +472,11 @@ export function ScheduleGrid({
         </div>
       ) : null}
 
-      <div className="flex gap-1 overflow-x-auto pb-1">
-        <div className="shrink-0" style={{ width: GUTTER_WIDTH }}>
+      <div
+        className="grid gap-1 pb-1"
+        style={{ gridTemplateColumns: `${GUTTER_WIDTH}px repeat(7, 1fr)` }}
+      >
+        <div>
           {/* Invisible but real header, sized/spaced exactly like the day
               columns' header pill -- a hardcoded pt-* here previously
               only approximated that height, so the time labels slowly
@@ -501,7 +503,7 @@ export function ScheduleGrid({
         </div>
 
         {weekDays.map((day) => (
-          <div key={day.date} className="shrink-0" style={{ width: DAY_COL_WIDTH }}>
+          <div key={day.date}>
             <div
               className={`sticky top-0 rounded-t-lg py-1 text-center text-xs font-medium ${
                 day.date === todayStr ? "bg-rose text-white" : "bg-bg text-ink"
