@@ -108,9 +108,6 @@ const TABS = [
   { id: "measurements", label: "Measurements" },
   { id: "requests", label: "Requests" },
   { id: "payments", label: "Payments" },
-  { id: "habits", label: "Habits" },
-  { id: "nutrition", label: "Nutrition" },
-  { id: "symptoms", label: "Symptoms" },
 ] as const;
 
 const SESSION_TYPE_LABEL: Record<SessionType, string> = {
@@ -422,9 +419,7 @@ export default async function ClientDetailPage({
       />
 
       <div className="flex gap-1 overflow-x-auto rounded-xl bg-white p-1 shadow-sm">
-        {TABS.filter(
-          (t) => t.id !== "symptoms" || client.symptom_tracker_enabled
-        ).map((t) => (
+        {TABS.map((t) => (
           <Link
             key={t.id}
             href={`/coach/clients/${id}?tab=${t.id}`}
@@ -495,6 +490,11 @@ export default async function ClientDetailPage({
           sessions={sessions ?? []}
           activities={activities ?? []}
           supabase={supabase}
+          habits={habits ?? []}
+          habitLogs={habitLogs ?? []}
+          nutritionLogs={nutritionLogs ?? []}
+          symptomLogs={symptomLogs ?? []}
+          symptomTrackerEnabled={client.symptom_tracker_enabled}
         />
       )}
       {tab === "attendance" && (
@@ -521,15 +521,6 @@ export default async function ClientDetailPage({
       )}
       {tab === "payments" && (
         <PaymentsTab clientId={id} payments={payments ?? []} />
-      )}
-      {tab === "habits" && (
-        <HabitsTab habits={habits ?? []} habitLogs={habitLogs ?? []} />
-      )}
-      {tab === "nutrition" && (
-        <NutritionTab nutritionLogs={nutritionLogs ?? []} supabase={supabase} />
-      )}
-      {tab === "symptoms" && client.symptom_tracker_enabled && (
-        <SymptomsTab symptomLogs={symptomLogs ?? []} />
       )}
     </div>
   );
@@ -1800,11 +1791,21 @@ async function LogTab({
   sessions,
   activities,
   supabase,
+  habits,
+  habitLogs,
+  nutritionLogs,
+  symptomLogs,
+  symptomTrackerEnabled,
 }: {
   clientId: string;
   sessions: TrainingSession[];
   activities: Activity[];
   supabase: Awaited<ReturnType<typeof createClient>>;
+  habits: ClientHabit[];
+  habitLogs: ClientHabitLog[];
+  nutritionLogs: ClientNutritionLog[];
+  symptomLogs: ClientSymptomLog[];
+  symptomTrackerEnabled: boolean;
 }) {
   const mediaPaths = [
     ...new Set(
@@ -2024,6 +2025,26 @@ async function LogTab({
           })}
         </div>
       )}
+
+      <Card>
+        <Collapsible label="Habits (client-tracked)">
+          <HabitsTab habits={habits} habitLogs={habitLogs} />
+        </Collapsible>
+      </Card>
+
+      <Card>
+        <Collapsible label="Nutrition (client-tracked)">
+          <NutritionTab nutritionLogs={nutritionLogs} supabase={supabase} />
+        </Collapsible>
+      </Card>
+
+      {symptomTrackerEnabled ? (
+        <Card>
+          <Collapsible label="Symptoms (shared with you)">
+            <SymptomsTab symptomLogs={symptomLogs} />
+          </Collapsible>
+        </Card>
+      ) : null}
     </div>
   );
 }
@@ -2241,8 +2262,7 @@ function HabitsTab({
 
   return (
     <div>
-      <p className="text-sm font-medium text-gray">Habits (last 7 days)</p>
-      <p className="mt-1 text-xs text-gray">
+      <p className="text-xs text-gray">
         Client-set colors — <span className="text-teal">teal</span>,{" "}
         <span className="text-gold">gold</span>,{" "}
         <span className="text-pink">pink</span> — whatever level they
@@ -2289,10 +2309,7 @@ function HabitsTab({
 function SymptomsTab({ symptomLogs }: { symptomLogs: ClientSymptomLog[] }) {
   return (
     <div>
-      <p className="text-sm font-medium text-gray">
-        Symptom log (shared with you)
-      </p>
-      <p className="mt-1 text-xs text-gray">
+      <p className="text-xs text-gray">
         Clients keep this mainly for their own doctor/PT visits — you only
         see an entry if they choose to share it.
       </p>
@@ -2351,7 +2368,6 @@ async function NutritionTab({
 
   return (
     <div>
-      <p className="text-sm font-medium text-gray">Nutrition log</p>
       {nutritionLogs.length === 0 ? (
         <EmptyState
           title="No nutrition entries yet"
