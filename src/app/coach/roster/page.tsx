@@ -62,6 +62,7 @@ export default async function RosterPage({
     { data: documentAckRows },
     { data: minorConsentRows },
     { data: allLinkedClientRows },
+    { data: upcomingMilestoneRows },
   ] = await Promise.all([
     supabase
       .from("requests")
@@ -131,6 +132,14 @@ export default async function RosterPage({
     // know that regardless of which roster view (active/archived) is
     // currently showing, or it phantom-counts them as still unlinked.
     supabase.from("clients").select("user_id").not("user_id", "is", null),
+    clientIds.length > 0
+      ? supabase
+          .from("client_milestones")
+          .select("client_id, title, target_date")
+          .in("client_id", clientIds)
+          .is("achieved_at", null)
+          .not("target_date", "is", null)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const pendingRequestsByClient = new Map<
@@ -169,6 +178,49 @@ export default async function RosterPage({
   const serviceCheckinDatesByClient = datesByClient(serviceCheckinRows);
 
   const today = toDateString(new Date());
+
+  // Upcoming milestones/birthdays -- both are "coming up soon" heads-up
+  // flags rather than problems, so they're purely informational (teal).
+  const MILESTONE_LOOKAHEAD_DAYS = 14;
+  const BIRTHDAY_LOOKAHEAD_DAYS = 7;
+  const daysBetween = (a: string, b: string) =>
+    Math.round(
+      (new Date(`${b}T00:00:00Z`).getTime() - new Date(`${a}T00:00:00Z`).getTime()) /
+        (1000 * 60 * 60 * 24)
+    );
+
+  const upcomingMilestoneByClient = new Map<
+    string,
+    { title: string; target_date: string }
+  >();
+  for (const m of upcomingMilestoneRows ?? []) {
+    if (!m.target_date) continue;
+    const daysUntil = daysBetween(today, m.target_date);
+    if (daysUntil < 0 || daysUntil > MILESTONE_LOOKAHEAD_DAYS) continue;
+    const existing = upcomingMilestoneByClient.get(m.client_id);
+    if (!existing || m.target_date < existing.target_date) {
+      upcomingMilestoneByClient.set(m.client_id, {
+        title: m.title,
+        target_date: m.target_date,
+      });
+    }
+  }
+
+  // Month/day only -- rolls to next year once this year's date has passed.
+  function nextBirthdayDateStr(dob: string, todayStr: string): string {
+    const [, month, day] = dob.split("-");
+    const todayYear = Number(todayStr.slice(0, 4));
+    const thisYear = `${todayYear}-${month}-${day}`;
+    return thisYear >= todayStr ? thisYear : `${todayYear + 1}-${month}-${day}`;
+  }
+  const birthdayByClient = new Map<string, string>();
+  for (const c of clients ?? []) {
+    if (!c.date_of_birth) continue;
+    const nextBirthday = nextBirthdayDateStr(c.date_of_birth, today);
+    if (daysBetween(today, nextBirthday) <= BIRTHDAY_LOOKAHEAD_DAYS) {
+      birthdayByClient.set(c.id, nextBirthday);
+    }
+  }
 
   const clientLoggedSessionDates = (sessionRows ?? []).filter(
     (r) => r.logged_by === "client"
@@ -367,10 +419,10 @@ export default async function RosterPage({
       (reqs?.reschedules ?? 0) -
       (reqs?.checkinCalls ?? 0) -
       (reqs?.videoSessions ?? 0);
-    const needsWindow =
-      inWindow &&
-      (!loggedThisMonth(measurementDatesByClient.get(client.id) ?? []) ||
-        !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []));
+    const measurementsDue =
+      inWindow && !loggedThisMonth(measurementDatesByClient.get(client.id) ?? []);
+    const checkinDue =
+      inWindow && !loggedThisMonth(serviceCheckinDatesByClient.get(client.id) ?? []);
     const risk = riskByClient.get(client.id) ?? { score: 0, level: "low" as RiskLevel };
     const paymentStatus =
       client.payment_schedule === "pay_as_you_go"
@@ -378,6 +430,12 @@ export default async function RosterPage({
         : client.payment_schedule === "monthly"
           ? monthlyPaymentStatus(paymentsByClient.get(client.id) ?? [], today)
           : null;
+    // Only a flag when money's actually owed -- "Paid up"/"Paid last
+    // session"/"Waived" (tone teal or gray) aren't something she needs
+    // surfaced on the board, just the pink (overdue/unpaid) and gold
+    // (due soon) states.
+    const owesPayment =
+      !!paymentStatus && paymentStatus.tone !== "teal" && paymentStatus.tone !== "gray";
 
     // Purely informational events (a cancellation, a signed
     // document) only show up while the coach hasn't opened this
@@ -387,37 +445,47 @@ export default async function RosterPage({
     const notYetSeen = (at: string) =>
       !client.last_viewed_at || client.last_viewed_at < at;
 
-    const flags: string[] = [];
+    type Flag = { label: string; tone: "negative" | "positive" };
+    const flags: Flag[] = [];
     if (newRequests > 0) {
-      flags.push(
-        newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`
-      );
+      flags.push({
+        label: newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`,
+        tone: "positive",
+      });
     }
     if ((reqs?.reschedules ?? 0) > 0) {
-      flags.push(
-        reqs!.reschedules === 1
-          ? "Requested reschedule"
-          : `Requested reschedule (${reqs!.reschedules})`
-      );
+      flags.push({
+        label:
+          reqs!.reschedules === 1
+            ? "Requested reschedule"
+            : `Requested reschedule (${reqs!.reschedules})`,
+        tone: "positive",
+      });
     }
     if ((reqs?.checkinCalls ?? 0) > 0) {
-      flags.push(
-        reqs!.checkinCalls === 1
-          ? "Check-in call requested"
-          : `Check-in call requested (${reqs!.checkinCalls})`
-      );
+      flags.push({
+        label:
+          reqs!.checkinCalls === 1
+            ? "Check-in call requested"
+            : `Check-in call requested (${reqs!.checkinCalls})`,
+        tone: "positive",
+      });
     }
     if ((reqs?.videoSessions ?? 0) > 0) {
-      flags.push(
-        reqs!.videoSessions === 1
-          ? "Video session requested"
-          : `Video session requested (${reqs!.videoSessions})`
-      );
+      flags.push({
+        label:
+          reqs!.videoSessions === 1
+            ? "Video session requested"
+            : `Video session requested (${reqs!.videoSessions})`,
+        tone: "positive",
+      });
     }
-    if (client.hold_started_at) flags.push("On hold");
-    if (risk.level === "high") flags.push("High risk");
-    if (paymentStatus) flags.push(paymentStatus.label);
-    if (lateCancelFeeDueByClient.has(client.id)) flags.push("Late cancel fee due");
+    if (client.hold_started_at) flags.push({ label: "On hold", tone: "negative" });
+    if (risk.level === "high") flags.push({ label: "High risk", tone: "negative" });
+    if (owesPayment) flags.push({ label: paymentStatus!.label, tone: "negative" });
+    if (lateCancelFeeDueByClient.has(client.id)) {
+      flags.push({ label: "Late cancel fee due", tone: "negative" });
+    }
 
     const lastTracked = lastTrackedByClient.get(client.id);
     const daysSinceActivity = lastTracked
@@ -433,22 +501,44 @@ export default async function RosterPage({
       new Date(today).getTime() - new Date(client.created_at).getTime() >
       3 * 24 * 60 * 60 * 1000;
     if (clientEstablished && daysSinceActivity > 3) {
-      flags.push(`Inactive ${daysSinceActivity}+ days`);
+      flags.push({ label: `Inactive ${daysSinceActivity}+ days`, tone: "negative" });
     }
 
     const lateCancel = recentLateCancelledByClient.get(client.id);
     if (lateCancel && notYetSeen(lateCancel.at)) {
-      flags.push(`Late cancellation (${shortDate(lateCancel.date)})`);
+      flags.push({
+        label: `Late cancellation (${shortDate(lateCancel.date)})`,
+        tone: "negative",
+      });
     }
     const cancel = recentCancelledByClient.get(client.id);
     if (cancel && notYetSeen(cancel.at)) {
-      flags.push(`Cancelled ${shortDate(cancel.date)} session`);
+      flags.push({
+        label: `Cancelled ${shortDate(cancel.date)} session`,
+        tone: "negative",
+      });
     }
     const documentAt = recentDocumentAtByClient.get(client.id);
     if (documentAt && notYetSeen(documentAt)) {
-      flags.push("Completed document");
+      flags.push({ label: "Completed document", tone: "positive" });
     }
-    if (needsWindow) flags.push("Needs monthly check-in");
+    if (measurementsDue) flags.push({ label: "Measurements due", tone: "positive" });
+    if (checkinDue) flags.push({ label: "Check-in due", tone: "positive" });
+
+    const milestone = upcomingMilestoneByClient.get(client.id);
+    if (milestone) {
+      flags.push({
+        label: `Milestone coming up: ${milestone.title} (${shortDate(milestone.target_date)})`,
+        tone: "positive",
+      });
+    }
+    const birthday = birthdayByClient.get(client.id);
+    if (birthday) {
+      flags.push({
+        label: birthday === today ? "Birthday today!" : `Birthday ${shortDate(birthday)}`,
+        tone: "positive",
+      });
+    }
 
     return (
       <Link key={client.id} href={`/coach/clients/${client.id}`}>
@@ -478,10 +568,12 @@ export default async function RosterPage({
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
               {flags.map((f) => (
                 <span
-                  key={f}
-                  className="text-sm font-medium text-rose before:mr-1 before:content-['•']"
+                  key={f.label}
+                  className={`text-sm font-medium before:mr-1 before:content-['•'] ${
+                    f.tone === "negative" ? "text-pink" : "text-teal"
+                  }`}
                 >
-                  {f}
+                  {f.label}
                 </span>
               ))}
             </div>

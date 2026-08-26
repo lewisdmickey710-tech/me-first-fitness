@@ -47,6 +47,8 @@ export interface Client {
   late_cancel_free_remaining: number | null;
   pro_bono: boolean;
   pro_bono_rate: number | null;
+  calorie_goal_enabled: boolean;
+  daily_calorie_goal: number | null;
 }
 
 export interface SessionEntry {

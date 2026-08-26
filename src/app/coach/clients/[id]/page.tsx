@@ -47,6 +47,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
+import { CalorieGoalField } from "@/components/calorie-goal-field";
 import { ACTIVITY_TYPES, formatReps, phaseInfo } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
@@ -1167,6 +1168,11 @@ function ProfileTab({
             name="symptom_tracker_enabled"
             label="Enable the optional symptom tracker for this client"
             defaultChecked={client.symptom_tracker_enabled}
+          />
+
+          <CalorieGoalField
+            defaultEnabled={client.calorie_goal_enabled}
+            defaultGoal={client.daily_calorie_goal}
           />
 
           <div>

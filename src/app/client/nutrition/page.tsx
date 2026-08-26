@@ -59,6 +59,15 @@ export default async function ClientNutritionPage() {
         </p>
       </div>
 
+      {me.calorie_goal_enabled && me.daily_calorie_goal ? (
+        <Card className="border-teal/40 bg-teal/5">
+          <p className="text-sm text-gray">Your daily calorie goal</p>
+          <p className="text-2xl font-semibold text-ink">
+            {me.daily_calorie_goal} <span className="text-sm font-normal text-gray">cal</span>
+          </p>
+        </Card>
+      ) : null}
+
       <Card>
         <form action={addNutritionLog} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
