@@ -201,6 +201,10 @@ export default async function ClientProgramPage() {
                       required
                       defaultValue={today}
                     />
+                    <p className="mt-1 text-xs text-gray">
+                      Forgot to log it the same day? Change the date to when
+                      you actually did it — logging it late is totally fine.
+                    </p>
                   </div>
 
                   <div>

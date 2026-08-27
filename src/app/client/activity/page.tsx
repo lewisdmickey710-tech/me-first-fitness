@@ -80,6 +80,10 @@ export default async function ClientActivityPage() {
               Date
             </label>
             <Input name="date" type="date" required defaultValue={today} />
+            <p className="mt-1 text-xs text-gray">
+              Forgot to log it the same day? Change the date to when it
+              actually happened — logging it late is totally fine.
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
