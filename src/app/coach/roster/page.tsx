@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { unarchiveClient, coachCancelSession } from "@/app/coach/actions";
+import { ConfirmButton } from "@/components/confirm-button";
 import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
@@ -780,9 +781,12 @@ export default async function RosterPage({
                   await coachCancelSession(nextSession!.clientId, nextSession!.date, null);
                 }}
               >
-                <Button type="submit" variant="danger">
+                <ConfirmButton
+                  variant="danger"
+                  confirmText={`Cancel ${nextSession.clientName}'s session on ${nextSession.date}?`}
+                >
                   Cancel
-                </Button>
+                </ConfirmButton>
               </form>
             </div>
           </Card>
