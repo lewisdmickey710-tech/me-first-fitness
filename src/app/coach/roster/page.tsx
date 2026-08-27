@@ -455,7 +455,7 @@ export default async function RosterPage({
   // weekly pattern. Never looks earlier than the app's real launch date --
   // nothing before that was ever actually tracked, so there's nothing to
   // flag as missing.
-  const APP_LAUNCH_DATE = "2026-08-22";
+  const APP_LAUNCH_DATE = "2026-08-24";
   function timeToMinutes(t: string): number {
     const [h, m] = t.slice(0, 5).split(":").map(Number);
     return h * 60 + m;

@@ -74,6 +74,7 @@ export interface NextSessionForClient {
   label: string | null;
   isOneOff: boolean;
   isVideoSession: boolean;
+  scheduleId: string | null;
 }
 
 /**
@@ -84,7 +85,13 @@ export interface NextSessionForClient {
  * occurrence has been cancelled/late-cancelled/rescheduled away.
  */
 export function nextSessionForClient(
-  schedules: { day_of_week: number; time_of_day: string; label: string | null; active: boolean }[],
+  schedules: {
+    id: string;
+    day_of_week: number;
+    time_of_day: string;
+    label: string | null;
+    active: boolean;
+  }[],
   occurrences: {
     occurrence_date: string;
     status: string;
@@ -115,6 +122,7 @@ export function nextSessionForClient(
         label: s.label,
         isOneOff: false,
         isVideoSession: occByDate.get(dateStr)?.is_video_session ?? false,
+        scheduleId: s.id,
       });
       break;
     }
@@ -133,6 +141,7 @@ export function nextSessionForClient(
       label: null,
       isOneOff: true,
       isVideoSession: o.is_video_session ?? false,
+      scheduleId: null,
     });
   }
 

@@ -221,6 +221,7 @@ export async function sendCoachCancelledSessionEmail(
       <p>Hi ${clientName},</p>
       <p>I need to cancel your session on <strong>${whenText}</strong> — I'll follow up by text to get you rescheduled.</p>
       <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you.</p>
+      <p>Since we won't get our session in, try to still sneak in some movement on your own today — a walk, some stretching, whatever you've got time for.</p>
     `),
   });
 }
@@ -243,6 +244,7 @@ export async function sendDayBlockedEmail(
       <p>Hi ${clientName},</p>
       <p>I'm unavailable on <strong>${whenText}</strong>${reason ? ` (${reason})` : ""}, so I had to cancel your session that day.</p>
       <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you. I'll follow up to get you set up on a new time.</p>
+      <p>Since we won't get our session in, try to still sneak in some movement on your own that day — a walk, some stretching, whatever you've got time for.</p>
     `),
   });
 }

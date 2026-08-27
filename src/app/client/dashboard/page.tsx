@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { respondToCounteredRequest } from "@/app/client/actions";
+import { respondToCounteredRequest, cancelMySession } from "@/app/client/actions";
+import { ConfirmButton } from "@/components/confirm-button";
+import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import {
   Badge,
   Button,
@@ -159,6 +161,12 @@ export default async function ClientDashboard() {
     ]);
 
   const nextSession = nextSessionForClient(schedules ?? [], occurrences ?? []);
+  const nextSessionHours =
+    nextSession?.timeOfDay
+      ? hoursUntilOccurrence(nextSession.date, nextSession.timeOfDay)
+      : null;
+  const nextSessionWouldBeLate =
+    nextSessionHours !== null && nextSessionHours < LATE_CANCEL_NOTICE_HOURS;
   const nextDue = payments?.[0] ?? null;
   const hasUnpaidLateFee = (payments ?? []).some(
     (p) => p.kind === "late_cancellation_fee"
@@ -353,12 +361,47 @@ export default async function ClientDashboard() {
               </p>
             )
           ) : null}
-          <Link
-            href="/client/schedule"
-            className="mt-2 inline-block text-sm text-rose hover:underline"
-          >
-            View your schedule →
-          </Link>
+
+          {nextSessionWouldBeLate ? (
+            <p className="mt-2 text-xs text-pink">
+              Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours notice
+              — this will count as a late cancellation.
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <form
+              action={async () => {
+                "use server";
+                await cancelMySession(
+                  nextSession.scheduleId,
+                  nextSession.date,
+                  nextSession.timeOfDay
+                );
+              }}
+            >
+              <ConfirmButton
+                variant="danger"
+                confirmText={
+                  nextSessionWouldBeLate
+                    ? `Cancelling now is under ${LATE_CANCEL_NOTICE_HOURS} hours notice and will count as a late cancellation. Cancel anyway?`
+                    : "Cancel this session? This can't be undone."
+                }
+              >
+                Cancel
+              </ConfirmButton>
+            </form>
+            <Link href={`/client/request?reschedule_from=${nextSession.date}`}>
+              <Button type="button" variant="secondary">
+                Request reschedule
+              </Button>
+            </Link>
+            <Link
+              href="/client/schedule"
+              className="text-sm text-rose hover:underline"
+            >
+              View your schedule →
+            </Link>
+          </div>
         </Card>
       ) : me.session_mode === "virtual" ? (
         <Card>
