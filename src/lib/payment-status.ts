@@ -1,7 +1,29 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 export type PaymentStatusBadge = {
   label: string;
   tone: "teal" | "gold" | "pink" | "gray";
 } | null;
+
+// Used to gate new self-service booking requests -- a client shouldn't be
+// able to request more session time while an existing payment is overdue.
+// Late cancellation fees have their own dedicated "sessions paused" flow
+// already, so they're excluded here to avoid double-gating on the same fee.
+export async function clientHasOverdueBalance(
+  supabase: SupabaseClient,
+  clientId: string,
+  today: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("client_id", clientId)
+    .is("paid_on", null)
+    .neq("kind", "late_cancellation_fee")
+    .lt("due_date", today)
+    .limit(1);
+  return (data ?? []).length > 0;
+}
 
 // Pay-as-you-go clients don't have scheduled invoices -- their status is
 // just whatever the coach marked on their most recent logged session.

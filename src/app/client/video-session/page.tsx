@@ -4,7 +4,8 @@ import { submitRequest } from "@/app/client/actions";
 import { getMyClient } from "@/lib/current-client";
 import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
-import { BUSINESS_TIMEZONE, timezoneLabel } from "@/lib/timezone";
+import { BUSINESS_TIMEZONE, timezoneLabel, toDateString, nowInBusinessTz } from "@/lib/timezone";
+import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import type { BusinessSettings } from "@/lib/types";
 
@@ -43,6 +44,26 @@ export default async function VideoSessionPage({
     .select("*")
     .eq("id", true)
     .maybeSingle()) as { data: BusinessSettings | null };
+
+  const overdue = await clientHasOverdueBalance(
+    supabase,
+    me.id,
+    toDateString(nowInBusinessTz())
+  );
+  if (overdue) {
+    return (
+      <div className="space-y-6">
+        <BackLink href="/client/dashboard" />
+        <EmptyState
+          title="Booking is on hold"
+          body="You have an outstanding balance, so new session requests are disabled until it's paid. Send it below and you're clear to book again right away."
+        />
+        <Card>
+          <PaymentMethods settings={businessSettings} />
+        </Card>
+      </div>
+    );
+  }
 
   const clientTz = me.timezone || BUSINESS_TIMEZONE;
   const isOwnTimezone = clientTz === BUSINESS_TIMEZONE;

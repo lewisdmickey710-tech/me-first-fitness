@@ -70,17 +70,24 @@ export function Sparkline({
 
 // A compact circular progress indicator for a "goal so far" number (e.g.
 // sessions this week) -- meant to read at a glance without a sentence of
-// explanation, unlike a plain "3/5" stat line.
+// explanation, unlike a plain "3/5" stat line. Passing overflowPercent
+// draws a second, smaller ring nested inside the first -- for a goal
+// that's already full but still has more to show (e.g. logging a snack
+// beyond the day's meal goal), rather than just capping the outer ring.
 export function ProgressRing({
   percent,
   label,
   sublabel,
   color = "#E75480",
+  overflowPercent,
+  overflowColor = "#D4A24C",
 }: {
   percent: number;
   label: string;
   sublabel: string;
   color?: string;
+  overflowPercent?: number;
+  overflowColor?: string;
 }) {
   const size = 72;
   const stroke = 7;
@@ -88,6 +95,14 @@ export function ProgressRing({
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, percent));
   const offset = circumference * (1 - clamped / 100);
+
+  const hasOverflow = overflowPercent != null && overflowPercent > 0;
+  const innerStroke = stroke - 2;
+  const innerRadius = radius - stroke;
+  const innerCircumference = 2 * Math.PI * innerRadius;
+  const clampedOverflow = Math.max(0, Math.min(100, overflowPercent ?? 0));
+  const innerOffset = innerCircumference * (1 - clampedOverflow / 100);
+
   return (
     <div className="flex flex-col items-center gap-1.5">
       <svg width={size} height={size} className="-rotate-90">
@@ -110,6 +125,29 @@ export function ProgressRing({
           strokeDashoffset={offset}
           strokeLinecap="round"
         />
+        {hasOverflow ? (
+          <>
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={innerRadius}
+              fill="none"
+              stroke="#EFEAE6"
+              strokeWidth={innerStroke}
+            />
+            <circle
+              cx={size / 2}
+              cy={size / 2}
+              r={innerRadius}
+              fill="none"
+              stroke={overflowColor}
+              strokeWidth={innerStroke}
+              strokeDasharray={innerCircumference}
+              strokeDashoffset={innerOffset}
+              strokeLinecap="round"
+            />
+          </>
+        ) : null}
       </svg>
       <div className="text-center leading-tight">
         <p className="text-sm font-semibold text-ink">{label}</p>

@@ -63,7 +63,7 @@ export default async function ClientDashboard() {
     { data: documents },
     { data: acks },
     { count: weeklySessionsCount },
-    { count: monthlySessionsCount },
+    { count: coachedSessionsMonthCount },
     { data: todaysNutrition },
   ] = await Promise.all([
     supabase
@@ -119,12 +119,13 @@ export default async function ClientDashboard() {
       .from("sessions")
       .select("id", { count: "exact", head: true })
       .eq("client_id", me.id)
+      .eq("coached", true)
       .gte("date", monthStart),
     supabase
       .from("client_nutrition_logs")
-      .select("calories")
+      .select("id")
       .eq("client_id", me.id)
-      .eq("log_date", today) as unknown as Promise<{ data: { calories: number | null }[] | null }>,
+      .eq("log_date", today) as unknown as Promise<{ data: { id: string }[] | null }>,
   ]);
 
   const { data: businessSettings } = (await supabase
@@ -133,19 +134,29 @@ export default async function ClientDashboard() {
     .eq("id", true)
     .maybeSingle()) as { data: BusinessSettings | null };
 
-  const [{ data: docAssignments }, { data: minorConsent }] = await Promise.all([
-    supabase
-      .from("client_document_assignments")
-      .select("*")
-      .eq("client_id", me.id) as unknown as Promise<{
-      data: ClientDocumentAssignment[] | null;
-    }>,
-    supabase
-      .from("client_minor_consent")
-      .select("*")
-      .eq("client_id", me.id)
-      .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
-  ]);
+  const [{ data: docAssignments }, { data: minorConsent }, { data: programDayRows }] =
+    await Promise.all([
+      supabase
+        .from("client_document_assignments")
+        .select("*")
+        .eq("client_id", me.id) as unknown as Promise<{
+        data: ClientDocumentAssignment[] | null;
+      }>,
+      supabase
+        .from("client_minor_consent")
+        .select("*")
+        .eq("client_id", me.id)
+        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+      me.care_profile_id && currentPhase
+        ? (supabase
+            .from("program_days")
+            .select("day_number")
+            .eq("care_profile_id", me.care_profile_id)
+            .eq("phase", currentPhase.phase) as unknown as Promise<{
+            data: { day_number: number }[] | null;
+          }>)
+        : Promise.resolve({ data: null }),
+    ]);
 
   const nextSession = nextSessionForClient(schedules ?? [], occurrences ?? []);
   const nextDue = payments?.[0] ?? null;
@@ -188,31 +199,42 @@ export default async function ClientDashboard() {
     .filter((m) => m.achieved_at && new Date(m.achieved_at) >= fourteenDaysAgo)
     .sort((a, b) => (b.achieved_at ?? "").localeCompare(a.achieved_at ?? ""));
 
-  // Three goal rings: sessions this week, nutrition today, sessions this
-  // month. The monthly goal matches the same days-per-week x 4 convention
-  // used for the coach's consistency scoring, so the two stay in step.
-  const weeklySessionGoal = me.days_per_week ?? 3;
-  const weeklySessionsLogged = weeklySessionsCount ?? 0;
-  const monthlySessionGoal = weeklySessionGoal * 4;
-  const monthlySessionsLogged = monthlySessionsCount ?? 0;
+  // Three goal rings, each specific to this client rather than a shared
+  // default:
+  // - Programmed Days: how many distinct days their actual program (this
+  //   phase) calls for per week, filled by any session logged this week.
+  //   Falls back to their days-per-week only if they have no program
+  //   assigned at all (e.g. a fully custom/virtual client).
+  // - Sessions with Mickey: coached sessions specifically (not solo-logged
+  //   ones), goal on the same days-per-week x 4 monthly convention the
+  //   coach's own consistency scoring already uses.
+  // - Nutrition: a flat 3-meals-a-day target regardless of calorie
+  //   tracking -- logging more than that (snacks) overflows into a second,
+  //   overlapping ring instead of just capping at full.
+  const programmedDaysGoal =
+    programDayRows && programDayRows.length > 0
+      ? new Set(programDayRows.map((d) => d.day_number)).size
+      : me.days_per_week ?? 3;
+  const programmedDaysLogged = weeklySessionsCount ?? 0;
 
-  const todaysCalories = (todaysNutrition ?? []).reduce(
-    (sum, n) => sum + (n.calories ?? 0),
-    0
-  );
-  const nutritionLoggedToday = (todaysNutrition ?? []).length > 0;
-  const nutritionRing =
-    me.calorie_goal_enabled && me.daily_calorie_goal
-      ? {
-          percent: (todaysCalories / me.daily_calorie_goal) * 100,
-          label: `${todaysCalories}/${me.daily_calorie_goal}`,
-          sublabel: "cal today",
-        }
-      : {
-          percent: nutritionLoggedToday ? 100 : 0,
-          label: nutritionLoggedToday ? "Logged" : "Not yet",
-          sublabel: "nutrition today",
-        };
+  const coachedSessionGoal = (me.days_per_week ?? 3) * 4;
+  const coachedSessionsLogged = coachedSessionsMonthCount ?? 0;
+
+  const NUTRITION_GOAL = 3;
+  const nutritionCount = (todaysNutrition ?? []).length;
+  const nutritionOverflow = Math.max(0, nutritionCount - NUTRITION_GOAL);
+  const nutritionRing = {
+    percent: (Math.min(nutritionCount, NUTRITION_GOAL) / NUTRITION_GOAL) * 100,
+    overflowPercent:
+      nutritionOverflow > 0
+        ? (Math.min(nutritionOverflow, NUTRITION_GOAL) / NUTRITION_GOAL) * 100
+        : undefined,
+    label: `${nutritionCount}/${NUTRITION_GOAL}`,
+    sublabel:
+      nutritionOverflow > 0
+        ? `+${nutritionOverflow} snack${nutritionOverflow > 1 ? "s" : ""} today`
+        : "meals today",
+  };
 
   const weekCycleLine = currentPhase
     ? `Week ${weekInPhase(currentPhase.started_on)} of this phase · Cycle ${currentPhase.cycle_number}`
@@ -380,21 +402,22 @@ export default async function ClientDashboard() {
         <p className="mb-3 text-sm font-medium text-gray">Your goals</p>
         <div className="flex items-center justify-around">
           <ProgressRing
-            percent={(weeklySessionsLogged / weeklySessionGoal) * 100}
-            label={`${weeklySessionsLogged}/${weeklySessionGoal}`}
-            sublabel="sessions this week"
+            percent={(programmedDaysLogged / programmedDaysGoal) * 100}
+            label={`${programmedDaysLogged}/${programmedDaysGoal}`}
+            sublabel="Programmed Days"
             color="#E75480"
           />
           <ProgressRing
             percent={nutritionRing.percent}
+            overflowPercent={nutritionRing.overflowPercent}
             label={nutritionRing.label}
             sublabel={nutritionRing.sublabel}
             color="#2FA6A6"
           />
           <ProgressRing
-            percent={(monthlySessionsLogged / monthlySessionGoal) * 100}
-            label={`${monthlySessionsLogged}/${monthlySessionGoal}`}
-            sublabel="sessions this month"
+            percent={(coachedSessionsLogged / coachedSessionGoal) * 100}
+            label={`${coachedSessionsLogged}/${coachedSessionGoal}`}
+            sublabel="Sessions with Mickey"
             color="#D4A24C"
           />
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -8,6 +8,8 @@ import {
   counterRequest,
   coachRescheduleSession,
   coachBookSession,
+  coachCancelSession,
+  removeClientSchedule,
 } from "@/app/coach/actions";
 import { Button, Select } from "@/components/ui";
 import { formatTimeOfDay } from "@/lib/schedule";
@@ -44,6 +46,7 @@ interface DayBooking {
   timeOfDay: string;
   clientName: string;
   durationMinutes: number;
+  clientScheduleId: string | null;
 }
 
 interface PendingReschedule {
@@ -127,6 +130,9 @@ export function ScheduleGrid({
   nextWeekHref,
   weekLabel,
   todayStr,
+  overdueClientIds = [],
+  autoPickupClientId,
+  autoPickupDate,
 }: {
   weekDays: WeekDay[];
   availability: AvailabilityWindow[];
@@ -138,6 +144,9 @@ export function ScheduleGrid({
   nextWeekHref: string;
   weekLabel: string;
   todayStr: string;
+  overdueClientIds?: string[];
+  autoPickupClientId?: string;
+  autoPickupDate?: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -158,6 +167,24 @@ export function ScheduleGrid({
   const [newBookingRecurring, setNewBookingRecurring] = useState(false);
   const [newBookingDuration, setNewBookingDuration] = useState<30 | 60>(60);
   const [error, setError] = useState<string | null>(null);
+  const [balanceActionBooking, setBalanceActionBooking] = useState<DayBooking | null>(
+    null
+  );
+
+  // Coming here from the "Next booked session" widget's Reschedule button
+  // should land exactly as if the coach had tapped this session themselves
+  // -- pick it up right away instead of making them find and tap it again.
+  const autoPickupHandledRef = useRef(false);
+  useEffect(() => {
+    if (autoPickupHandledRef.current || !autoPickupClientId || !autoPickupDate) return;
+    const match = bookings.find(
+      (b) => b.clientId === autoPickupClientId && b.date === autoPickupDate
+    );
+    if (match) {
+      autoPickupHandledRef.current = true;
+      setPickedUpBooking(match);
+    }
+  }, [bookings, autoPickupClientId, autoPickupDate]);
 
   // Press-and-hold on a booked session jumps straight to logging that
   // session for that client -- a plain tap still picks it up to reschedule
@@ -200,6 +227,7 @@ export function ScheduleGrid({
     setPickedUpBooking(null);
     setPendingReschedule(null);
     setNewBookingSlot(null);
+    setBalanceActionBooking(null);
     setError(null);
   }
 
@@ -396,6 +424,31 @@ export function ScheduleGrid({
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Couldn't move that session.");
+      }
+    });
+  }
+
+  function cancelSingleOccurrence(b: DayBooking) {
+    startTransition(async () => {
+      try {
+        await coachCancelSession(b.clientId, b.date, b.clientScheduleId);
+        setBalanceActionBooking(null);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't cancel that session.");
+      }
+    });
+  }
+
+  function removeRecurringBooking(b: DayBooking) {
+    if (!b.clientScheduleId) return;
+    startTransition(async () => {
+      try {
+        await removeClientSchedule(b.clientScheduleId!, b.clientId);
+        setBalanceActionBooking(null);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't remove that recurring time.");
       }
     });
   }
@@ -632,6 +685,7 @@ export function ScheduleGrid({
                 const movable = day.date >= todayStr;
                 const isPickedUp =
                   pickedUpBooking?.clientId === b.clientId && pickedUpBooking?.date === b.date;
+                const isPending = overdueClientIds.includes(b.clientId);
                 return (
                   <div
                     key={`${b.clientId}-${b.timeOfDay}`}
@@ -640,7 +694,13 @@ export function ScheduleGrid({
                         longPressFiredRef.current = false;
                         return;
                       }
-                      movable && pickUpBooking(b);
+                      if (!movable) return;
+                      if (isPending) {
+                        clearPickups();
+                        setBalanceActionBooking(b);
+                        return;
+                      }
+                      pickUpBooking(b);
                     }}
                     onPointerDown={(e) => startLongPress(b, e.clientY)}
                     onPointerMove={(e) => moveLongPress(e.clientY)}
@@ -648,16 +708,23 @@ export function ScheduleGrid({
                     onPointerLeave={endLongPress}
                     onPointerCancel={endLongPress}
                     title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
-                      movable ? " · tap to reschedule" : ""
+                      isPending
+                        ? " · pending: outstanding balance"
+                        : movable
+                          ? " · tap to reschedule"
+                          : ""
                     } · press and hold to log this session`}
                     className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[10px] font-medium leading-none text-ink ${
                       isPickedUp
                         ? "border-rose bg-rose/50 ring-2 ring-rose"
-                        : "border-pink/60 bg-pink/40"
+                        : isPending
+                          ? "border-gold/70 bg-gold/40"
+                          : "border-pink/60 bg-pink/40"
                     } cursor-pointer`}
                     style={{ top: geometry.top, height: geometry.height }}
                   >
                     {initials(b.clientName)}
+                    {isPending ? "*" : ""}
                   </div>
                 );
               })}
@@ -681,6 +748,9 @@ export function ScheduleGrid({
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-purple/15" /> Awaiting their reply
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded bg-gold/40" /> Pending (balance owed)
         </span>
       </div>
 
@@ -845,6 +915,59 @@ export function ScheduleGrid({
                 onClick={() => setNewBookingSlot(null)}
               >
                 Cancel
+              </Button>
+            </div>
+            {error ? <p className="text-sm text-pink">{error}</p> : null}
+          </div>
+        </Modal>
+      ) : null}
+
+      {balanceActionBooking ? (
+        <Modal onClose={() => setBalanceActionBooking(null)}>
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-ink">
+              {balanceActionBooking.clientName} has an outstanding balance —
+              this session on {balanceActionBooking.date} at{" "}
+              {formatTimeOfDay(balanceActionBooking.timeOfDay)} is pending.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => {
+                  const b = balanceActionBooking;
+                  setBalanceActionBooking(null);
+                  pickUpBooking(b);
+                }}
+              >
+                Reschedule
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                disabled={isPending}
+                onClick={() => cancelSingleOccurrence(balanceActionBooking)}
+              >
+                Cancel this session
+              </Button>
+              {balanceActionBooking.clientScheduleId ? (
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={isPending}
+                  onClick={() => removeRecurringBooking(balanceActionBooking)}
+                >
+                  Remove recurring time (lost cause)
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => setBalanceActionBooking(null)}
+              >
+                Close
               </Button>
             </div>
             {error ? <p className="text-sm text-pink">{error}</p> : null}

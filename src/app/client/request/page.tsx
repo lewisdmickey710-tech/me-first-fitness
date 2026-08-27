@@ -1,8 +1,12 @@
 import { BackLink } from "@/components/back-link";
+import { createClient } from "@/lib/supabase/server";
 import { submitRequest } from "@/app/client/actions";
 import { getMyClient } from "@/lib/current-client";
-import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
-import { BUSINESS_TIMEZONE, timezoneLabel } from "@/lib/timezone";
+import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
+import { PaymentMethods } from "@/components/payment-methods";
+import { BUSINESS_TIMEZONE, timezoneLabel, toDateString, nowInBusinessTz } from "@/lib/timezone";
+import { clientHasOverdueBalance } from "@/lib/payment-status";
+import type { BusinessSettings } from "@/lib/types";
 
 export default async function RequestTimePage({
   searchParams,
@@ -13,6 +17,31 @@ export default async function RequestTimePage({
   const me = await getMyClient();
   const clientTz = me?.timezone || BUSINESS_TIMEZONE;
   const isOwnTimezone = clientTz === BUSINESS_TIMEZONE;
+
+  const supabase = await createClient();
+  const overdue = me
+    ? await clientHasOverdueBalance(supabase, me.id, toDateString(nowInBusinessTz()))
+    : false;
+
+  if (overdue) {
+    const { data: businessSettings } = (await supabase
+      .from("business_settings")
+      .select("*")
+      .eq("id", true)
+      .maybeSingle()) as { data: BusinessSettings | null };
+    return (
+      <div className="space-y-6">
+        <BackLink href="/client/dashboard" />
+        <EmptyState
+          title="Booking is on hold"
+          body="You have an outstanding balance, so new session requests are disabled until it's paid. Send it below and you're clear to book again right away."
+        />
+        <Card>
+          <PaymentMethods settings={businessSettings} />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

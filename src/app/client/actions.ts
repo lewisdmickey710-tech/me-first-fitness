@@ -12,8 +12,9 @@ import {
   lateCancellationFeeAmount,
   LATE_CANCEL_WINDOW_DAYS,
 } from "@/lib/cancellation";
-import { BUSINESS_TIMEZONE, convertWallTime } from "@/lib/timezone";
+import { BUSINESS_TIMEZONE, convertWallTime, toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
+import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { safeFileName } from "@/lib/storage";
 import type { PaymentSchedule } from "@/lib/types";
 
@@ -219,6 +220,13 @@ export async function submitRequest(formData: FormData) {
 
   if (request_type === "video_session" && !me.video_sessions_enabled) {
     redirect(backTo("Video sessions aren't enabled on your profile -- ask Mickey."));
+  }
+
+  // Belt-and-suspenders: the request pages already hide this form behind
+  // an overdue balance, but the action itself has to enforce it too since
+  // a form POST doesn't go through page rendering.
+  if (await clientHasOverdueBalance(supabase, me.id, toDateString(nowInBusinessTz()))) {
+    redirect(backTo("You have an outstanding balance -- new requests are disabled until it's paid."));
   }
 
   if (!preferred_date) {

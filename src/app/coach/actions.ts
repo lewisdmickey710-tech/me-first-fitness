@@ -933,6 +933,7 @@ export async function removeClientSchedule(
 
   revalidatePath(`/coach/clients/${clientId}/schedule`);
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
 }
 
 export async function updatePaymentMethods(formData: FormData) {

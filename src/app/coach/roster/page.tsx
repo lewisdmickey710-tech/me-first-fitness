@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { unarchiveClient } from "@/app/coach/actions";
+import { unarchiveClient, coachCancelSession } from "@/app/coach/actions";
 import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
@@ -21,6 +21,14 @@ const SHORT_DATE_FMT = new Intl.DateTimeFormat("en-US", {
 
 function shortDate(dateStr: string): string {
   return SHORT_DATE_FMT.format(new Date(`${dateStr}T00:00:00Z`));
+}
+
+// Sunday of the week containing dateStr -- matches the ?week= param the
+// Schedule page expects (its own week always starts on a Sunday too).
+function sundayOf(dateStr: string): string {
+  const d = new Date(`${dateStr}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - d.getUTCDay());
+  return toDateString(d);
 }
 
 export default async function RosterPage({
@@ -741,23 +749,43 @@ export default async function RosterPage({
 
       {!showArchived ? (
         nextSession ? (
-          <Link
-            href={`/coach/clients/${nextSession.clientId}/log-session?date=${nextSession.date}`}
-          >
-            <Card className="border-teal/30 bg-teal/5 transition hover:border-teal/60">
-              <p className="text-sm font-medium text-gray">
-                <Heart className="mr-1" />
-                Next booked session
-              </p>
-              <p className="mt-1 text-2xl font-semibold text-ink">
-                {nextSession.clientName}
-              </p>
-              <p className="mt-0.5 text-sm text-gray">
-                {nextSession.date === today ? "Today" : shortDate(nextSession.date)} at{" "}
-                {formatTimeOfDay(nextSession.timeOfDay)} · tap to log this session
-              </p>
-            </Card>
-          </Link>
+          <Card className="border-teal/30 bg-teal/5">
+            <p className="text-sm font-medium text-gray">
+              <Heart className="mr-1" />
+              Next booked session
+            </p>
+            <p className="mt-1 text-2xl font-semibold text-ink">
+              {nextSession.clientName}
+            </p>
+            <p className="mt-0.5 text-sm text-gray">
+              {nextSession.date === today ? "Today" : shortDate(nextSession.date)} at{" "}
+              {formatTimeOfDay(nextSession.timeOfDay)}
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link
+                href={`/coach/clients/${nextSession.clientId}/log-session?date=${nextSession.date}`}
+                className="rounded-xl bg-rose px-3 py-1.5 text-sm font-medium text-white hover:opacity-90"
+              >
+                Log session
+              </Link>
+              <Link
+                href={`/coach/schedule?week=${sundayOf(nextSession.date)}&pickupClientId=${nextSession.clientId}&pickupDate=${nextSession.date}`}
+                className="rounded-xl border border-grayLt bg-white px-3 py-1.5 text-sm font-medium text-ink hover:bg-bg"
+              >
+                Reschedule
+              </Link>
+              <form
+                action={async () => {
+                  "use server";
+                  await coachCancelSession(nextSession!.clientId, nextSession!.date, null);
+                }}
+              >
+                <Button type="submit" variant="danger">
+                  Cancel
+                </Button>
+              </form>
+            </div>
+          </Card>
         ) : (
           <Card className="border-teal/30 bg-teal/5">
             <p className="text-sm font-medium text-gray">

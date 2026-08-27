@@ -46,10 +46,22 @@ interface DaySession {
 export default async function CoachSchedulePage({
   searchParams,
 }: {
-  searchParams: Promise<{ month?: string; date?: string; week?: string }>;
+  searchParams: Promise<{
+    month?: string;
+    date?: string;
+    week?: string;
+    pickupClientId?: string;
+    pickupDate?: string;
+  }>;
 }) {
   const supabase = await createClient();
-  const { month: monthParam, date: dateParam, week: weekParam } = await searchParams;
+  const {
+    month: monthParam,
+    date: dateParam,
+    week: weekParam,
+    pickupClientId,
+    pickupDate,
+  } = await searchParams;
 
   const now = nowInBusinessTz();
   const todayStr = toDateString(now);
@@ -104,6 +116,7 @@ export default async function CoachSchedulePage({
     { data: weekBlocks },
     { data: weekOccurrences },
     { data: openRequests },
+    { data: overduePayments },
   ] = await Promise.all([
     supabase
       .from("client_schedules")
@@ -150,9 +163,20 @@ export default async function CoachSchedulePage({
       .in("status", ["pending", "countered"]) as unknown as Promise<{
       data: (SessionRequest & { clients: { id: string; name: string } | null })[] | null;
     }>,
+    supabase
+      .from("payments")
+      .select("client_id")
+      .is("paid_on", null)
+      .neq("kind", "late_cancellation_fee")
+      .lt("due_date", todayStr) as unknown as Promise<{
+      data: { client_id: string }[] | null;
+    }>,
   ]);
 
   const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
+  const overdueClientIds = [
+    ...new Set((overduePayments ?? []).map((p) => p.client_id)),
+  ];
 
   const activeSchedules = (schedules ?? []).filter((s) => s.clients);
   const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
@@ -172,6 +196,7 @@ export default async function CoachSchedulePage({
     timeOfDay: string;
     clientName: string;
     durationMinutes: number;
+    clientScheduleId: string | null;
   }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
@@ -192,6 +217,7 @@ export default async function CoachSchedulePage({
         timeOfDay: s.time_of_day,
         clientName: s.clients!.name,
         durationMinutes: s.duration_minutes,
+        clientScheduleId: s.id,
       });
     }
   }
@@ -205,6 +231,7 @@ export default async function CoachSchedulePage({
       timeOfDay: timeMatch[1],
       clientName: clientNameById.get(o.client_id) ?? "Client",
       durationMinutes: o.duration_minutes,
+      clientScheduleId: null,
     });
   }
 
@@ -324,6 +351,9 @@ export default async function CoachSchedulePage({
             nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
             weekLabel={weekLabel}
             todayStr={todayStr}
+            overdueClientIds={overdueClientIds}
+            autoPickupClientId={pickupClientId}
+            autoPickupDate={pickupDate}
           />
         </Card>
       </div>
