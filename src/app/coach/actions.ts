@@ -979,6 +979,78 @@ export async function updateBusinessFinanceSettings(formData: FormData) {
   revalidatePath("/coach/finances");
 }
 
+export async function addExpense(formData: FormData) {
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  const category = String(formData.get("category") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const amount = String(formData.get("amount") ?? "");
+
+  if (!date || !category || !amount) {
+    throw new Error("Date, category, and amount are required.");
+  }
+
+  const { error } = await supabase.from("business_expenses").insert({
+    date,
+    category,
+    description,
+    amount: Number(amount),
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
+}
+
+export async function deleteExpense(expenseId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("business_expenses")
+    .delete()
+    .eq("id", expenseId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
+}
+
+export async function addCredential(formData: FormData) {
+  const supabase = await createClient();
+
+  const label = String(formData.get("label") ?? "").trim();
+  const renewalDate = String(formData.get("renewal_date") ?? "");
+  const notes = String(formData.get("notes") ?? "").trim();
+
+  if (!label || !renewalDate) {
+    throw new Error("Label and renewal date are required.");
+  }
+
+  const { error } = await supabase.from("business_credentials").insert({
+    label,
+    renewal_date: renewalDate,
+    notes: notes || null,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
+}
+
+export async function deleteCredential(credentialId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("business_credentials")
+    .delete()
+    .eq("id", credentialId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
+}
+
 export async function addPayment(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
@@ -1003,6 +1075,31 @@ export async function addPayment(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=payments`);
 }
 
+export async function addPaymentFromLedger(formData: FormData) {
+  const supabase = await createClient();
+
+  const clientId = String(formData.get("client_id") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim();
+  const amount = String(formData.get("amount") ?? "");
+  const dueDate = String(formData.get("due_date") ?? "");
+
+  if (!clientId || !description || !amount || !dueDate) {
+    throw new Error("Client, description, amount, and due date are required.");
+  }
+
+  const { error } = await supabase.from("payments").insert({
+    client_id: clientId,
+    description,
+    amount: Number(amount),
+    due_date: dueDate,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/finances");
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 export async function markPaymentPaid(paymentId: string, clientId: string) {
   const supabase = await createClient();
 
@@ -1016,6 +1113,7 @@ export async function markPaymentPaid(paymentId: string, clientId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/finances");
 }
 
 export async function updateLegalDocument(

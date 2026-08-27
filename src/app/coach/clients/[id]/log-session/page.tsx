@@ -23,11 +23,17 @@ interface ProgramDayJoinRow {
 
 export default async function LogSessionPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ date?: string }>;
 }) {
   const { id } = await params;
-  const today = new Date().toISOString().slice(0, 10);
+  const { date: dateParam } = await searchParams;
+  const today =
+    dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+      ? dateParam
+      : new Date().toISOString().slice(0, 10);
 
   const supabase = await createClient();
   const { data: client } = (await supabase

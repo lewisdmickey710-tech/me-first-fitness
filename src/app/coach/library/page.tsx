@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { BackLink } from "@/components/back-link";
 import { Heart } from "@/components/ui";
+import { BackOfficeTabs } from "@/components/back-office-tabs";
 import { LibraryFilterList } from "./LibraryFilterList";
 import type { Exercise } from "@/lib/types";
 
@@ -15,7 +15,7 @@ export default async function LibraryPage() {
 
   return (
     <div className="space-y-6">
-      <BackLink href="/coach/roster">← Back to Motherboard</BackLink>
+      <BackOfficeTabs active="/coach/library" />
 
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-ink">

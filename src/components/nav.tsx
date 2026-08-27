@@ -13,7 +13,7 @@ export function TopNav({
   faqHref?: string;
 }) {
   return (
-    <header className="border-b border-grayLt bg-pink/15">
+    <header className="border-b border-grayLt bg-pink/15 print:hidden">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <a href="/" className="shrink-0 font-semibold text-ink">
           <Heart className="mr-1.5" />

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { BackOfficeTabs } from "@/components/back-office-tabs";
 import type { ServiceCheckin } from "@/lib/types";
 
 export default async function CoachTestimonialsPage() {
@@ -23,6 +24,8 @@ export default async function CoachTestimonialsPage() {
 
   return (
     <div className="space-y-6">
+      <BackOfficeTabs active="/coach/testimonials" />
+
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />

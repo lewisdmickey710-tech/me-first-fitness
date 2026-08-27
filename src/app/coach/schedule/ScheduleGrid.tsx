@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -158,6 +158,37 @@ export function ScheduleGrid({
   const [newBookingRecurring, setNewBookingRecurring] = useState(false);
   const [newBookingDuration, setNewBookingDuration] = useState<30 | 60>(60);
   const [error, setError] = useState<string | null>(null);
+
+  // Press-and-hold on a booked session jumps straight to logging that
+  // session for that client -- a plain tap still picks it up to reschedule
+  // (below), so this needs its own timer to tell the two gestures apart,
+  // and cancels itself if the finger moves (a scroll attempt, not a hold).
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFiredRef = useRef(false);
+  const longPressStartYRef = useRef(0);
+
+  function startLongPress(b: DayBooking, clientY: number) {
+    longPressFiredRef.current = false;
+    longPressStartYRef.current = clientY;
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      router.push(`/coach/clients/${b.clientId}/log-session?date=${b.date}`);
+    }, 550);
+  }
+
+  function moveLongPress(clientY: number) {
+    if (longPressTimerRef.current && Math.abs(clientY - longPressStartYRef.current) > 10) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function endLongPress() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
 
   // Tapping a booking or a request to "pick it up" and then tapping a
   // slot to "drop" it there -- native HTML5 drag-and-drop never fires on
@@ -416,7 +447,8 @@ export function ScheduleGrid({
         Tap an open slot to book someone in right there. Tap a purple
         request to accept or decline it. Tap a booked (pink) session, then
         tap a new slot, to reschedule it — you&apos;ll be asked to confirm
-        before it moves. Client emails go out automatically either way.
+        before it moves. Press and hold a booked session to jump straight to
+        logging it. Client emails go out automatically either way.
       </p>
 
       {pickedUpBooking ? (
@@ -603,15 +635,26 @@ export function ScheduleGrid({
                 return (
                   <div
                     key={`${b.clientId}-${b.timeOfDay}`}
-                    onClick={() => movable && pickUpBooking(b)}
+                    onClick={() => {
+                      if (longPressFiredRef.current) {
+                        longPressFiredRef.current = false;
+                        return;
+                      }
+                      movable && pickUpBooking(b);
+                    }}
+                    onPointerDown={(e) => startLongPress(b, e.clientY)}
+                    onPointerMove={(e) => moveLongPress(e.clientY)}
+                    onPointerUp={endLongPress}
+                    onPointerLeave={endLongPress}
+                    onPointerCancel={endLongPress}
                     title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
                       movable ? " · tap to reschedule" : ""
-                    }`}
+                    } · press and hold to log this session`}
                     className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[10px] font-medium leading-none text-ink ${
                       isPickedUp
                         ? "border-rose bg-rose/50 ring-2 ring-rose"
                         : "border-pink/60 bg-pink/40"
-                    } ${movable ? "cursor-pointer" : ""}`}
+                    } cursor-pointer`}
                     style={{ top: geometry.top, height: geometry.height }}
                   >
                     {initials(b.clientName)}

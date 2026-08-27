@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { updateLegalDocument } from "@/app/coach/actions";
+import { BackOfficeTabs } from "@/components/back-office-tabs";
 import {
   Badge,
   Button,
@@ -36,6 +37,8 @@ export default async function CoachDocumentsPage() {
 
   return (
     <div className="space-y-6">
+      <BackOfficeTabs active="/coach/documents" />
+
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
         Contract &amp; documents

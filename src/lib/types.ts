@@ -124,6 +124,23 @@ export interface BusinessFinanceSettings {
   updated_at: string;
 }
 
+export interface BusinessExpense {
+  id: string;
+  date: string;
+  category: string;
+  description: string;
+  amount: number;
+  created_at: string;
+}
+
+export interface BusinessCredential {
+  id: string;
+  label: string;
+  renewal_date: string;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface ClientMilestone {
   id: string;
   client_id: string;

@@ -14,15 +14,11 @@ export default function CoachLayout({
         links={[
           { href: "/coach/roster", label: "Motherboard" },
           { href: "/coach/schedule", label: "Schedule" },
-          { href: "/coach/availability", label: "Availability" },
           { href: "/coach/signups", label: "Signups" },
           { href: "/coach/leads", label: "Leads" },
-          { href: "/coach/library", label: "Library" },
           { href: "/coach/programs", label: "Programs" },
-          { href: "/coach/documents", label: "Documents" },
-          { href: "/coach/testimonials", label: "Testimonials" },
           { href: "/coach/community", label: "Community" },
-          { href: "/coach/finances", label: "Finances" },
+          { href: "/coach/back-office", label: "Back Office" },
           { href: "/coach/settings", label: "Settings" },
         ]}
       />
