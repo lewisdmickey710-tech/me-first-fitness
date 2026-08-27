@@ -11,6 +11,7 @@ export default function CoachLayout({
       <TopNav
         title="B.O.S."
         faqHref="/coach/faq"
+        settingsHref="/coach/settings"
         links={[
           { href: "/coach/roster", label: "Motherboard" },
           { href: "/coach/schedule", label: "Schedule" },
@@ -19,7 +20,6 @@ export default function CoachLayout({
           { href: "/coach/programs", label: "Programs" },
           { href: "/coach/community", label: "Community" },
           { href: "/coach/back-office", label: "Back Office" },
-          { href: "/coach/settings", label: "Settings" },
         ]}
       />
       <main className="mx-auto max-w-3xl px-4 py-6">{children}</main>

@@ -7,10 +7,12 @@ export function TopNav({
   title,
   links,
   faqHref,
+  settingsHref,
 }: {
   title: string;
   links?: { href: string; label: string }[];
   faqHref?: string;
+  settingsHref?: string;
 }) {
   return (
     <header className="border-b border-grayLt bg-pink/15 print:hidden">
@@ -20,6 +22,14 @@ export function TopNav({
           {title}
         </a>
         <div className="flex shrink-0 items-center gap-2">
+          {settingsHref ? (
+            <a
+              href={settingsHref}
+              className="rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
+            >
+              Settings
+            </a>
+          ) : null}
           {faqHref ? (
             <a
               href={faqHref}
