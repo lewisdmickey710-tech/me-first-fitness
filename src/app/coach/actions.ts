@@ -243,7 +243,7 @@ export async function counterRequest(
 //    moved (which automatically covers this date too, since it now
 //    matches the new day-of-week); otherwise a new recurring row is
 //    created starting now.
-export async function coachRescheduleSession(
+async function coachRescheduleSessionCore(
   clientId: string,
   fromDate: string,
   fromTime: string,
@@ -350,6 +350,102 @@ export async function coachRescheduleSession(
   revalidatePath("/client/dashboard");
 }
 
+// "Semi-merged" booking partners (e.g. two friends who always train
+// together but are on entirely separate programs) -- true only when the
+// partner has a booking at this *exact* date+time, so a coincidental
+// unrelated booking never gets swept up. Only checks the regular weekly
+// pattern plus one-off confirmed-time bookings, same as the rest of the
+// scheduling logic elsewhere in this file.
+async function findPartnerScheduleMatch(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  partnerId: string,
+  date: string,
+  time: string
+): Promise<{ clientScheduleId: string | null } | null> {
+  const norm = (t: string) => t.slice(0, 5);
+  const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+
+  const [{ data: schedules }, { data: occurrence }] = await Promise.all([
+    supabase
+      .from("client_schedules")
+      .select("id, time_of_day")
+      .eq("client_id", partnerId)
+      .eq("active", true)
+      .eq("day_of_week", dayOfWeek),
+    supabase
+      .from("session_occurrences")
+      .select("status, notes")
+      .eq("client_id", partnerId)
+      .eq("occurrence_date", date)
+      .maybeSingle(),
+  ]);
+
+  const recurringMatch = (schedules ?? []).find((s) => norm(s.time_of_day) === norm(time));
+  if (recurringMatch) {
+    // An override other than "completed" means this date's already been
+    // resolved independently for the partner (they cancelled it
+    // themselves, it was already moved, etc) -- leave it alone.
+    if (occurrence && occurrence.status !== "completed" && occurrence.status !== "scheduled") {
+      return null;
+    }
+    return { clientScheduleId: recurringMatch.id };
+  }
+
+  if (occurrence?.status === "scheduled") {
+    const timeMatch = occurrence.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+    if (timeMatch && norm(timeMatch[1]) === norm(time)) {
+      return { clientScheduleId: null };
+    }
+  }
+
+  return null;
+}
+
+export async function coachRescheduleSession(
+  clientId: string,
+  fromDate: string,
+  fromTime: string,
+  toDate: string,
+  toTime: string,
+  durationMinutes: number,
+  permanent = false
+) {
+  await coachRescheduleSessionCore(
+    clientId,
+    fromDate,
+    fromTime,
+    toDate,
+    toTime,
+    durationMinutes,
+    permanent
+  );
+
+  const supabase = await createClient();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.partner_client_id) return;
+
+  const match = await findPartnerScheduleMatch(supabase, client.partner_client_id, fromDate, fromTime);
+  if (!match) return;
+
+  try {
+    await coachRescheduleSessionCore(
+      client.partner_client_id,
+      fromDate,
+      fromTime,
+      toDate,
+      toTime,
+      durationMinutes,
+      permanent
+    );
+  } catch (err) {
+    console.error("Failed to mirror reschedule to booking partner", err);
+  }
+}
+
 function timeToMinutes(t: string): number {
   const [h, m] = t.slice(0, 5).split(":").map(Number);
   return h * 60 + m;
@@ -370,7 +466,7 @@ function timesOverlap(
 // request/accept round trip, since the coach is the one initiating this.
 // Mirrors submitRequest's own conflict checks (client/actions.ts) so a
 // slot that looks open on the grid can't silently double-book someone.
-export async function coachBookSession(
+async function coachBookSessionCore(
   clientId: string,
   date: string,
   time: string,
@@ -523,6 +619,46 @@ export async function coachBookSession(
   revalidatePath("/coach/finances");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
+}
+
+// Clicking an open slot on the schedule grid books it directly -- no
+// request/accept round trip, since the coach is the one initiating this.
+// A booking partner (two separate clients who always attend together) is
+// booked at the exact same date/time/type automatically -- if that
+// conflicts with something already on the partner's own calendar, the
+// primary booking still goes through and the partner side is just skipped,
+// since failing the whole thing over a partner-side conflict would be
+// more surprising than helpful.
+export async function coachBookSession(
+  clientId: string,
+  date: string,
+  time: string,
+  requestType: "session" | "checkin_call" | "video_session",
+  recurring = false,
+  durationMinutesOverride?: number
+) {
+  await coachBookSessionCore(clientId, date, time, requestType, recurring, durationMinutesOverride);
+
+  const supabase = await createClient();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.partner_client_id) return;
+
+  try {
+    await coachBookSessionCore(
+      client.partner_client_id,
+      date,
+      time,
+      requestType,
+      recurring,
+      durationMinutesOverride
+    );
+  } catch (err) {
+    console.error("Failed to mirror booking to booking partner", err);
+  }
 }
 
 export async function logSession(clientId: string, formData: FormData) {
@@ -925,6 +1061,12 @@ export async function removeClientSchedule(
 ) {
   const supabase = await createClient();
 
+  const { data: schedule } = await supabase
+    .from("client_schedules")
+    .select("day_of_week, time_of_day")
+    .eq("id", scheduleId)
+    .single();
+
   const { error } = await supabase
     .from("client_schedules")
     .delete()
@@ -935,6 +1077,38 @@ export async function removeClientSchedule(
   revalidatePath(`/coach/clients/${clientId}/schedule`);
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/schedule");
+
+  // Mirror the removal to a booking partner's matching recurring slot, if
+  // any -- a "lost cause" removal is meant to end the pair's booking
+  // together, not leave the partner still expected to show up alone.
+  if (!schedule) return;
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.partner_client_id) return;
+
+  const { data: partnerSchedule } = await supabase
+    .from("client_schedules")
+    .select("id")
+    .eq("client_id", client.partner_client_id)
+    .eq("day_of_week", schedule.day_of_week)
+    .eq("time_of_day", schedule.time_of_day)
+    .maybeSingle();
+  if (!partnerSchedule) return;
+
+  try {
+    const { error: partnerError } = await supabase
+      .from("client_schedules")
+      .delete()
+      .eq("id", partnerSchedule.id);
+    if (partnerError) throw new Error(partnerError.message);
+    revalidatePath(`/coach/clients/${client.partner_client_id}/schedule`);
+    revalidatePath(`/coach/clients/${client.partner_client_id}`);
+  } catch (err) {
+    console.error("Failed to mirror schedule removal to booking partner", err);
+  }
 }
 
 export async function updatePaymentMethods(formData: FormData) {
@@ -1263,6 +1437,70 @@ export async function rejectSignup(userId: string) {
 
   revalidatePath("/coach/signups");
   revalidatePath("/coach/sign-ons");
+}
+
+// Links two clients as booking partners -- "semi-merged" for scheduling
+// only (booking/rescheduling/cancelling one mirrors to the other), while
+// everything else about them (program, phase, goals, payments) stays
+// completely separate. Always symmetric: setting A's partner to B also
+// sets B's partner to A, and clears whichever partner either of them had
+// before, since a client can only ever be paired with one other client
+// at a time. This doesn't touch either client's existing schedule --
+// linking just means future booking/reschedule/cancel actions from
+// either side apply to both going forward.
+export async function setClientPartner(clientId: string, partnerClientId: string | null) {
+  const supabase = await createClient();
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  const previousPartnerId = client?.partner_client_id ?? null;
+
+  if (previousPartnerId && previousPartnerId !== partnerClientId) {
+    const { error } = await supabase
+      .from("clients")
+      .update({ partner_client_id: null })
+      .eq("id", previousPartnerId);
+    if (error) throw new Error(error.message);
+  }
+
+  if (partnerClientId) {
+    // The new partner might already be paired with someone else -- break
+    // that pairing first so no client ever ends up with a one-way link.
+    const { data: newPartner } = await supabase
+      .from("clients")
+      .select("partner_client_id")
+      .eq("id", partnerClientId)
+      .single();
+    if (newPartner?.partner_client_id && newPartner.partner_client_id !== clientId) {
+      const { error } = await supabase
+        .from("clients")
+        .update({ partner_client_id: null })
+        .eq("id", newPartner.partner_client_id);
+      if (error) throw new Error(error.message);
+    }
+  }
+
+  const { error: clientError } = await supabase
+    .from("clients")
+    .update({ partner_client_id: partnerClientId })
+    .eq("id", clientId);
+  if (clientError) throw new Error(clientError.message);
+
+  if (partnerClientId) {
+    const { error: partnerError } = await supabase
+      .from("clients")
+      .update({ partner_client_id: clientId })
+      .eq("id", partnerClientId);
+    if (partnerError) throw new Error(partnerError.message);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  if (partnerClientId) revalidatePath(`/coach/clients/${partnerClientId}`);
+  if (previousPartnerId) revalidatePath(`/coach/clients/${previousPartnerId}`);
+  revalidatePath("/coach/roster");
 }
 
 export async function updateClientProfile(clientId: string, formData: FormData) {
@@ -1800,11 +2038,11 @@ export async function unblockDate(id: string) {
 // the coach's side: no late-cancellation fee logic (never applies when
 // it's the coach cancelling), and an immediate email so the client has
 // something in writing before Mickey follows up by text herself.
-export async function coachCancelSession(
+async function coachCancelSessionCore(
   clientId: string,
   occurrenceDate: string,
   clientScheduleId: string | null,
-  isEmergency: boolean = false
+  isEmergency: boolean
 ) {
   const supabase = await createClient();
 
@@ -1845,4 +2083,41 @@ export async function coachCancelSession(
   revalidatePath("/coach/schedule");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
+}
+
+// timeOfDay is optional only for backward compatibility with older call
+// sites -- without it, a booking partner's matching slot can't be found,
+// so the cancellation just applies to this one client as before.
+export async function coachCancelSession(
+  clientId: string,
+  occurrenceDate: string,
+  clientScheduleId: string | null,
+  isEmergency: boolean = false,
+  timeOfDay: string | null = null
+) {
+  await coachCancelSessionCore(clientId, occurrenceDate, clientScheduleId, isEmergency);
+
+  if (!timeOfDay) return;
+
+  const supabase = await createClient();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.partner_client_id) return;
+
+  const match = await findPartnerScheduleMatch(supabase, client.partner_client_id, occurrenceDate, timeOfDay);
+  if (!match) return;
+
+  try {
+    await coachCancelSessionCore(
+      client.partner_client_id,
+      occurrenceDate,
+      match.clientScheduleId,
+      isEmergency
+    );
+  } catch (err) {
+    console.error("Failed to mirror cancellation to booking partner", err);
+  }
 }

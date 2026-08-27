@@ -50,6 +50,7 @@ export interface Client {
   calorie_goal_enabled: boolean;
   daily_calorie_goal: number | null;
   is_test: boolean;
+  partner_client_id: string | null;
 }
 
 export interface SessionEntry {

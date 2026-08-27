@@ -683,6 +683,9 @@ export default async function RosterPage({
                 </p>
                 <p className="mt-0.5 text-sm text-gray">
                   {client.care_profiles?.name ?? "No care profile set"}
+                  {client.partner_client_id && clientNameById.get(client.partner_client_id)
+                    ? ` · paired with ${clientNameById.get(client.partner_client_id)}`
+                    : ""}
                 </p>
               </div>
             </div>
@@ -782,7 +785,13 @@ export default async function RosterPage({
               <form
                 action={async () => {
                   "use server";
-                  await coachCancelSession(nextSession!.clientId, nextSession!.date, null);
+                  await coachCancelSession(
+                    nextSession!.clientId,
+                    nextSession!.date,
+                    null,
+                    false,
+                    nextSession!.timeOfDay
+                  );
                 }}
               >
                 <ConfirmButton
@@ -799,7 +808,8 @@ export default async function RosterPage({
                     nextSession!.clientId,
                     nextSession!.date,
                     null,
-                    true
+                    true,
+                    nextSession!.timeOfDay
                   );
                 }}
               >

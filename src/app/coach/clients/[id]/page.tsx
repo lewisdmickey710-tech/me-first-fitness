@@ -19,6 +19,7 @@ import {
   markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
+  setClientPartner,
   setLogEntryCoachNotes,
   setRequestStatus,
   startClientHold,
@@ -282,6 +283,13 @@ export default async function ClientDetailPage({
     );
   }
 
+  const { data: otherClients } = (await supabase
+    .from("clients")
+    .select("id, name")
+    .neq("id", id)
+    .is("archived_at", null)
+    .order("name")) as { data: { id: string; name: string }[] | null };
+
   const { data: clientIntake } = (await supabase
     .from("client_intake")
     .select("*")
@@ -461,6 +469,7 @@ export default async function ClientDetailPage({
           intake={clientIntake}
           careProfiles={careProfiles ?? []}
           milestones={milestones ?? []}
+          otherClients={otherClients ?? []}
         />
       )}
       {tab === "documents" && (
@@ -938,12 +947,15 @@ function ProfileTab({
   intake,
   careProfiles,
   milestones,
+  otherClients,
 }: {
   client: Client;
   intake: ClientIntake | null;
   careProfiles: CareProfile[];
   milestones: ClientMilestone[];
+  otherClients: { id: string; name: string }[];
 }) {
+  const currentPartner = otherClients.find((c) => c.id === client.partner_client_id);
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
@@ -1216,6 +1228,43 @@ function ProfileTab({
 
           <Button type="submit">Save</Button>
         </form>
+      </Card>
+
+      <Card className="space-y-2">
+        <p className="font-medium text-ink">Booking partner</p>
+        <p className="text-sm text-gray">
+          For two separate clients who always train together (own program,
+          own goals, own everything else) but book, reschedule, and cancel
+          as one — booking, rescheduling, or cancelling either of them
+          automatically does the same for the other. This doesn&apos;t
+          touch their existing schedule, only future changes from either
+          side.
+        </p>
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            const partnerId = String(formData.get("partner_client_id") ?? "") || null;
+            await setClientPartner(client.id, partnerId);
+          }}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <Select name="partner_client_id" defaultValue={client.partner_client_id ?? ""}>
+            <option value="">No booking partner</option>
+            {otherClients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+          <Button type="submit" variant="secondary">
+            Save
+          </Button>
+        </form>
+        {currentPartner ? (
+          <p className="text-xs text-gray">
+            Currently paired with {currentPartner.name}.
+          </p>
+        ) : null}
       </Card>
 
       <Card className="space-y-2">
@@ -2170,7 +2219,13 @@ function AttendanceTab({
                 <form
                   action={async () => {
                     "use server";
-                    await coachCancelSession(clientId, occ.date, occ.scheduleId);
+                    await coachCancelSession(
+                      clientId,
+                      occ.date,
+                      occ.scheduleId,
+                      false,
+                      occ.timeOfDay
+                    );
                   }}
                 >
                   <ConfirmButton
@@ -2183,7 +2238,13 @@ function AttendanceTab({
                 <form
                   action={async () => {
                     "use server";
-                    await coachCancelSession(clientId, occ.date, occ.scheduleId, true);
+                    await coachCancelSession(
+                      clientId,
+                      occ.date,
+                      occ.scheduleId,
+                      true,
+                      occ.timeOfDay
+                    );
                   }}
                 >
                   <ConfirmButton

@@ -472,7 +472,13 @@ export default async function CoachSchedulePage({
                     <form
                       action={async () => {
                         "use server";
-                        await coachCancelSession(s.clientId, selectedCell.date, null);
+                        await coachCancelSession(
+                          s.clientId,
+                          selectedCell.date,
+                          null,
+                          false,
+                          s.timeOfDay
+                        );
                       }}
                     >
                       <ConfirmButton
@@ -485,7 +491,13 @@ export default async function CoachSchedulePage({
                     <form
                       action={async () => {
                         "use server";
-                        await coachCancelSession(s.clientId, selectedCell.date, null, true);
+                        await coachCancelSession(
+                          s.clientId,
+                          selectedCell.date,
+                          null,
+                          true,
+                          s.timeOfDay
+                        );
                       }}
                     >
                       <ConfirmButton

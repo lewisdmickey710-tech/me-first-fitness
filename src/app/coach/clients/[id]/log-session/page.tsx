@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { BackLink } from "@/components/back-link";
-import { Heart } from "@/components/ui";
+import { Card, Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
 import { formatReps } from "@/lib/constants";
 import { mergeLogEntries } from "@/lib/log-entries";
@@ -43,6 +44,14 @@ export default async function LogSessionPage({
     .single()) as { data: Client | null };
 
   if (!client) notFound();
+
+  const { data: partner } = client.partner_client_id
+    ? ((await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("id", client.partner_client_id)
+        .single()) as { data: { id: string; name: string } | null })
+    : { data: null };
 
   const [{ data: days }, currentPhase, { data: lastSessions }, { data: lastActivities }] =
     await Promise.all([
@@ -143,6 +152,22 @@ export default async function LogSessionPage({
         <Heart className="mr-1.5" />
         Log a session
       </h1>
+
+      {partner ? (
+        <Card className="border-teal/30 bg-teal/5">
+          <p className="text-sm text-ink">
+            Booked with <strong>{partner.name}</strong> — if they pay as one,
+            mark payment on whichever of them actually paid and{" "}
+            <strong>waived</strong> on the other.
+          </p>
+          <Link
+            href={`/coach/clients/${partner.id}/log-session?date=${today}`}
+            className="mt-2 inline-block text-sm font-medium text-rose hover:underline"
+          >
+            Log {partner.name}&apos;s session too →
+          </Link>
+        </Card>
+      ) : null}
 
       <LogSessionForm
         clientId={id}

@@ -431,7 +431,7 @@ export function ScheduleGrid({
   function cancelSingleOccurrence(b: DayBooking, isEmergency: boolean = false) {
     startTransition(async () => {
       try {
-        await coachCancelSession(b.clientId, b.date, b.clientScheduleId, isEmergency);
+        await coachCancelSession(b.clientId, b.date, b.clientScheduleId, isEmergency, b.timeOfDay);
         setBalanceActionBooking(null);
         router.refresh();
       } catch (err) {
