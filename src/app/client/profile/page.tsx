@@ -1,8 +1,16 @@
+import Link from "next/link";
 import { BackLink } from "@/components/back-link";
+import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
-import { Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
 import { US_TIMEZONES } from "@/lib/timezone";
+import type {
+  ClientDocumentAcknowledgment,
+  ClientDocumentAssignment,
+  LegalDocument,
+  Payment,
+} from "@/lib/types";
 
 export default async function ClientProfilePage() {
   const me = await getMyClient();
@@ -17,6 +25,51 @@ export default async function ClientProfilePage() {
   }
 
   const isFirstTime = !me.profile_completed_at;
+  const supabase = await createClient();
+
+  const [{ data: documents }, { data: acks }, { data: assignments }, { data: paidPayments }, { count: sessionCount }] =
+    isFirstTime
+      ? [
+          { data: [] as LegalDocument[] },
+          { data: [] as ClientDocumentAcknowledgment[] },
+          { data: [] as ClientDocumentAssignment[] },
+          { data: [] as Payment[] },
+          { count: 0 },
+        ]
+      : await Promise.all([
+          supabase.from("legal_documents").select("*").order("key") as unknown as Promise<{
+            data: LegalDocument[] | null;
+          }>,
+          supabase
+            .from("client_document_acknowledgments")
+            .select("*")
+            .eq("client_id", me.id) as unknown as Promise<{
+            data: ClientDocumentAcknowledgment[] | null;
+          }>,
+          supabase
+            .from("client_document_assignments")
+            .select("*")
+            .eq("client_id", me.id) as unknown as Promise<{
+            data: ClientDocumentAssignment[] | null;
+          }>,
+          supabase
+            .from("payments")
+            .select("*")
+            .eq("client_id", me.id)
+            .not("paid_on", "is", null)
+            .order("paid_on", { ascending: false })
+            .limit(20) as unknown as Promise<{ data: Payment[] | null }>,
+          supabase
+            .from("sessions")
+            .select("id", { count: "exact", head: true })
+            .eq("client_id", me.id),
+        ]);
+
+  const assignedDocIds = new Set((assignments ?? []).map((a) => a.document_id));
+  const ackByDocId = new Map((acks ?? []).map((a) => [`${a.document_id}:${a.document_version}`, a]));
+  const visibleDocuments = (documents ?? []).filter(
+    (d) => d.key !== "minor_consent" && (d.assigned_to_all || assignedDocIds.has(d.id))
+  );
 
   return (
     <div className="space-y-6">
@@ -151,6 +204,75 @@ export default async function ClientProfilePage() {
           </Button>
         </form>
       </Card>
+
+      {!isFirstTime ? (
+        <Card className="space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="font-medium text-ink">Signed documents</p>
+            <Link href="/client/documents" className="text-sm text-rose hover:underline">
+              View all →
+            </Link>
+          </div>
+          {visibleDocuments.length === 0 ? (
+            <p className="text-sm text-gray">Nothing assigned yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {visibleDocuments.map((d) => {
+                const ack = ackByDocId.get(`${d.id}:${d.version}`);
+                return (
+                  <div key={d.id} className="flex items-center justify-between text-sm">
+                    <span className="text-ink">{d.title}</span>
+                    {ack ? (
+                      <Badge tone="green">
+                        {ack.signed_name ? "signed" : "read"} {ack.acknowledged_at.slice(0, 10)}
+                      </Badge>
+                    ) : (
+                      <Badge tone="gold">needs review</Badge>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      ) : null}
+
+      {!isFirstTime ? (
+        <Card className="space-y-2">
+          <p className="font-medium text-ink">Payment history</p>
+          {!paidPayments || paidPayments.length === 0 ? (
+            <p className="text-sm text-gray">No payments recorded yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {paidPayments.map((p) => (
+                <div key={p.id} className="flex items-center justify-between text-sm">
+                  <span className="text-ink">
+                    {p.description}{" "}
+                    <span className="text-gray">— {p.paid_on}</span>
+                  </span>
+                  <span className="font-medium text-ink">
+                    ${Number(p.amount).toFixed(2)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      ) : null}
+
+      {!isFirstTime ? (
+        <Card className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-ink">Training history</p>
+            <p className="text-sm text-gray">
+              {sessionCount ?? 0} session{(sessionCount ?? 0) === 1 ? "" : "s"} logged
+            </p>
+          </div>
+          <Link href="/client/history" className="text-sm text-rose hover:underline">
+            View →
+          </Link>
+        </Card>
+      ) : null}
 
       {!isFirstTime ? (
         <Card className="space-y-2">

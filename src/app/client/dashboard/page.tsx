@@ -2,17 +2,24 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { respondToCounteredRequest } from "@/app/client/actions";
-import { Badge, Button, Card, Collapsible, EmptyState, Heart, PhaseBanner } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  Collapsible,
+  EmptyState,
+  Heart,
+  PhaseBanner,
+  ProgressRing,
+} from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
-import { toDateString } from "@/lib/timezone";
+import { toDateString, nowInBusinessTz } from "@/lib/timezone";
 import type {
   BusinessSettings,
-  CareProfile,
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
-  ClientIntake,
   ClientMilestone,
   ClientMinorConsent,
   ClientSchedule,
@@ -37,16 +44,27 @@ export default async function ClientDashboard() {
 
   const supabase = await createClient();
 
+  const today = toDateString(nowInBusinessTz());
+  const weekStartDate = new Date(`${today}T00:00:00Z`);
+  weekStartDate.setUTCDate(weekStartDate.getUTCDate() - weekStartDate.getUTCDay());
+  const weekStart = toDateString(weekStartDate);
+  const weekEndDate = new Date(weekStartDate);
+  weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
+  const weekEnd = toDateString(weekEndDate);
+  const monthStart = `${today.slice(0, 7)}-01`;
+
   const [
     { data: sessions },
     { data: requests },
-    { data: careProfile },
     currentPhase,
     { data: schedules },
     { data: occurrences },
     { data: payments },
     { data: documents },
     { data: acks },
+    { count: weeklySessionsCount },
+    { count: monthlySessionsCount },
+    { data: todaysNutrition },
   ] = await Promise.all([
     supabase
       .from("sessions")
@@ -64,13 +82,6 @@ export default async function ClientDashboard() {
       .in("status", ["pending", "countered"]) as unknown as Promise<{
       data: SessionRequest[] | null;
     }>,
-    me.care_profile_id
-      ? (supabase
-          .from("care_profiles")
-          .select("*")
-          .eq("id", me.care_profile_id)
-          .single() as unknown as Promise<{ data: CareProfile | null }>)
-      : Promise.resolve({ data: null }),
     getCurrentPhase(supabase, me.id),
     supabase
       .from("client_schedules")
@@ -98,6 +109,22 @@ export default async function ClientDashboard() {
       .eq("client_id", me.id) as unknown as Promise<{
       data: ClientDocumentAcknowledgment[] | null;
     }>,
+    supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", me.id)
+      .gte("date", weekStart)
+      .lte("date", weekEnd),
+    supabase
+      .from("sessions")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", me.id)
+      .gte("date", monthStart),
+    supabase
+      .from("client_nutrition_logs")
+      .select("calories")
+      .eq("client_id", me.id)
+      .eq("log_date", today) as unknown as Promise<{ data: { calories: number | null }[] | null }>,
   ]);
 
   const { data: businessSettings } = (await supabase
@@ -106,32 +133,32 @@ export default async function ClientDashboard() {
     .eq("id", true)
     .maybeSingle()) as { data: BusinessSettings | null };
 
-  const [{ data: clientIntake }, { data: docAssignments }, { data: minorConsent }] =
-    await Promise.all([
-      supabase
-        .from("client_intake")
-        .select("*")
-        .eq("client_id", me.id)
-        .maybeSingle() as unknown as Promise<{ data: ClientIntake | null }>,
-      supabase
-        .from("client_document_assignments")
-        .select("*")
-        .eq("client_id", me.id) as unknown as Promise<{
-        data: ClientDocumentAssignment[] | null;
-      }>,
-      supabase
-        .from("client_minor_consent")
-        .select("*")
-        .eq("client_id", me.id)
-        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
-    ]);
+  const [{ data: docAssignments }, { data: minorConsent }] = await Promise.all([
+    supabase
+      .from("client_document_assignments")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{
+      data: ClientDocumentAssignment[] | null;
+    }>,
+    supabase
+      .from("client_minor_consent")
+      .select("*")
+      .eq("client_id", me.id)
+      .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+  ]);
 
   const nextSession = nextSessionForClient(schedules ?? [], occurrences ?? []);
   const nextDue = payments?.[0] ?? null;
   const hasUnpaidLateFee = (payments ?? []).some(
     (p) => p.kind === "late_cancellation_fee"
   );
-  const today = toDateString(new Date());
+  // Late cancellation fees get their own dedicated "sessions paused" card
+  // below regardless of due date, so they're excluded here to avoid
+  // saying the same thing twice.
+  const overduePayment =
+    nextDue && nextDue.kind !== "late_cancellation_fee" && nextDue.due_date < today
+      ? nextDue
+      : null;
 
   const assignedDocIds = new Set((docAssignments ?? []).map((a) => a.document_id));
   const ackedKeys = new Set(
@@ -150,11 +177,6 @@ export default async function ClientDashboard() {
     visibleDocuments.filter((d) => !ackedKeys.has(`${d.id}:${d.version}`)).length +
     (minorConsentPending ? 1 : 0);
 
-  const { count: sessionsUsed } = await supabase
-    .from("sessions")
-    .select("id", { count: "exact", head: true })
-    .eq("client_id", me.id);
-
   const { data: milestones } = (await supabase
     .from("client_milestones")
     .select("*")
@@ -166,29 +188,45 @@ export default async function ClientDashboard() {
     .filter((m) => m.achieved_at && new Date(m.achieved_at) >= fourteenDaysAgo)
     .sort((a, b) => (b.achieved_at ?? "").localeCompare(a.achieved_at ?? ""));
 
-  const allotted = me.sessions_allotted;
+  // Three goal rings: sessions this week, nutrition today, sessions this
+  // month. The monthly goal matches the same days-per-week x 4 convention
+  // used for the coach's consistency scoring, so the two stay in step.
+  const weeklySessionGoal = me.days_per_week ?? 3;
+  const weeklySessionsLogged = weeklySessionsCount ?? 0;
+  const monthlySessionGoal = weeklySessionGoal * 4;
+  const monthlySessionsLogged = monthlySessionsCount ?? 0;
+
+  const todaysCalories = (todaysNutrition ?? []).reduce(
+    (sum, n) => sum + (n.calories ?? 0),
+    0
+  );
+  const nutritionLoggedToday = (todaysNutrition ?? []).length > 0;
+  const nutritionRing =
+    me.calorie_goal_enabled && me.daily_calorie_goal
+      ? {
+          percent: (todaysCalories / me.daily_calorie_goal) * 100,
+          label: `${todaysCalories}/${me.daily_calorie_goal}`,
+          sublabel: "cal today",
+        }
+      : {
+          percent: nutritionLoggedToday ? 100 : 0,
+          label: nutritionLoggedToday ? "Logged" : "Not yet",
+          sublabel: "nutrition today",
+        };
+
+  const weekCycleLine = currentPhase
+    ? `Week ${weekInPhase(currentPhase.started_on)} of this phase · Cycle ${currentPhase.cycle_number}`
+    : undefined;
 
   return (
     <div className="space-y-6">
-      <PhaseBanner
-        phase={currentPhase?.phase ?? "n/a"}
-        title={`Hey, ${me.name.split(" ")[0]}`}
-        subtitle={careProfile?.client_label ?? careProfile?.name ?? undefined}
-      />
-
-      <Link
-        href="/client/profile"
-        className="inline-block text-sm text-gray hover:text-ink"
-      >
-        Edit profile
+      <Link href="/client/profile">
+        <PhaseBanner
+          phase={currentPhase?.phase ?? "n/a"}
+          title={`Hey, ${me.name.split(" ")[0]}`}
+          subtitle={weekCycleLine}
+        />
       </Link>
-
-      {currentPhase ? (
-        <p className="-mt-3 text-sm text-gray">
-          Week {weekInPhase(currentPhase.started_on)} of this phase · Cycle{" "}
-          {currentPhase.cycle_number}
-        </p>
-      ) : null}
 
       {recentlyAchieved.length > 0 ? (
         <Card className="border-gold/40 bg-gold/5">
@@ -206,6 +244,43 @@ export default async function ClientDashboard() {
           >
             View your milestones →
           </Link>
+        </Card>
+      ) : null}
+
+      {unacknowledgedCount > 0 || overduePayment ? (
+        <Card className="space-y-3 border-gold/50 bg-gold/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            Needs your review
+          </p>
+          {unacknowledgedCount > 0 ? (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-ink">
+                {unacknowledgedCount} document
+                {unacknowledgedCount > 1 ? "s" : ""} to review
+              </p>
+              <Link
+                href="/client/documents"
+                className="text-sm font-medium text-rose hover:underline"
+              >
+                Review →
+              </Link>
+            </div>
+          ) : null}
+          {overduePayment ? (
+            <div
+              className={
+                unacknowledgedCount > 0 ? "space-y-2 border-t border-gold/30 pt-3" : "space-y-2"
+              }
+            >
+              <p className="text-sm text-ink">
+                <strong>${Number(overduePayment.amount).toFixed(2)} overdue</strong>{" "}
+                since {overduePayment.due_date} — training is on hold until
+                it&apos;s paid.
+              </p>
+              <PaymentMethods settings={businessSettings} />
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -287,11 +362,9 @@ export default async function ClientDashboard() {
         </Card>
       ) : null}
 
-      {nextDue ? (
-        <Card className={nextDue.due_date < today ? "border-pink/40 bg-pink/5" : ""}>
-          <p className="text-sm font-medium text-gray">
-            {nextDue.due_date < today ? "Payment overdue" : "Payment due"}
-          </p>
+      {nextDue && nextDue.kind !== "late_cancellation_fee" && nextDue.due_date >= today ? (
+        <Card>
+          <p className="text-sm font-medium text-gray">Payment due</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             ${Number(nextDue.amount).toFixed(2)}
             <span className="text-base font-normal text-gray">
@@ -304,82 +377,28 @@ export default async function ClientDashboard() {
       ) : null}
 
       <Card>
-        <p className="text-sm font-medium text-gray">Sessions</p>
-        {allotted ? (
-          <>
-            <p className="mt-1 text-2xl font-semibold text-ink">
-              {sessionsUsed ?? 0} / {allotted}
-            </p>
-            <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-grayLt">
-              <div
-                className="h-full rounded-full bg-rose"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    ((sessionsUsed ?? 0) / allotted) * 100
-                  )}%`,
-                }}
-              />
-            </div>
-          </>
-        ) : (
-          <p className="mt-1 text-2xl font-semibold text-ink">
-            {sessionsUsed ?? 0} logged
-          </p>
-        )}
+        <p className="mb-3 text-sm font-medium text-gray">Your goals</p>
+        <div className="flex items-center justify-around">
+          <ProgressRing
+            percent={(weeklySessionsLogged / weeklySessionGoal) * 100}
+            label={`${weeklySessionsLogged}/${weeklySessionGoal}`}
+            sublabel="sessions this week"
+            color="#E75480"
+          />
+          <ProgressRing
+            percent={nutritionRing.percent}
+            label={nutritionRing.label}
+            sublabel={nutritionRing.sublabel}
+            color="#2FA6A6"
+          />
+          <ProgressRing
+            percent={(monthlySessionsLogged / monthlySessionGoal) * 100}
+            label={`${monthlySessionsLogged}/${monthlySessionGoal}`}
+            sublabel="sessions this month"
+            color="#D4A24C"
+          />
+        </div>
       </Card>
-
-
-      {!clientIntake?.submitted_at ? (
-        <Card className="border-gold/50 bg-gold/5">
-          <p className="text-sm font-medium text-ink">
-            <Heart className="mr-1" />
-            A little about you
-          </p>
-          <p className="mt-1 text-sm text-gray">
-            A few things I&apos;d love to know — goals, health history, how
-            you like to be coached. Nothing here is a test.
-          </p>
-          <Link
-            href="/client/intake"
-            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            Fill it out
-          </Link>
-        </Card>
-      ) : (
-        <Card>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-ink">
-              Your intake questionnaire
-            </p>
-            <Badge tone="green">submitted</Badge>
-          </div>
-          <Link
-            href="/client/intake"
-            className="mt-2 inline-block text-sm text-gray hover:text-ink"
-          >
-            Review or update your answers →
-          </Link>
-        </Card>
-      )}
-
-      {unacknowledgedCount > 0 ? (
-        <Card className="border-gold/50 bg-gold/5">
-          <p className="text-sm font-medium text-ink">
-            <Heart className="mr-1" />
-            {unacknowledgedCount} document
-            {unacknowledgedCount > 1 ? "s" : ""} need
-            {unacknowledgedCount > 1 ? "" : "s"} your review
-          </p>
-          <Link
-            href="/client/documents"
-            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            Review now
-          </Link>
-        </Card>
-      ) : null}
 
       {(requests?.length ?? 0) > 0 ? (
         <Card>
@@ -450,11 +469,6 @@ export default async function ClientDashboard() {
           description="View & manage your sessions"
         />
         <ActionTile
-          href="/client/activity"
-          label="Activity log"
-          description="Log a workout, walk, or mobility session"
-        />
-        <ActionTile
           href="/client/nutrition"
           label="Nutrition"
           description={
@@ -469,6 +483,11 @@ export default async function ClientDashboard() {
           label="My progress"
           description="Photos, measurements & trends"
         />
+        <ActionTile
+          href="/client/community"
+          label="Community"
+          description="See what the group's up to"
+        />
       </div>
 
       <Collapsible label="More" labelClassName="text-sm font-medium text-gray">
@@ -477,7 +496,6 @@ export default async function ClientDashboard() {
           {me.symptom_tracker_enabled ? (
             <MoreLink href="/client/symptoms" label="Symptom log" />
           ) : null}
-          <MoreLink href="/client/community" label="Community" />
           <MoreLink href="/client/milestones" label="Milestones" />
           <MoreLink href="/client/guide" label="Wellness guide" />
           <MoreLink

@@ -68,6 +68,57 @@ export function Sparkline({
   );
 }
 
+// A compact circular progress indicator for a "goal so far" number (e.g.
+// sessions this week) -- meant to read at a glance without a sentence of
+// explanation, unlike a plain "3/5" stat line.
+export function ProgressRing({
+  percent,
+  label,
+  sublabel,
+  color = "#E75480",
+}: {
+  percent: number;
+  label: string;
+  sublabel: string;
+  color?: string;
+}) {
+  const size = 72;
+  const stroke = 7;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, percent));
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#EFEAE6"
+          strokeWidth={stroke}
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={stroke}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+        />
+      </svg>
+      <div className="text-center leading-tight">
+        <p className="text-sm font-semibold text-ink">{label}</p>
+        <p className="text-[11px] text-gray">{sublabel}</p>
+      </div>
+    </div>
+  );
+}
+
 export function DeltaField({
   label,
   value,

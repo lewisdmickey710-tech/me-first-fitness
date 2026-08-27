@@ -144,9 +144,11 @@ export default async function RosterPage({
       : Promise.resolve({ data: [] }),
     supabase
       .from("client_schedules")
-      .select("client_id, day_of_week, time_of_day")
+      .select("client_id, day_of_week, time_of_day, duration_minutes")
       .eq("active", true) as unknown as Promise<{
-      data: { client_id: string; day_of_week: number; time_of_day: string }[] | null;
+      data:
+        | { client_id: string; day_of_week: number; time_of_day: string; duration_minutes: number }[]
+        | null;
     }>,
   ]);
 
@@ -381,7 +383,7 @@ export default async function RosterPage({
   const clientNameById = new Map((clients ?? []).map((c) => [c.id, c.name]));
   const scheduleByDayOfWeek = new Map<
     number,
-    { client_id: string; time_of_day: string }[]
+    { client_id: string; time_of_day: string; duration_minutes: number }[]
   >();
   for (const s of activeSchedules ?? []) {
     const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
@@ -390,6 +392,9 @@ export default async function RosterPage({
   }
   const occByClientDate = new Map(
     (occurrenceRows ?? []).map((o) => [`${o.client_id}:${o.occurrence_date}`, o])
+  );
+  const loggedSessionDates = new Set(
+    (sessionRows ?? []).map((r) => `${r.client_id}:${r.date}`)
   );
 
   type NextSession = { clientId: string; clientName: string; date: string; timeOfDay: string };
@@ -430,6 +435,38 @@ export default async function RosterPage({
     if (upcoming.length > 0) {
       nextSession = upcoming[0];
       break outer;
+    }
+  }
+
+  // "Session not logged" flag -- scans the recurring schedule backward for
+  // any slot that ended over an hour ago with nothing explaining its
+  // absence (no log, no cancellation/reschedule override), so a missed
+  // write-up doesn't just quietly fall off the bottom of the schedule.
+  // One-off confirmed-time bookings aren't covered here, only the regular
+  // weekly pattern.
+  function timeToMinutes(t: string): number {
+    const [h, m] = t.slice(0, 5).split(":").map(Number);
+    return h * 60 + m;
+  }
+  const nowBizMinutes = timeToMinutes(nowBizTimeStr);
+  const unloggedDatesByClient = new Map<string, string[]>();
+  const UNLOGGED_LOOKBACK_DAYS = 14;
+  for (let i = 0; i <= UNLOGGED_LOOKBACK_DAYS; i++) {
+    const d = new Date(`${nowBizDateStr}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - i);
+    const dateStr = toDateString(d);
+    const dayOfWeek = d.getUTCDay();
+
+    for (const s of scheduleByDayOfWeek.get(dayOfWeek) ?? []) {
+      const override = occByClientDate.get(`${s.client_id}:${dateStr}`);
+      if (override && override.status !== "scheduled") continue;
+      const endMinutes = timeToMinutes(s.time_of_day) + s.duration_minutes + 60;
+      const passed = dateStr < nowBizDateStr || endMinutes <= nowBizMinutes;
+      if (!passed) continue;
+      if (loggedSessionDates.has(`${s.client_id}:${dateStr}`)) continue;
+      const list = unloggedDatesByClient.get(s.client_id) ?? [];
+      list.push(dateStr);
+      unloggedDatesByClient.set(s.client_id, list);
     }
   }
 
@@ -547,6 +584,16 @@ export default async function RosterPage({
     if (owesPayment) flags.push({ label: paymentStatus!.label, tone: "negative" });
     if (lateCancelFeeDueByClient.has(client.id)) {
       flags.push({ label: "Late cancel fee due", tone: "negative" });
+    }
+    const unloggedDates = unloggedDatesByClient.get(client.id) ?? [];
+    if (unloggedDates.length > 0) {
+      flags.push({
+        label:
+          unloggedDates.length === 1
+            ? `Session not logged (${shortDate(unloggedDates[0])})`
+            : `${unloggedDates.length} sessions not logged`,
+        tone: "negative",
+      });
     }
 
     const lastTracked = lastTrackedByClient.get(client.id);
