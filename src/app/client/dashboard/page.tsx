@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { respondToCounteredRequest } from "@/app/client/actions";
-import { Badge, Button, Card, EmptyState, Heart, PhaseBanner } from "@/components/ui";
+import { Badge, Button, Card, Collapsible, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
@@ -208,28 +208,6 @@ export default async function ClientDashboard() {
           </Link>
         </Card>
       ) : null}
-
-      <div className="grid grid-cols-3 gap-3">
-        <QuickAction href="/client/program" label="My program" />
-        <QuickAction href="/client/activity" label="Activity log" />
-        <QuickAction href="/client/schedule" label="My schedule" />
-        <QuickAction href="/client/checkin" label="Log check-in" />
-        <QuickAction href="/client/habits" label="Habits" />
-        <QuickAction href="/client/nutrition" label="Nutrition" />
-        {me.symptom_tracker_enabled ? (
-          <QuickAction href="/client/symptoms" label="Symptom log" />
-        ) : null}
-        <QuickAction href="/client/progress" label="My progress" />
-        <QuickAction href="/client/community" label="Community" />
-        <QuickAction href="/client/milestones" label="Milestones" />
-        <QuickAction href="/client/guide" label="Wellness guide" />
-        <QuickAction href="/client/documents" label="Documents" />
-        <QuickAction href="/client/plan" label="Payment plan" />
-        <QuickAction href="/client/checkin-call" label="Book a check-in call" />
-        {me.video_sessions_enabled ? (
-          <QuickAction href="/client/video-session" label="Book a video session" />
-        ) : null}
-      </div>
 
       {me.hold_started_at ? (
         <Card className="space-y-1 border-gold/40 bg-gold/5">
@@ -460,6 +438,61 @@ export default async function ClientDashboard() {
         </Card>
       ) : null}
 
+      <div className="grid grid-cols-2 gap-3">
+        <ActionTile
+          href="/client/program"
+          label="My program"
+          description="This week's exercises & cues"
+        />
+        <ActionTile
+          href="/client/schedule"
+          label="My schedule"
+          description="View & manage your sessions"
+        />
+        <ActionTile
+          href="/client/activity"
+          label="Activity log"
+          description="Log a workout, walk, or mobility session"
+        />
+        <ActionTile
+          href="/client/nutrition"
+          label="Nutrition"
+          description={
+            me.calorie_goal_enabled && me.daily_calorie_goal
+              ? `Goal: ${me.daily_calorie_goal} cal/day`
+              : "Log meals, hunger & fullness"
+          }
+        />
+        <ActionTile href="/client/habits" label="Habits" description="Track your daily habits" />
+        <ActionTile
+          href="/client/progress"
+          label="My progress"
+          description="Photos, measurements & trends"
+        />
+      </div>
+
+      <Collapsible label="More" labelClassName="text-sm font-medium text-gray">
+        <div className="rounded-xl border border-grayLt bg-white px-4">
+          <MoreLink href="/client/checkin" label="Log a daily check-in" />
+          {me.symptom_tracker_enabled ? (
+            <MoreLink href="/client/symptoms" label="Symptom log" />
+          ) : null}
+          <MoreLink href="/client/community" label="Community" />
+          <MoreLink href="/client/milestones" label="Milestones" />
+          <MoreLink href="/client/guide" label="Wellness guide" />
+          <MoreLink
+            href="/client/documents"
+            label="Documents"
+            badge={unacknowledgedCount > 0 ? `${unacknowledgedCount} new` : undefined}
+          />
+          <MoreLink href="/client/plan" label="Payment plan" />
+          <MoreLink href="/client/checkin-call" label="Book a check-in call" />
+          {me.video_sessions_enabled ? (
+            <MoreLink href="/client/video-session" label="Book a video session" />
+          ) : null}
+        </div>
+      </Collapsible>
+
       <div>
         <p className="mb-2 text-sm font-medium text-gray">Recent sessions</p>
         {!sessions || sessions.length === 0 ? (
@@ -497,14 +530,45 @@ export default async function ClientDashboard() {
   );
 }
 
-function QuickAction({ href, label }: { href: string; label: string }) {
+function ActionTile({
+  href,
+  label,
+  description,
+}: {
+  href: string;
+  label: string;
+  description: string;
+}) {
   return (
     <Link
       href={href}
-      className="flex flex-col items-center justify-center gap-1 rounded-xl border border-grayLt bg-white px-2 py-4 text-center text-sm font-medium text-ink shadow-sm transition hover:border-rose/40"
+      className="flex flex-col gap-0.5 rounded-xl border border-grayLt bg-white px-4 py-3 shadow-sm transition hover:border-rose/40"
     >
-      <Heart className="text-base" />
-      {label}
+      <span className="text-sm font-semibold text-ink">{label}</span>
+      <span className="text-xs text-gray">{description}</span>
+    </Link>
+  );
+}
+
+function MoreLink({
+  href,
+  label,
+  badge,
+}: {
+  href: string;
+  label: string;
+  badge?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between border-b border-grayLt/50 py-2.5 text-sm text-ink last:border-0 hover:text-rose"
+    >
+      <span>{label}</span>
+      <span className="flex items-center gap-2 text-gray">
+        {badge ? <Badge tone="gold">{badge}</Badge> : null}
+        <span aria-hidden>→</span>
+      </span>
     </Link>
   );
 }
