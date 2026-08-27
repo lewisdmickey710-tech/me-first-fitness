@@ -2,7 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { coachCancelSession } from "@/app/coach/actions";
 import { ScheduleGrid, type RequestChip } from "./ScheduleGrid";
-import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
+import { ConfirmButton } from "@/components/confirm-button";
+import { Badge, Card, EmptyState, Heart } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type {
@@ -467,16 +468,34 @@ export default async function CoachSchedulePage({
                   </Badge>
                 </div>
                 {cancellable ? (
-                  <form
-                    action={async () => {
-                      "use server";
-                      await coachCancelSession(s.clientId, selectedCell.date, null);
-                    }}
-                  >
-                    <Button type="submit" variant="danger">
-                      I&apos;m unavailable — cancel &amp; email them
-                    </Button>
-                  </form>
+                  <div className="flex flex-wrap gap-2">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await coachCancelSession(s.clientId, selectedCell.date, null);
+                      }}
+                    >
+                      <ConfirmButton
+                        variant="danger"
+                        confirmText={`Cancel ${s.clientName}'s session on ${selectedCell.date} and email them?`}
+                      >
+                        I&apos;m unavailable — cancel &amp; email them
+                      </ConfirmButton>
+                    </form>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await coachCancelSession(s.clientId, selectedCell.date, null, true);
+                      }}
+                    >
+                      <ConfirmButton
+                        variant="secondary"
+                        confirmText={`Mark ${s.clientName}'s session on ${selectedCell.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+                      >
+                        Client emergency
+                      </ConfirmButton>
+                    </form>
+                  </div>
                 ) : null}
               </Card>
             );

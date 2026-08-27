@@ -428,10 +428,10 @@ export function ScheduleGrid({
     });
   }
 
-  function cancelSingleOccurrence(b: DayBooking) {
+  function cancelSingleOccurrence(b: DayBooking, isEmergency: boolean = false) {
     startTransition(async () => {
       try {
-        await coachCancelSession(b.clientId, b.date, b.clientScheduleId);
+        await coachCancelSession(b.clientId, b.date, b.clientScheduleId, isEmergency);
         setBalanceActionBooking(null);
         router.refresh();
       } catch (err) {
@@ -950,6 +950,14 @@ export function ScheduleGrid({
                 onClick={() => cancelSingleOccurrence(balanceActionBooking)}
               >
                 Cancel this session
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={isPending}
+                onClick={() => cancelSingleOccurrence(balanceActionBooking, true)}
+              >
+                Client emergency (no charge)
               </Button>
               {balanceActionBooking.clientScheduleId ? (
                 <Button

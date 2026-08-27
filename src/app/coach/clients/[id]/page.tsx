@@ -2166,17 +2166,34 @@ function AttendanceTab({
                   placeholder="Reason, or reschedule details (optional)"
                 />
               </form>
-              <form
-                action={async () => {
-                  "use server";
-                  await coachCancelSession(clientId, occ.date, occ.scheduleId);
-                }}
-                className="mt-2"
-              >
-                <Button type="submit" variant="danger">
-                  I&apos;m unavailable — cancel &amp; email them
-                </Button>
-              </form>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <form
+                  action={async () => {
+                    "use server";
+                    await coachCancelSession(clientId, occ.date, occ.scheduleId);
+                  }}
+                >
+                  <ConfirmButton
+                    variant="danger"
+                    confirmText={`Cancel this session on ${occ.date} and email them?`}
+                  >
+                    I&apos;m unavailable — cancel &amp; email them
+                  </ConfirmButton>
+                </form>
+                <form
+                  action={async () => {
+                    "use server";
+                    await coachCancelSession(clientId, occ.date, occ.scheduleId, true);
+                  }}
+                >
+                  <ConfirmButton
+                    variant="secondary"
+                    confirmText={`Mark this session on ${occ.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+                  >
+                    Client emergency
+                  </ConfirmButton>
+                </form>
+              </div>
             </Card>
           ))}
         </div>

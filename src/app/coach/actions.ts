@@ -8,6 +8,7 @@ import { nextPhase, getCurrentPhase } from "@/lib/phase";
 import {
   sendMilestoneAchievedEmail,
   sendCoachCancelledSessionEmail,
+  sendEmergencyCancelledSessionEmail,
   sendDayBlockedEmail,
   sendRequestCounteredEmail,
   sendSessionRescheduledEmail,
@@ -1802,7 +1803,8 @@ export async function unblockDate(id: string) {
 export async function coachCancelSession(
   clientId: string,
   occurrenceDate: string,
-  clientScheduleId: string | null
+  clientScheduleId: string | null,
+  isEmergency: boolean = false
 ) {
   const supabase = await createClient();
 
@@ -1813,6 +1815,7 @@ export async function coachCancelSession(
       occurrence_date: occurrenceDate,
       status: "cancelled",
       cancelled_by: "coach",
+      ...(isEmergency ? { notes: "Client emergency — excused, no charge." } : {}),
     },
     { onConflict: "client_id,occurrence_date" }
   );
@@ -1827,7 +1830,11 @@ export async function coachCancelSession(
     if (client) {
       const email = await clientLoginEmail(client.user_id);
       if (email) {
-        await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+        if (isEmergency) {
+          await sendEmergencyCancelledSessionEmail(email, client.name, occurrenceDate);
+        } else {
+          await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+        }
       }
     }
   } catch (emailError) {

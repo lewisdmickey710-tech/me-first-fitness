@@ -792,6 +792,24 @@ export default async function RosterPage({
                   Cancel
                 </ConfirmButton>
               </form>
+              <form
+                action={async () => {
+                  "use server";
+                  await coachCancelSession(
+                    nextSession!.clientId,
+                    nextSession!.date,
+                    null,
+                    true
+                  );
+                }}
+              >
+                <ConfirmButton
+                  variant="secondary"
+                  confirmText={`Mark ${nextSession.clientName}'s session on ${nextSession.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+                >
+                  Client emergency
+                </ConfirmButton>
+              </form>
             </div>
           </Card>
         ) : (

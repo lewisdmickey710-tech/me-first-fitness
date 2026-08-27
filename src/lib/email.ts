@@ -226,6 +226,27 @@ export async function sendCoachCancelledSessionEmail(
   });
 }
 
+export async function sendEmergencyCancelledSessionEmail(
+  to: string,
+  clientName: string,
+  whenText: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping emergency-cancelled session email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "Your session is cancelled — take care of what you need to",
+    html: wrapper(`
+      <p>Hi ${clientName},</p>
+      <p>I've cancelled your session on <strong>${whenText}</strong> — no charge, no worries at all. Take care of what you need to.</p>
+      <p>Whenever you're ready, let's find a new time.</p>
+    `),
+  });
+}
+
 export async function sendDayBlockedEmail(
   to: string,
   clientName: string,
