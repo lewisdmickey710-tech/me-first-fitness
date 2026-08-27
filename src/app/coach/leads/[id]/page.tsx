@@ -141,7 +141,7 @@ export default async function LeadDetailPage({
 
   return (
     <div className="space-y-6">
-      <BackLink href="/coach/leads">← Back to leads</BackLink>
+      <BackLink href="/coach/sign-ons">← Back to sign-ons</BackLink>
 
       <div className="flex items-center justify-between">
         <div>

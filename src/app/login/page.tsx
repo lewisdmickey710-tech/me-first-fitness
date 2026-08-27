@@ -58,17 +58,23 @@ export default function LoginPage() {
           </button>
         </div>
 
+        {tab === "client" ? (
+          <p className="mb-3 text-sm font-medium text-ink">
+            Already have an account?
+          </p>
+        ) : null}
+
         {tab === "client" ? <ClientLogin /> : <CoachLogin />}
       </Card>
 
       {tab === "client" ? (
-        <p className="mt-4 text-center text-xs text-gray">
+        <p className="mt-4 text-center text-sm text-gray">
           New here?{" "}
           <a
             href="/request-assessment"
-            className="text-rose hover:underline"
+            className="inline-block rounded-full bg-rose px-4 py-1.5 font-bold text-white shadow-sm transition hover:scale-105 hover:opacity-90"
           >
-            Request a free assessment
+            Book a free consultation ♥
           </a>
         </p>
       ) : null}

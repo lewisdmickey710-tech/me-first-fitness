@@ -1223,6 +1223,7 @@ export async function addClientForAccount(userId: string, formData: FormData) {
   if (phaseError) throw new Error(phaseError.message);
 
   revalidatePath("/coach/signups");
+  revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
   redirect(`/coach/clients/${data.id}`);
 }
@@ -1241,6 +1242,7 @@ export async function linkExistingClientToAccount(
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/signups");
+  revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
   revalidatePath(`/coach/clients/${clientId}`);
 }
@@ -1258,6 +1260,7 @@ export async function rejectSignup(userId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/signups");
+  revalidatePath("/coach/sign-ons");
 }
 
 export async function updateClientProfile(clientId: string, formData: FormData) {

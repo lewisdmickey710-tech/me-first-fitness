@@ -6,7 +6,7 @@ import {
   unblockDate,
 } from "@/app/coach/actions";
 import { BlockHoursGrid } from "./BlockHoursGrid";
-import { BackOfficeTabs } from "@/components/back-office-tabs";
+import { BackLink } from "@/components/back-link";
 import { Button, Card, EmptyState, Heart, Input, Select, Textarea } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
@@ -152,7 +152,7 @@ export default async function CoachAvailabilityPage({
 
   return (
     <div className="space-y-6">
-      <BackOfficeTabs active="/coach/availability" />
+      <BackLink href="/coach/schedule">← Back to schedule</BackLink>
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />

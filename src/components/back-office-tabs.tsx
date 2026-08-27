@@ -5,7 +5,6 @@ const TABS = [
   { href: "/coach/documents", label: "Documents" },
   { href: "/coach/testimonials", label: "Testimonials" },
   { href: "/coach/library", label: "Library" },
-  { href: "/coach/availability", label: "Availability" },
 ] as const;
 
 export function BackOfficeTabs({

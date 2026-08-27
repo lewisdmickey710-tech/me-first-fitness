@@ -279,10 +279,18 @@ export default async function CoachSchedulePage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-ink">
-        <Heart className="mr-1.5" />
-        Your schedule
-      </h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          Your schedule
+        </h1>
+        <Link
+          href="/coach/availability"
+          className="shrink-0 rounded-xl bg-white px-3 py-1.5 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
+        >
+          Availability
+        </Link>
+      </div>
       <p className="text-sm text-gray">
         Teal is available time, light pink is booked (with client initials),
         dark pink is blocked, and purple is a time request waiting on you.

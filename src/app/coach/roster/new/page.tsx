@@ -88,8 +88,8 @@ export default async function NewClientPage() {
         They start at Phase 1, week 1 of a new cycle automatically. Once
         they log in for the first time (client tab on the login page),
         you&apos;ll find them under{" "}
-        <Link href="/coach/signups" className="text-rose hover:underline">
-          Signups
+        <Link href="/coach/sign-ons" className="text-rose hover:underline">
+          Sign-ons
         </Link>{" "}
         to link their login to this client record.
       </p>

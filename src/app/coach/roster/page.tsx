@@ -6,7 +6,8 @@ import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
 import { computeCancellationRisk, RISK_LEVEL_COLOR, RISK_LEVEL_LABEL } from "@/lib/risk";
 import type { RiskLevel } from "@/lib/risk";
-import { toDateString } from "@/lib/timezone";
+import { toDateString, nowInBusinessTz } from "@/lib/timezone";
+import { formatTimeOfDay } from "@/lib/schedule";
 import { monthlyPaymentStatus, payAsYouGoStatus } from "@/lib/payment-status";
 import type { Client, OccurrenceStatus } from "@/lib/types";
 
@@ -63,6 +64,7 @@ export default async function RosterPage({
     { data: minorConsentRows },
     { data: allLinkedClientRows },
     { data: upcomingMilestoneRows },
+    { data: activeSchedules },
   ] = await Promise.all([
     supabase
       .from("requests")
@@ -97,7 +99,7 @@ export default async function RosterPage({
     clientIds.length > 0
       ? supabase
           .from("session_occurrences")
-          .select("client_id, status, occurrence_date, created_at")
+          .select("client_id, status, occurrence_date, created_at, notes")
           .in("client_id", clientIds)
           .order("occurrence_date", { ascending: false })
       : Promise.resolve({ data: [] }),
@@ -140,6 +142,12 @@ export default async function RosterPage({
           .is("achieved_at", null)
           .not("target_date", "is", null)
       : Promise.resolve({ data: [] }),
+    supabase
+      .from("client_schedules")
+      .select("client_id, day_of_week, time_of_day")
+      .eq("active", true) as unknown as Promise<{
+      data: { client_id: string; day_of_week: number; time_of_day: string }[] | null;
+    }>,
   ]);
 
   const pendingRequestsByClient = new Map<
@@ -349,23 +357,9 @@ export default async function RosterPage({
     (p) => !linkedUserIds.has(p.id)
   ).length;
 
-  const sessionCountByClientId = new Map<string, number>();
-  for (const row of sessionRows ?? []) {
-    sessionCountByClientId.set(
-      row.client_id,
-      (sessionCountByClientId.get(row.client_id) ?? 0) + 1
-    );
-  }
   // Test profiles are still full clients in every other respect -- they
   // just shouldn't skew aggregate numbers the coach uses to make decisions.
   const statsClients = (clients ?? []).filter((c) => !c.is_test);
-
-  const proBonoClients = statsClients.filter((c) => c.pro_bono);
-  const proBonoTotalValue = proBonoClients.reduce(
-    (sum, c) =>
-      sum + (sessionCountByClientId.get(c.id) ?? 0) * (c.pro_bono_rate ?? 0),
-    0
-  );
 
   const inWindow = isFirstWeekOfMonth();
   const clientsNeedingWindow = statsClients.filter(
@@ -374,6 +368,70 @@ export default async function RosterPage({
       (!loggedThisMonth(measurementDatesByClient.get(c.id) ?? []) ||
         !loggedThisMonth(serviceCheckinDatesByClient.get(c.id) ?? []))
   ).length;
+
+  // "Next booked session" widget -- scans the recurring weekly schedule
+  // plus any one-off confirmed-time occurrences forward from right now,
+  // using the same override rule the Schedule page itself uses (a
+  // same-date occurrence row other than "completed" replaces the
+  // recurring default rather than stacking with it).
+  const nowBiz = nowInBusinessTz();
+  const nowBizDateStr = toDateString(nowBiz);
+  const nowBizTimeStr = nowBiz.toISOString().slice(11, 16);
+
+  const clientNameById = new Map((clients ?? []).map((c) => [c.id, c.name]));
+  const scheduleByDayOfWeek = new Map<
+    number,
+    { client_id: string; time_of_day: string }[]
+  >();
+  for (const s of activeSchedules ?? []) {
+    const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
+    list.push(s);
+    scheduleByDayOfWeek.set(s.day_of_week, list);
+  }
+  const occByClientDate = new Map(
+    (occurrenceRows ?? []).map((o) => [`${o.client_id}:${o.occurrence_date}`, o])
+  );
+
+  type NextSession = { clientId: string; clientName: string; date: string; timeOfDay: string };
+  let nextSession: NextSession | null = null;
+  const NEXT_SESSION_LOOKAHEAD_DAYS = 21;
+  outer: for (let i = 0; i < NEXT_SESSION_LOOKAHEAD_DAYS; i++) {
+    const d = new Date(`${nowBizDateStr}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + i);
+    const dateStr = toDateString(d);
+    const dayOfWeek = d.getUTCDay();
+
+    const candidates: NextSession[] = [];
+    for (const s of scheduleByDayOfWeek.get(dayOfWeek) ?? []) {
+      const override = occByClientDate.get(`${s.client_id}:${dateStr}`);
+      if (override && override.status !== "completed") continue;
+      candidates.push({
+        clientId: s.client_id,
+        clientName: clientNameById.get(s.client_id) ?? "Client",
+        date: dateStr,
+        timeOfDay: s.time_of_day,
+      });
+    }
+    for (const o of occurrenceRows ?? []) {
+      if (o.occurrence_date !== dateStr || o.status !== "scheduled") continue;
+      const match = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
+      if (!match) continue;
+      candidates.push({
+        clientId: o.client_id,
+        clientName: clientNameById.get(o.client_id) ?? "Client",
+        date: dateStr,
+        timeOfDay: match[1],
+      });
+    }
+
+    const upcoming = candidates
+      .filter((c) => dateStr > nowBizDateStr || c.timeOfDay >= nowBizTimeStr)
+      .sort((a, b) => a.timeOfDay.localeCompare(b.timeOfDay));
+    if (upcoming.length > 0) {
+      nextSession = upcoming[0];
+      break outer;
+    }
+  }
 
   const riskByClient = new Map<string, { score: number; level: RiskLevel }>();
   for (const c of clients ?? []) {
@@ -634,20 +692,36 @@ export default async function RosterPage({
         </Link>
       ) : null}
 
-      {!showArchived && proBonoClients.length > 0 ? (
-        <Card className="border-rose/30 bg-rose/5">
-          <p className="text-sm font-medium text-gray">
-            <Heart className="mr-1" />
-            Pro bono impact
-          </p>
-          <p className="mt-1 text-2xl font-semibold text-ink">
-            ${proBonoTotalValue.toFixed(2)}
-            <span className="ml-2 text-sm font-normal text-gray">
-              across {proBonoClients.length} client
-              {proBonoClients.length > 1 ? "s" : ""}
-            </span>
-          </p>
-        </Card>
+      {!showArchived ? (
+        nextSession ? (
+          <Link
+            href={`/coach/clients/${nextSession.clientId}/log-session?date=${nextSession.date}`}
+          >
+            <Card className="border-teal/30 bg-teal/5 transition hover:border-teal/60">
+              <p className="text-sm font-medium text-gray">
+                <Heart className="mr-1" />
+                Next booked session
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-ink">
+                {nextSession.clientName}
+              </p>
+              <p className="mt-0.5 text-sm text-gray">
+                {nextSession.date === today ? "Today" : shortDate(nextSession.date)} at{" "}
+                {formatTimeOfDay(nextSession.timeOfDay)} · tap to log this session
+              </p>
+            </Card>
+          </Link>
+        ) : (
+          <Card className="border-teal/30 bg-teal/5">
+            <p className="text-sm font-medium text-gray">
+              <Heart className="mr-1" />
+              Next booked session
+            </p>
+            <p className="mt-1 text-sm text-gray">
+              Nothing booked in the next {NEXT_SESSION_LOOKAHEAD_DAYS} days.
+            </p>
+          </Card>
+        )
       ) : null}
 
       {pendingSignupCount > 0 ? (
@@ -659,7 +733,7 @@ export default async function RosterPage({
               client
             </p>
             <Link
-              href="/coach/signups"
+              href="/coach/sign-ons"
               className="shrink-0 text-sm font-medium text-rose hover:opacity-80"
             >
               Review →

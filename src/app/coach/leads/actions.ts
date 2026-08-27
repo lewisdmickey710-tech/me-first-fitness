@@ -268,6 +268,7 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
   }
 
   revalidatePath("/coach/leads");
+  revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
   redirect(`/coach/clients/${client.id}`);
 }
@@ -283,7 +284,8 @@ export async function archiveLead(leadId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/leads");
-  redirect("/coach/leads");
+  revalidatePath("/coach/sign-ons");
+  redirect("/coach/sign-ons");
 }
 
 // Unlike clients, leads are often just inquiries or test data -- a real,
@@ -301,5 +303,6 @@ export async function deleteLead(leadId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/leads");
-  redirect("/coach/leads");
+  revalidatePath("/coach/sign-ons");
+  redirect("/coach/sign-ons");
 }
