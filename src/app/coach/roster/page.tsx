@@ -452,7 +452,10 @@ export default async function RosterPage({
   // absence (no log, no cancellation/reschedule override), so a missed
   // write-up doesn't just quietly fall off the bottom of the schedule.
   // One-off confirmed-time bookings aren't covered here, only the regular
-  // weekly pattern.
+  // weekly pattern. Never looks earlier than the app's real launch date --
+  // nothing before that was ever actually tracked, so there's nothing to
+  // flag as missing.
+  const APP_LAUNCH_DATE = "2026-08-22";
   function timeToMinutes(t: string): number {
     const [h, m] = t.slice(0, 5).split(":").map(Number);
     return h * 60 + m;
@@ -464,6 +467,7 @@ export default async function RosterPage({
     const d = new Date(`${nowBizDateStr}T00:00:00Z`);
     d.setUTCDate(d.getUTCDate() - i);
     const dateStr = toDateString(d);
+    if (dateStr < APP_LAUNCH_DATE) break;
     const dayOfWeek = d.getUTCDay();
 
     for (const s of scheduleByDayOfWeek.get(dayOfWeek) ?? []) {
