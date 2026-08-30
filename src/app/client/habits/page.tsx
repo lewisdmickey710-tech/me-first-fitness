@@ -1,10 +1,11 @@
 import { Fragment } from "react";
+import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { addHabit, cycleHabitLog, deleteHabit } from "@/app/client/actions";
 import { Button, Card, EmptyState, Heart, Input } from "@/components/ui";
-import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { nowInBusinessTz, toDateString, weekDates } from "@/lib/timezone";
 import type { ClientHabit, ClientHabitLog } from "@/lib/types";
 
 const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
@@ -15,7 +16,11 @@ const LEVEL_CLASS: Record<number, string> = {
   3: "border-pink bg-pink",
 };
 
-export default async function ClientHabitsPage() {
+export default async function ClientHabitsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ week?: string }>;
+}) {
   const me = await getMyClient();
 
   if (!me) {
@@ -27,16 +32,13 @@ export default async function ClientHabitsPage() {
     );
   }
 
+  const { week: weekParam } = await searchParams;
+  const weekOffset = Math.min(0, Math.trunc(Number(weekParam ?? 0)) || 0);
+
   const supabase = await createClient();
   const now = nowInBusinessTz();
   const todayStr = toDateString(now);
-
-  const last7Days: string[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(now);
-    d.setUTCDate(d.getUTCDate() - i);
-    last7Days.push(toDateString(d));
-  }
+  const last7Days = weekDates(now, weekOffset);
 
   const [{ data: habits }, { data: habitLogs }] = await Promise.all([
     supabase
@@ -49,7 +51,8 @@ export default async function ClientHabitsPage() {
       .from("client_habit_logs")
       .select("*")
       .eq("client_id", me.id)
-      .gte("log_date", last7Days[0]) as unknown as Promise<{
+      .gte("log_date", last7Days[0])
+      .lte("log_date", last7Days[6]) as unknown as Promise<{
       data: ClientHabitLog[] | null;
     }>,
   ]);
@@ -75,6 +78,28 @@ export default async function ClientHabitsPage() {
           however makes sense to you — done/not done, or how mild to severe
           something was.
         </p>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Link
+          href={`/client/habits?week=${weekOffset - 1}`}
+          className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
+        >
+          ← Prev week
+        </Link>
+        <p className="text-xs text-gray">
+          {last7Days[0]} – {last7Days[6]}
+        </p>
+        {weekOffset < 0 ? (
+          <Link
+            href={`/client/habits?week=${weekOffset + 1}`}
+            className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
+          >
+            Next week →
+          </Link>
+        ) : (
+          <span className="px-2 py-1 text-sm text-grayLt">Next week →</span>
+        )}
       </div>
 
       {(habits ?? []).length === 0 ? (

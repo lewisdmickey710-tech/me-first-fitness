@@ -92,8 +92,8 @@ export async function buildClientExportText(
       .eq("client_id", clientId)
       .order("log_date"),
     supabase
-      .from("client_symptom_logs")
-      .select("*")
+      .from("client_symptom_day_logs")
+      .select("*, client_symptoms(name)")
       .eq("client_id", clientId)
       .order("log_date"),
     supabase.from("service_checkins").select("*").eq("client_id", clientId).order("date"),
@@ -279,7 +279,7 @@ export async function buildClientExportText(
       (symptomLogs ?? [])
         .map(
           (s) =>
-            `${s.log_date}: ${s.symptom}${s.severity ? ` (severity ${s.severity})` : ""}${s.notes ? ` — ${s.notes}` : ""}`
+            `${s.log_date}: ${s.client_symptoms?.name ?? "(deleted)"} (level ${s.level}/3)${s.note ? ` — ${s.note}` : ""}${s.shared_with_coach ? " [shared with coach]" : ""}`
         )
         .join("\n")
     )

@@ -87,7 +87,7 @@ import type {
   ClientPhaseHistory,
   ClientProgramOverride,
   ClientSchedule,
-  ClientSymptomLog,
+  ClientSymptomDayLog,
   LegalDocument,
   Measurement,
   OccurrenceStatus,
@@ -98,6 +98,10 @@ import type {
   SessionType,
   TrainingSession,
 } from "@/lib/types";
+
+type SharedSymptomDayLog = ClientSymptomDayLog & {
+  client_symptoms: { name: string } | null;
+};
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -386,11 +390,12 @@ export default async function ClientDetailPage({
       // RLS scopes the coach's view of this table to shared_with_coach = true
       // rows only -- nothing further to filter here.
       supabase
-        .from("client_symptom_logs")
-        .select("*")
+        .from("client_symptom_day_logs")
+        .select("*, client_symptoms(name)")
         .eq("client_id", id)
-        .order("log_date", { ascending: false })
-        .limit(20) as unknown as Promise<{ data: ClientSymptomLog[] | null }>,
+        .gte("log_date", sevenDaysAgo) as unknown as Promise<{
+        data: SharedSymptomDayLog[] | null;
+      }>,
       supabase
         .from("client_nutrition_logs")
         .select("*")
@@ -1894,7 +1899,7 @@ async function LogTab({
   habits: ClientHabit[];
   habitLogs: ClientHabitLog[];
   nutritionLogs: ClientNutritionLog[];
-  symptomLogs: ClientSymptomLog[];
+  symptomLogs: SharedSymptomDayLog[];
   symptomTrackerEnabled: boolean;
 }) {
   const mediaPaths = [
@@ -2440,39 +2445,79 @@ function HabitsTab({
   );
 }
 
-function SymptomsTab({ symptomLogs }: { symptomLogs: ClientSymptomLog[] }) {
+function SymptomsTab({ symptomLogs }: { symptomLogs: SharedSymptomDayLog[] }) {
+  const now = nowInBusinessTz();
+  const last7Days: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() - i);
+    last7Days.push(toDateString(d));
+  }
+
+  const nameBySymptomId = new Map<string, string>();
+  for (const l of symptomLogs) {
+    if (l.client_symptoms?.name) nameBySymptomId.set(l.symptom_id, l.client_symptoms.name);
+  }
+  const symptomIds = [...nameBySymptomId.keys()];
+
+  const logByKey = new Map(
+    symptomLogs.map((l) => [`${l.symptom_id}:${l.log_date}`, l])
+  );
+  const notedLogs = symptomLogs.filter((l) => l.note);
+
   return (
     <div>
       <p className="text-xs text-gray">
         Clients keep this mainly for their own doctor/PT visits — you only
-        see an entry if they choose to share it.
+        see a day once they choose to share it.
       </p>
-      {symptomLogs.length === 0 ? (
+      {symptomIds.length === 0 ? (
         <EmptyState
           title="Nothing shared yet"
-          body="No shared symptom entries from this client."
+          body="No shared symptom entries from this client in the last 7 days."
         />
       ) : (
-        <div className="mt-2 space-y-2">
-          {symptomLogs.map((s) => (
-            <Card key={s.id}>
-              <div className="flex items-center justify-between">
-                <p className="font-medium text-ink">
-                  {s.symptom}
-                  {s.severity ? (
-                    <span className="ml-2 text-sm text-gray">
-                      severity {s.severity}/5
-                    </span>
-                  ) : null}
-                </p>
-                <p className="text-sm text-gray">{s.log_date}</p>
+        <Card className="mt-2 space-y-3">
+          <div className="grid grid-cols-[1fr_repeat(7,1.75rem)] items-center gap-x-1 gap-y-2 text-xs text-gray">
+            <div />
+            {last7Days.map((d) => (
+              <div key={d} className="text-center">
+                {d.slice(5)}
               </div>
-              {s.notes ? (
-                <p className="mt-1 text-sm text-ink">{s.notes}</p>
-              ) : null}
-            </Card>
-          ))}
-        </div>
+            ))}
+            {symptomIds.map((sid) => (
+              <Fragment key={sid}>
+                <span className="truncate text-sm text-ink">
+                  {nameBySymptomId.get(sid)}
+                </span>
+                {last7Days.map((d) => {
+                  const log = logByKey.get(`${sid}:${d}`);
+                  return (
+                    <div key={`${sid}-${d}`} className="flex justify-center">
+                      <span
+                        className={`inline-block h-4 w-4 rounded-full border ${
+                          log ? WELLNESS_LEVEL_CLASS[log.level] : "border-grayLt bg-white"
+                        }`}
+                      />
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+          {notedLogs.length > 0 ? (
+            <div className="space-y-1 border-t border-grayLt pt-2">
+              {notedLogs.map((l) => (
+                <p key={l.id} className="text-xs text-ink">
+                  <span className="text-gray">
+                    {l.log_date} — {nameBySymptomId.get(l.symptom_id)}:
+                  </span>{" "}
+                  {l.note}
+                </p>
+              ))}
+            </div>
+          ) : null}
+        </Card>
       )}
     </div>
   );

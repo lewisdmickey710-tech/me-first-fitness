@@ -42,6 +42,23 @@ export function toDateString(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/**
+ * The 7 dates (oldest first) of the week ending `weekOffset` weeks back
+ * from today (in business tz) -- weekOffset 0 is the trailing 7 days
+ * ending today, -1 is the 7 days before that, and so on. Shared by the
+ * habit and symptom trackers so clients can page backward through past
+ * weeks to spot trends.
+ */
+export function weekDates(now: Date, weekOffset: number): string[] {
+  const days: string[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setUTCDate(d.getUTCDate() + weekOffset * 7 - i);
+    days.push(toDateString(d));
+  }
+  return days;
+}
+
 // ---- Cross-timezone conversion, for virtual clients outside the business
 // timezone. Everything stored in the database (session times, requests,
 // availability) stays anchored to BUSINESS_TIMEZONE wall-clock time, same

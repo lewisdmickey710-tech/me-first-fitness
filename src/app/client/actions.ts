@@ -1190,41 +1190,88 @@ export async function cycleHabitLog(habitId: string, logDate: string) {
   revalidatePath("/client/habits");
 }
 
-export async function addSymptomLog(formData: FormData) {
+export async function addSymptomTracker(name: string) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
-
-  const logDate = String(formData.get("log_date") ?? "");
-  const symptom = String(formData.get("symptom") ?? "").trim();
-  const severityRaw = String(formData.get("severity") ?? "").trim();
-  const notes = String(formData.get("notes") ?? "").trim();
-  const sharedWithCoach = formData.get("shared_with_coach") === "on";
-
-  if (!logDate || !symptom) throw new Error("Date and symptom are required.");
+  const trimmed = name.trim();
+  if (!trimmed) return;
 
   const supabase = await createClient();
-  const { error } = await supabase.from("client_symptom_logs").insert({
-    client_id: me.id,
-    log_date: logDate,
-    symptom,
-    severity: severityRaw ? Number(severityRaw) : null,
-    notes: notes || null,
-    shared_with_coach: sharedWithCoach,
-  });
+  const { error } = await supabase
+    .from("client_symptoms")
+    .insert({ client_id: me.id, name: trimmed });
   if (error) throw new Error(error.message);
 
   revalidatePath("/client/symptoms");
 }
 
-export async function deleteSymptomLog(logId: string) {
+export async function deleteSymptomTracker(symptomId: string) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
 
   const supabase = await createClient();
   const { error } = await supabase
-    .from("client_symptom_logs")
+    .from("client_symptoms")
     .delete()
-    .eq("id", logId)
+    .eq("id", symptomId)
+    .eq("client_id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/symptoms");
+}
+
+// Same tap-to-cycle pattern as cycleHabitLog above -- empty -> level 1
+// (teal) -> level 2 (gold) -> level 3 (pink) -> empty.
+export async function cycleSymptomLog(symptomId: string, logDate: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("client_symptom_day_logs")
+    .select("id, level")
+    .eq("symptom_id", symptomId)
+    .eq("log_date", logDate)
+    .maybeSingle();
+
+  if (!existing) {
+    const { error } = await supabase
+      .from("client_symptom_day_logs")
+      .insert({ symptom_id: symptomId, client_id: me.id, log_date: logDate, level: 1 });
+    if (error) throw new Error(error.message);
+  } else if (existing.level >= 3) {
+    const { error } = await supabase
+      .from("client_symptom_day_logs")
+      .delete()
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase
+      .from("client_symptom_day_logs")
+      .update({ level: existing.level + 1 })
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  }
+
+  revalidatePath("/client/symptoms");
+}
+
+export async function updateSymptomLogDetails(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const symptomId = String(formData.get("symptom_id") ?? "");
+  const logDate = String(formData.get("log_date") ?? "");
+  const note = String(formData.get("note") ?? "").trim();
+  const sharedWithCoach = formData.get("shared_with_coach") === "on";
+  if (!symptomId || !logDate) throw new Error("Missing symptom or date.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_symptom_day_logs")
+    .update({ note: note || null, shared_with_coach: sharedWithCoach })
+    .eq("symptom_id", symptomId)
+    .eq("log_date", logDate)
     .eq("client_id", me.id);
   if (error) throw new Error(error.message);
 

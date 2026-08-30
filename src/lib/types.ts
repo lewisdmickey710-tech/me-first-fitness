@@ -350,13 +350,21 @@ export interface ClientHabitLog {
   created_at: string;
 }
 
-export interface ClientSymptomLog {
+export interface ClientSymptom {
   id: string;
   client_id: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ClientSymptomDayLog {
+  id: string;
+  symptom_id: string;
+  client_id: string;
   log_date: string;
-  symptom: string;
-  severity: number | null;
-  notes: string | null;
+  level: number;
+  note: string | null;
   shared_with_coach: boolean;
   created_at: string;
 }
