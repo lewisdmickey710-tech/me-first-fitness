@@ -51,6 +51,7 @@ export interface Client {
   daily_calorie_goal: number | null;
   is_test: boolean;
   partner_client_id: string | null;
+  session_rate: number | null;
 }
 
 export interface SessionEntry {
@@ -246,6 +247,7 @@ export interface Exercise {
   primary_muscle_group: MuscleGroup | null;
   movement_type: MovementType | null;
   laterality: Laterality | null;
+  video_url: string | null;
   created_at: string;
 }
 

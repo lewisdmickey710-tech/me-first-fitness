@@ -50,6 +50,23 @@ export function ExerciseForm({
           />
         </div>
 
+        <div>
+          <label className="mb-1 block text-sm font-medium text-ink">
+            Demo video link{" "}
+            <span className="font-normal text-gray">(optional)</span>
+          </label>
+          <Input
+            name="video_url"
+            type="url"
+            defaultValue={exercise?.video_url ?? ""}
+            placeholder="https://youtube.com/watch?v=..."
+          />
+          <p className="mt-1 text-xs text-gray">
+            Shown to clients as a &quot;Watch demo&quot; link next to this
+            movement in their program.
+          </p>
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">

@@ -36,6 +36,7 @@ interface ProgramDayJoinRow {
       regress_to_id: string | null;
       progress_to_id: string | null;
       laterality: string | null;
+      video_url: string | null;
     } | null;
   }[];
 }
@@ -60,7 +61,7 @@ export default async function ClientProgramPage() {
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id, laterality))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id, laterality, video_url))"
           )
           .eq("care_profile_id", me.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -114,7 +115,7 @@ export default async function ClientProgramPage() {
   const { data: extraExercises } = extraIds.size
     ? await supabase
         .from("exercises")
-        .select("id, name, client_description, laterality")
+        .select("id, name, client_description, laterality, video_url")
         .in("id", [...extraIds])
     : {
         data: [] as {
@@ -122,6 +123,7 @@ export default async function ClientProgramPage() {
           name: string;
           client_description: string | null;
           laterality: string | null;
+          video_url: string | null;
         }[],
       };
   const extraById = new Map((extraExercises ?? []).map((e) => [e.id, e]));
@@ -283,6 +285,17 @@ export default async function ClientProgramPage() {
                               {effective.client_description}
                             </p>
                           </Collapsible>
+                        ) : null}
+
+                        {effective?.video_url ? (
+                          <a
+                            href={effective.video_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block text-sm font-medium text-rose hover:underline"
+                          >
+                            ▶ Watch demo
+                          </a>
                         ) : null}
 
                         {substitute ? (

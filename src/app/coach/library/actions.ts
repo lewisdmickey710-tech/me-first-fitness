@@ -27,6 +27,7 @@ export async function addExercise(formData: FormData) {
     primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
     movement_type: cleanText(formData.get("movement_type")),
     laterality: cleanText(formData.get("laterality")),
+    video_url: cleanText(formData.get("video_url")),
   });
 
   if (error) throw new Error(error.message);
@@ -55,6 +56,7 @@ export async function updateExercise(exerciseId: string, formData: FormData) {
       primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
       movement_type: cleanText(formData.get("movement_type")),
       laterality: cleanText(formData.get("laterality")),
+      video_url: cleanText(formData.get("video_url")),
     })
     .eq("id", exerciseId);
 

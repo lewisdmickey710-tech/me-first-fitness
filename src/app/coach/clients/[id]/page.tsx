@@ -1187,6 +1187,28 @@ function ProfileTab({
             defaultGoal={client.daily_calorie_goal}
           />
 
+          <div className="max-w-[12rem]">
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Negotiated session rate{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Input
+              name="session_rate"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="e.g. 30"
+              defaultValue={client.session_rate ?? ""}
+            />
+            <p className="mt-1 text-xs text-gray">
+              Leave blank for your standard rate. Use this for friends &amp;
+              family pricing, a shorter session, or any other one-off deal —
+              it&apos;s never shown to clients or offered as a sign-up
+              option, it just pre-fills the amount when you add a payment
+              for them.
+            </p>
+          </div>
+
           <div>
             <Checkbox
               name="pro_bono"

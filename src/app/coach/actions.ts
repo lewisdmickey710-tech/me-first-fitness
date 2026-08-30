@@ -1518,6 +1518,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   const timezone = String(formData.get("timezone") ?? "").trim();
   const pro_bono_rate_raw = String(formData.get("pro_bono_rate") ?? "").trim();
   const daily_calorie_goal_raw = String(formData.get("daily_calorie_goal") ?? "").trim();
+  const session_rate_raw = String(formData.get("session_rate") ?? "").trim();
 
   const { error } = await supabase
     .from("clients")
@@ -1546,6 +1547,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       calorie_goal_enabled: formData.get("calorie_goal_enabled") === "on",
       daily_calorie_goal: daily_calorie_goal_raw ? Number(daily_calorie_goal_raw) : null,
       is_test: formData.get("is_test") === "on",
+      session_rate: session_rate_raw ? Number(session_rate_raw) : null,
     })
     .eq("id", clientId);
 

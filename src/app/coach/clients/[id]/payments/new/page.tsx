@@ -1,6 +1,8 @@
 import { BackLink } from "@/components/back-link";
+import { createClient } from "@/lib/supabase/server";
 import { addPayment } from "@/app/coach/actions";
 import { Button, Card, Heart, Input } from "@/components/ui";
+import type { Client } from "@/lib/types";
 
 export default async function NewPaymentPage({
   params,
@@ -9,6 +11,13 @@ export default async function NewPaymentPage({
 }) {
   const { id } = await params;
   const today = new Date().toISOString().slice(0, 10);
+
+  const supabase = await createClient();
+  const { data: client } = (await supabase
+    .from("clients")
+    .select("session_rate")
+    .eq("id", id)
+    .maybeSingle()) as { data: Pick<Client, "session_rate"> | null };
 
   const boundAdd = addPayment.bind(null, id);
 
@@ -39,7 +48,14 @@ export default async function NewPaymentPage({
               <label className="mb-1 block text-sm font-medium text-ink">
                 Amount ($)
               </label>
-              <Input name="amount" type="number" step="0.01" min="0" required />
+              <Input
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0"
+                required
+                defaultValue={client?.session_rate ?? ""}
+              />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
