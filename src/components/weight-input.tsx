@@ -21,13 +21,18 @@ export function WeightInput({
   name,
   form,
   placeholder,
+  defaultValue,
 }: {
   name: string;
   form?: string;
   placeholder?: string;
+  defaultValue?: string;
 }) {
   const [unit, setUnit] = useState<"lb" | "kg">("lb");
-  const [text, setText] = useState("");
+  const [text, setText] = useState(() => {
+    const n = defaultValue ? parseNumber(defaultValue) : null;
+    return n === null ? "" : String(n);
+  });
 
   const entered = parseNumber(text);
   const lbValue =

@@ -765,6 +765,117 @@ export async function logSession(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=log`);
 }
 
+// Corrects a session she already logged -- a misclick on the wrong day,
+// exercise, date, etc. Only ever reached for sessions she logged herself
+// (the edit link is hidden on client-logged entries), so this doesn't need
+// to worry about preserving the richer per-entry fields
+// (substitute_exercise_id, prescribed_exercise, entry notes) that only
+// exist on entries a client logs from their own program page.
+export async function updateSession(
+  clientId: string,
+  sessionId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const day_label = String(formData.get("day_label") ?? "").trim();
+  const date = String(formData.get("date") ?? "");
+  const ratingRaw = String(formData.get("rating") ?? "");
+  const day_notes = String(formData.get("day_notes") ?? "").trim();
+  const sessionTypeRaw = String(formData.get("session_type") ?? "freestyle");
+  const session_type = (
+    ["program", "freestyle", "conversation", "recovery", "assessment"].includes(
+      sessionTypeRaw
+    )
+      ? sessionTypeRaw
+      : "freestyle"
+  ) as SessionType;
+  const bodyMapRaw = String(formData.get("body_map") ?? "");
+  let body_map: BodyMapMarker[] | null = null;
+  if (bodyMapRaw) {
+    try {
+      const parsed = JSON.parse(bodyMapRaw);
+      if (Array.isArray(parsed) && parsed.length > 0) body_map = parsed;
+    } catch {
+      // ignore malformed body map JSON rather than blocking the save
+    }
+  }
+
+  const exercises = formData.getAll("exercise") as string[];
+  const sets = formData.getAll("sets") as string[];
+  const reps = formData.getAll("reps") as string[];
+  const weights = formData.getAll("weight") as string[];
+  const files = formData.getAll("file");
+  const existingMediaPaths = formData.getAll("existing_media_path") as string[];
+
+  const entries: SessionEntry[] = (
+    await Promise.all(
+      exercises.map(async (exercise, i) => {
+        const trimmed = exercise?.trim() ?? "";
+        if (!trimmed) return null;
+
+        let media_path: string | null = existingMediaPaths[i] || null;
+        const file = files[i];
+        if (file instanceof File && file.size > 0) {
+          const path = `${clientId}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
+          const { error: uploadError } = await supabase.storage
+            .from("form-checks")
+            .upload(path, file, { contentType: file.type });
+          if (uploadError) throw new Error(uploadError.message);
+          media_path = path;
+        }
+
+        const entry: SessionEntry = {
+          exercise: trimmed,
+          sets: sets[i] ?? "",
+          reps: reps[i] ?? "",
+          weight: weights[i] ?? "",
+        };
+        if (media_path) entry.media_path = media_path;
+        return entry;
+      })
+    )
+  ).filter((e): e is SessionEntry => e !== null);
+
+  if (!day_label || !date) {
+    throw new Error("Day label and date are required.");
+  }
+
+  const paymentStatusRaw = String(formData.get("payment_status") ?? "");
+  const payment_status = (
+    ["paid", "unpaid", "waived"].includes(paymentStatusRaw) ? paymentStatusRaw : null
+  ) as "paid" | "unpaid" | "waived" | null;
+
+  const coached = formData.get("coached") === "on";
+
+  const { error } = await supabase
+    .from("sessions")
+    .update({
+      day_label,
+      date,
+      entries,
+      rating: ratingRaw ? Number(ratingRaw) : null,
+      day_notes: day_notes || null,
+      session_type,
+      body_map,
+      payment_status,
+      coached,
+    })
+    .eq("id", sessionId)
+    .eq("client_id", clientId);
+
+  if (error) throw new Error(error.message);
+
+  // Same as logSession -- the (possibly changed) date counts as attended.
+  await supabase.from("session_occurrences").upsert(
+    { client_id: clientId, occurrence_date: date, status: "completed" },
+    { onConflict: "client_id,occurrence_date" }
+  );
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  redirect(`/coach/clients/${clientId}?tab=log`);
+}
+
 // Cleans up a mis-logged entry -- e.g. a client using the prescribed-day
 // log form for something that was actually out-of-session activity. The
 // clientId check is just defense against a stale/tampered id from an old

@@ -2114,21 +2114,30 @@ async function LogTab({
                 </Collapsible>
 
                 {s ? (
-                  <form
-                    action={async () => {
-                      "use server";
-                      await deleteLoggedSession(clientId, s.id);
-                    }}
-                    className="mt-2"
-                  >
-                    <ConfirmButton
-                      variant="ghost"
-                      confirmText="Delete this logged session? This can't be undone -- if it was really out-of-session activity, log it as one from the form above instead."
-                      className="text-xs text-gray hover:text-pink"
+                  <div className="mt-2 flex items-center gap-3">
+                    {entry.loggedBy !== "client" ? (
+                      <Link
+                        href={`/coach/clients/${clientId}/log-session/${s.id}/edit`}
+                        className="text-xs font-medium text-rose hover:underline"
+                      >
+                        Edit
+                      </Link>
+                    ) : null}
+                    <form
+                      action={async () => {
+                        "use server";
+                        await deleteLoggedSession(clientId, s.id);
+                      }}
                     >
-                      Delete
-                    </ConfirmButton>
-                  </form>
+                      <ConfirmButton
+                        variant="ghost"
+                        confirmText="Delete this logged session? This can't be undone -- if it was really out-of-session activity, log it as one from the form above instead."
+                        className="text-xs text-gray hover:text-pink"
+                      >
+                        Delete
+                      </ConfirmButton>
+                    </form>
+                  </div>
                 ) : null}
               </Card>
             );

@@ -2,13 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { addHabitForClient, addMilestone, logSession } from "@/app/coach/actions";
+import { addHabitForClient, addMilestone, logSession, updateSession } from "@/app/coach/actions";
 import { Badge, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { WeightInput } from "@/components/weight-input";
 import { PHASES } from "@/lib/constants";
 import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
-import type { SessionType } from "@/lib/types";
+import type { BodyMapMarker, SessionEntry, SessionType } from "@/lib/types";
 
 export interface ProgramDayOption {
   phase: string;
@@ -17,14 +17,39 @@ export interface ProgramDayOption {
   exercises: { exercise: string; sets: string; reps: string }[];
 }
 
+export interface ExistingSession {
+  id: string;
+  day_label: string;
+  date: string;
+  session_type: SessionType;
+  entries: SessionEntry[];
+  rating: number | null;
+  day_notes: string | null;
+  payment_status: "paid" | "unpaid" | "waived" | null;
+  body_map: BodyMapMarker[] | null;
+  coached: boolean;
+}
+
 interface Row {
   exercise: string;
   sets: string;
   reps: string;
   weight: string;
+  existingMediaPath?: string;
 }
 
 const BLANK_ROWS = 6;
+
+function rowsFromEntries(entries: SessionEntry[]): Row[] {
+  const filled = entries.map((e) => ({
+    exercise: e.exercise,
+    sets: e.sets,
+    reps: e.reps,
+    weight: e.weight,
+    existingMediaPath: e.media_path ?? undefined,
+  }));
+  return [...filled, ...blankRows(2)];
+}
 
 const SESSION_TYPES: { id: SessionType; label: string }[] = [
   { id: "program", label: "Program day" },
@@ -57,12 +82,14 @@ export function LogSessionForm({
   programDayOptions,
   defaultPhase,
   lastEntry,
+  existingSession,
 }: {
   clientId: string;
   today: string;
   programDayOptions: ProgramDayOption[];
   defaultPhase: string;
   lastEntry: LogEntry | null;
+  existingSession?: ExistingSession | null;
 }) {
   const availablePhases = useMemo(
     () =>
@@ -73,22 +100,30 @@ export function LogSessionForm({
   );
 
   const [sessionType, setSessionType] = useState<SessionType>(
-    availablePhases.length > 0 ? "program" : "freestyle"
+    existingSession?.session_type ?? (availablePhases.length > 0 ? "program" : "freestyle")
   );
   const [phase, setPhase] = useState(
     availablePhases.some((p) => p.id === defaultPhase)
       ? defaultPhase
       : availablePhases[0]?.id ?? ""
   );
-  const [dayLabel, setDayLabel] = useState("");
-  const [rows, setRows] = useState<Row[]>(blankRows(BLANK_ROWS));
-  const [recoveryDescription, setRecoveryDescription] = useState("");
+  const [dayLabel, setDayLabel] = useState(existingSession?.day_label ?? "");
+  const [rows, setRows] = useState<Row[]>(
+    existingSession ? rowsFromEntries(existingSession.entries) : blankRows(BLANK_ROWS)
+  );
+  const [recoveryDescription, setRecoveryDescription] = useState(
+    existingSession?.session_type === "recovery"
+      ? existingSession.entries[0]?.exercise ?? ""
+      : ""
+  );
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
   const [habitName, setHabitName] = useState("");
   const [milestoneTitle, setMilestoneTitle] = useState("");
-  const [dayLabelTouched, setDayLabelTouched] = useState(false);
+  const [dayLabelTouched, setDayLabelTouched] = useState(!!existingSession);
 
-  const boundLogSession = logSession.bind(null, clientId);
+  const boundLogSession = existingSession
+    ? updateSession.bind(null, clientId, existingSession.id)
+    : logSession.bind(null, clientId);
   const boundAddHabit = addHabitForClient.bind(null, clientId);
   const boundAddMilestone = addMilestone.bind(null, clientId);
 
@@ -336,7 +371,7 @@ export function LogSessionForm({
               <label className="mb-1 block text-sm font-medium text-ink">
                 Date
               </label>
-              <Input name="date" type="date" required defaultValue={today} />
+              <Input name="date" type="date" required defaultValue={existingSession?.date ?? today} />
             </div>
           </div>
 
@@ -375,15 +410,27 @@ export function LogSessionForm({
                           key={`${activeDayKey ?? "free"}-${i}`}
                           name="weight"
                           placeholder="Weight"
+                          defaultValue={row.weight}
                         />
                       </div>
                     </div>
+                    <input
+                      type="hidden"
+                      name="existing_media_path"
+                      value={row.existingMediaPath ?? ""}
+                    />
                     <input
                       type="file"
                       name="file"
                       accept="image/*,video/*"
                       className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
                     />
+                    {row.existingMediaPath ? (
+                      <p className="text-xs text-gray">
+                        Has a photo/video attached — choose a file above only
+                        if you want to replace it.
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -415,7 +462,13 @@ export function LogSessionForm({
                 Rating (1–5){" "}
                 <span className="font-normal text-gray">(optional)</span>
               </label>
-              <Input name="rating" type="number" min="1" max="5" />
+              <Input
+                name="rating"
+                type="number"
+                min="1"
+                max="5"
+                defaultValue={existingSession?.rating ?? ""}
+              />
             </div>
           ) : null}
 
@@ -423,7 +476,7 @@ export function LogSessionForm({
             <label className="mb-1 block text-sm font-medium text-ink">
               {NOTES_LABEL[sessionType]}
             </label>
-            <Textarea name="day_notes" rows={3} />
+            <Textarea name="day_notes" rows={3} defaultValue={existingSession?.day_notes ?? ""} />
           </div>
 
           <div>
@@ -431,7 +484,7 @@ export function LogSessionForm({
               Payment{" "}
               <span className="font-normal text-gray">(optional)</span>
             </label>
-            <Select name="payment_status" defaultValue="">
+            <Select name="payment_status" defaultValue={existingSession?.payment_status ?? ""}>
               <option value="">— Not recorded —</option>
               <option value="paid">Paid this session</option>
               <option value="unpaid">Not paid this session</option>
@@ -444,13 +497,13 @@ export function LogSessionForm({
               Body map{" "}
               <span className="font-normal text-gray">(optional)</span>
             </p>
-            <BodyMapInput name="body_map" />
+            <BodyMapInput name="body_map" defaultValue={existingSession?.body_map} />
           </div>
 
           <Checkbox
             name="coached"
             label="This was a session I ran"
-            defaultChecked
+            defaultChecked={existingSession ? existingSession.coached : true}
           />
           <p className="-mt-2 text-xs text-gray">
             Uncheck this if you&apos;re recording something they did on
@@ -458,10 +511,12 @@ export function LogSessionForm({
             coached session.
           </p>
 
-          <Button type="submit">Save session</Button>
+          <Button type="submit">{existingSession ? "Save changes" : "Save session"}</Button>
         </form>
       </Card>
 
+      {existingSession ? null : (
+      <>
       <Card className="space-y-2">
         <p className="text-sm font-medium text-ink">Add a habit for them</p>
         <p className="text-xs text-gray">
@@ -513,6 +568,8 @@ export function LogSessionForm({
           </div>
         </form>
       </Card>
+      </>
+      )}
     </div>
   );
 }
