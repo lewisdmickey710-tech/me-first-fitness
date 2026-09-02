@@ -16,7 +16,6 @@ import {
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
-import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { safeFileName } from "@/lib/storage";
 import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
@@ -1695,11 +1694,12 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
-// Puts a client's membership on hold: no standing sessions, but a flat
-// weekly retainer keeps their app access and reserves their spot. Creates
-// the first week's retainer payment immediately -- the daily cron rolls
-// subsequent weeks forward for as long as hold_started_at stays set (see
-// src/app/api/cron/reminders/route.ts).
+// Puts a client's membership on hold: no standing sessions, but their app
+// access and spot are reserved. The first FREE_HOLD_DAYS are free -- no
+// retainer payment is created here. The daily cron (see
+// src/app/api/cron/reminders/route.ts) starts billing the flat weekly
+// retainer only once a hold has run longer than that, and keeps rolling a
+// new week forward for as long as hold_started_at stays set.
 export async function startClientHold(clientId: string) {
   const supabase = await createClient();
 
@@ -1708,15 +1708,6 @@ export async function startClientHold(clientId: string) {
     .update({ hold_started_at: new Date().toISOString() })
     .eq("id", clientId);
   if (error) throw new Error(error.message);
-
-  const { error: paymentError } = await supabase.from("payments").insert({
-    client_id: clientId,
-    description: "Weekly hold retainer",
-    amount: RETAINER_FEE_PER_WEEK,
-    due_date: toDateString(nowInBusinessTz()),
-    kind: "retainer",
-  });
-  if (paymentError) throw new Error(paymentError.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
@@ -1729,6 +1720,50 @@ export async function endClientHold(clientId: string) {
     .from("clients")
     .update({ hold_started_at: null })
     .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+}
+
+const OVERRIDABLE_FLAGS = ["inactive", "high_risk", "session_not_logged"] as const;
+
+// Dismisses a roster "attention" flag she already knows the story behind
+// (a known vacation, an injury she's tracking outside the app, etc.),
+// keeping why and for how long as a record rather than just silently
+// clearing it. Leaving until_date blank makes it stand until she clears it
+// herself; setting one lets the flag start showing again on its own once
+// that day passes.
+export async function addFlagOverride(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const flag_key = String(formData.get("flag_key") ?? "");
+  if (!(OVERRIDABLE_FLAGS as readonly string[]).includes(flag_key)) {
+    throw new Error("Unknown flag.");
+  }
+  const reason = String(formData.get("reason") ?? "").trim();
+  if (!reason) throw new Error("A reason is required.");
+  const untilRaw = String(formData.get("until_date") ?? "").trim();
+
+  const { error } = await supabase.from("client_flag_overrides").insert({
+    client_id: clientId,
+    flag_key,
+    reason,
+    until_date: untilRaw || null,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+}
+
+export async function clearFlagOverride(clientId: string, overrideId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("client_flag_overrides")
+    .delete()
+    .eq("id", overrideId)
+    .eq("client_id", clientId);
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
@@ -2150,12 +2185,17 @@ export async function unblockDate(id: string) {
 // Mirrors the client's own "Cancel" button on /client/schedule, but from
 // the coach's side: no late-cancellation fee logic (never applies when
 // it's the coach cancelling), and an immediate email so the client has
-// something in writing before Mickey follows up by text herself.
+// something in writing before Mickey follows up by text herself -- unless
+// `silent`, for retroactively recording a session that was already
+// cancelled outside the app (a text, a call) before she got to marking it
+// here. Emailing about that after the fact would just be confusing, so
+// it's skipped entirely rather than sent late.
 async function coachCancelSessionCore(
   clientId: string,
   occurrenceDate: string,
   clientScheduleId: string | null,
-  isEmergency: boolean
+  isEmergency: boolean,
+  silent: boolean = false
 ) {
   const supabase = await createClient();
 
@@ -2172,24 +2212,26 @@ async function coachCancelSessionCore(
   );
   if (error) throw new Error(error.message);
 
-  try {
-    const { data: client } = await supabase
-      .from("clients")
-      .select("name, user_id")
-      .eq("id", clientId)
-      .single();
-    if (client) {
-      const email = await clientLoginEmail(client.user_id);
-      if (email) {
-        if (isEmergency) {
-          await sendEmergencyCancelledSessionEmail(email, client.name, occurrenceDate);
-        } else {
-          await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+  if (!silent) {
+    try {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("name, user_id")
+        .eq("id", clientId)
+        .single();
+      if (client) {
+        const email = await clientLoginEmail(client.user_id);
+        if (email) {
+          if (isEmergency) {
+            await sendEmergencyCancelledSessionEmail(email, client.name, occurrenceDate);
+          } else {
+            await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+          }
         }
       }
+    } catch (emailError) {
+      console.error("Failed to send coach-cancelled session email", emailError);
     }
-  } catch (emailError) {
-    console.error("Failed to send coach-cancelled session email", emailError);
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
@@ -2206,9 +2248,10 @@ export async function coachCancelSession(
   occurrenceDate: string,
   clientScheduleId: string | null,
   isEmergency: boolean = false,
-  timeOfDay: string | null = null
+  timeOfDay: string | null = null,
+  silent: boolean = false
 ) {
-  await coachCancelSessionCore(clientId, occurrenceDate, clientScheduleId, isEmergency);
+  await coachCancelSessionCore(clientId, occurrenceDate, clientScheduleId, isEmergency, silent);
 
   if (!timeOfDay) return;
 
@@ -2228,7 +2271,8 @@ export async function coachCancelSession(
       client.partner_client_id,
       occurrenceDate,
       match.clientScheduleId,
-      isEmergency
+      isEmergency,
+      silent
     );
   } catch (err) {
     console.error("Failed to mirror cancellation to booking partner", err);

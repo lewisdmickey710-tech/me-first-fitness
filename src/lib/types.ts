@@ -333,6 +333,15 @@ export interface ClientProgressPhoto {
   created_at: string;
 }
 
+export interface ClientFlagOverride {
+  id: string;
+  client_id: string;
+  flag_key: "inactive" | "high_risk" | "session_not_logged";
+  reason: string;
+  until_date: string | null;
+  created_at: string;
+}
+
 export interface ClientHabit {
   id: string;
   client_id: string;

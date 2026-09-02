@@ -74,6 +74,7 @@ export default async function RosterPage({
     { data: allLinkedClientRows },
     { data: upcomingMilestoneRows },
     { data: activeSchedules },
+    { data: flagOverrideRows },
   ] = await Promise.all([
     supabase
       .from("requests")
@@ -159,6 +160,12 @@ export default async function RosterPage({
         | { client_id: string; day_of_week: number; time_of_day: string; duration_minutes: number }[]
         | null;
     }>,
+    clientIds.length > 0
+      ? supabase
+          .from("client_flag_overrides")
+          .select("client_id, flag_key, reason, until_date")
+          .in("client_id", clientIds)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const pendingRequestsByClient = new Map<
@@ -197,6 +204,27 @@ export default async function RosterPage({
   const serviceCheckinDatesByClient = datesByClient(serviceCheckinRows);
 
   const today = toDateString(new Date());
+
+  // Active flag overrides -- dismissed with a reason (and optionally an
+  // expiry), see addFlagOverride. An expired one is treated as if it
+  // weren't there, so the flag it was covering starts showing again on
+  // its own.
+  const activeOverrideByClientFlag = new Map<
+    string,
+    { reason: string; until_date: string | null }
+  >();
+  for (const o of (flagOverrideRows ?? []) as {
+    client_id: string;
+    flag_key: string;
+    reason: string;
+    until_date: string | null;
+  }[]) {
+    if (o.until_date && o.until_date < today) continue;
+    activeOverrideByClientFlag.set(`${o.client_id}:${o.flag_key}`, {
+      reason: o.reason,
+      until_date: o.until_date,
+    });
+  }
 
   // Upcoming milestones/birthdays -- both are "coming up soon" heads-up
   // flags rather than problems, so they're purely informational (teal).
@@ -559,6 +587,18 @@ export default async function RosterPage({
 
     type Flag = { label: string; tone: "negative" | "positive" };
     const flags: Flag[] = [];
+    // Pushes a normally-negative flag unless she's already dismissed it
+    // with a reason for this client -- shown as a calm teal note instead
+    // of dropped silently, so the override itself stays visible on the
+    // board rather than just in the audit trail.
+    const pushOverridableFlag = (flagKey: string, label: string) => {
+      const override = activeOverrideByClientFlag.get(`${client.id}:${flagKey}`);
+      if (override) {
+        flags.push({ label: `${label} — overridden: ${override.reason}`, tone: "positive" });
+      } else {
+        flags.push({ label, tone: "negative" });
+      }
+    };
     if (newRequests > 0) {
       flags.push({
         label: newRequests === 1 ? "Requested time" : `Requested time (${newRequests})`,
@@ -593,20 +633,19 @@ export default async function RosterPage({
       });
     }
     if (client.hold_started_at) flags.push({ label: "On hold", tone: "negative" });
-    if (risk.level === "high") flags.push({ label: "High risk", tone: "negative" });
+    if (risk.level === "high") pushOverridableFlag("high_risk", "High risk");
     if (owesPayment) flags.push({ label: paymentStatus!.label, tone: "negative" });
     if (lateCancelFeeDueByClient.has(client.id)) {
       flags.push({ label: "Late cancel fee due", tone: "negative" });
     }
     const unloggedDates = unloggedDatesByClient.get(client.id) ?? [];
     if (unloggedDates.length > 0) {
-      flags.push({
-        label:
-          unloggedDates.length === 1
-            ? `Session not logged (${shortDate(unloggedDates[0])})`
-            : `${unloggedDates.length} sessions not logged`,
-        tone: "negative",
-      });
+      pushOverridableFlag(
+        "session_not_logged",
+        unloggedDates.length === 1
+          ? `Session not logged (${shortDate(unloggedDates[0])})`
+          : `${unloggedDates.length} sessions not logged`
+      );
     }
 
     const lastTracked = lastTrackedByClient.get(client.id);
@@ -623,7 +662,7 @@ export default async function RosterPage({
       new Date(today).getTime() - new Date(client.created_at).getTime() >
       3 * 24 * 60 * 60 * 1000;
     if (clientEstablished && daysSinceActivity > 3) {
-      flags.push({ label: `Inactive ${daysSinceActivity}+ days`, tone: "negative" });
+      pushOverridableFlag("inactive", `Inactive ${daysSinceActivity}+ days`);
     }
 
     const lateCancel = recentLateCancelledByClient.get(client.id);

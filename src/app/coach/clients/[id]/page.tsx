@@ -7,8 +7,10 @@ import {
   addActivityAsCoach,
   addClientNote,
   addMilestone,
+  addFlagOverride,
   advancePhase,
   archiveClient,
+  clearFlagOverride,
   coachCancelSession,
   confirmVideoSessionRequest,
   deleteClientNote,
@@ -61,7 +63,7 @@ import {
 import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
-import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
+import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { lateCancellationFreeAllotment } from "@/lib/cancellation";
 import { CALL_DURATION_MINUTES } from "@/lib/video-session";
 import {
@@ -80,6 +82,7 @@ import type {
   ClientProgressPhoto,
   ClientHabitLog,
   ClientIntake,
+  ClientFlagOverride,
   ClientMilestone,
   ClientMinorConsent,
   ClientNote,
@@ -294,6 +297,12 @@ export default async function ClientDetailPage({
     .is("archived_at", null)
     .order("name")) as { data: { id: string; name: string }[] | null };
 
+  const { data: flagOverrides } = (await supabase
+    .from("client_flag_overrides")
+    .select("*")
+    .eq("client_id", id)
+    .order("created_at", { ascending: false })) as { data: ClientFlagOverride[] | null };
+
   const { data: clientIntake } = (await supabase
     .from("client_intake")
     .select("*")
@@ -475,6 +484,7 @@ export default async function ClientDetailPage({
           careProfiles={careProfiles ?? []}
           milestones={milestones ?? []}
           otherClients={otherClients ?? []}
+          flagOverrides={flagOverrides ?? []}
         />
       )}
       {tab === "documents" && (
@@ -947,20 +957,30 @@ function Overview({
   );
 }
 
+const OVERRIDABLE_FLAG_LABEL: Record<ClientFlagOverride["flag_key"], string> = {
+  inactive: "Inactive",
+  high_risk: "High risk",
+  session_not_logged: "Session not logged",
+};
+
 function ProfileTab({
   client,
   intake,
   careProfiles,
   milestones,
   otherClients,
+  flagOverrides,
 }: {
   client: Client;
   intake: ClientIntake | null;
   careProfiles: CareProfile[];
   milestones: ClientMilestone[];
   otherClients: { id: string; name: string }[];
+  flagOverrides: ClientFlagOverride[];
 }) {
   const currentPartner = otherClients.find((c) => c.id === client.partner_client_id);
+  const today = toDateString(new Date());
+  const activeOverrides = flagOverrides.filter((o) => !o.until_date || o.until_date >= today);
   return (
     <div className="space-y-4">
       <Card className="space-y-4">
@@ -1296,17 +1316,26 @@ function ProfileTab({
 
       <Card className="space-y-2">
         <div className="flex items-center justify-between">
-          <p className="font-medium text-ink">Membership hold</p>
+          <p className="font-medium text-ink">Membership hold (pause)</p>
           {client.hold_started_at ? (
-            <Badge tone="gold">
-              on hold since {client.hold_started_at.slice(0, 10)}
-            </Badge>
+            (() => {
+              const freeUntil = new Date(client.hold_started_at!);
+              freeUntil.setUTCDate(freeUntil.getUTCDate() + FREE_HOLD_DAYS);
+              const stillFree = toDateString(freeUntil) > toDateString(new Date());
+              return (
+                <Badge tone={stillFree ? "teal" : "gold"}>
+                  {stillFree
+                    ? `free until ${toDateString(freeUntil)}`
+                    : "retainer billing active"}
+                </Badge>
+              );
+            })()
           ) : null}
         </div>
         <p className="text-sm text-gray">
           {client.hold_started_at
-            ? `Reserving their spot for a flat $${RETAINER_FEE_PER_WEEK}/week retainer instead of standing sessions. A new retainer payment is added automatically each week they stay on hold.`
-            : `No standing sessions, but keeps their app access and reserves their spot for a flat $${RETAINER_FEE_PER_WEEK}/week retainer instead of a full billing gap.`}
+            ? `No standing sessions, but keeps their app access and reserves their spot. Free for the first ${FREE_HOLD_DAYS} days -- a flat $${RETAINER_FEE_PER_WEEK}/week retainer starts automatically if the hold runs longer than that.`
+            : `No standing sessions, but keeps their app access and reserves their spot -- free for up to ${FREE_HOLD_DAYS} days. A flat $${RETAINER_FEE_PER_WEEK}/week retainer kicks in automatically only if it runs longer than that.`}
         </p>
         <form
           action={async () => {
@@ -1321,6 +1350,76 @@ function ProfileTab({
           <Button type="submit" variant="secondary">
             {client.hold_started_at ? "End hold" : "Start hold"}
           </Button>
+        </form>
+      </Card>
+
+      <Card className="space-y-3">
+        <p className="font-medium text-ink">Roster flags</p>
+        <p className="text-sm text-gray">
+          Dismiss a flag you already know the story behind (a known
+          vacation, something you&apos;re tracking outside the app) --
+          it&apos;ll show on the roster as overridden, with your reason,
+          instead of nagging you every time.
+        </p>
+        {activeOverrides.length > 0 ? (
+          <div className="space-y-2">
+            {activeOverrides.map((o) => (
+              <div
+                key={o.id}
+                className="flex items-start justify-between gap-2 rounded-lg bg-cream px-3 py-2"
+              >
+                <div>
+                  <p className="text-sm font-medium text-ink">
+                    {OVERRIDABLE_FLAG_LABEL[o.flag_key]}
+                  </p>
+                  <p className="text-sm text-gray">{o.reason}</p>
+                  <p className="text-xs text-gray">
+                    {o.until_date ? `Until ${o.until_date}` : "No end date set"}
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    "use server";
+                    await clearFlagOverride(client.id, o.id);
+                  }}
+                >
+                  <button type="submit" className="shrink-0 text-xs text-gray hover:text-pink">
+                    Clear
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            await addFlagOverride(client.id, formData);
+          }}
+          className="space-y-2"
+        >
+          <Select name="flag_key" defaultValue="" required>
+            <option value="" disabled>
+              Which flag?
+            </option>
+            {Object.entries(OVERRIDABLE_FLAG_LABEL).map(([key, label]) => (
+              <option key={key} value={key}>
+                {label}
+              </option>
+            ))}
+          </Select>
+          <Textarea name="reason" rows={2} required placeholder="Why -- e.g. on vacation until the 14th" />
+          <div className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-ink">
+                Until (optional)
+              </label>
+              <Input name="until_date" type="date" />
+            </div>
+            <Button type="submit" variant="secondary">
+              Dismiss flag
+            </Button>
+          </div>
         </form>
       </Card>
 

@@ -10,7 +10,7 @@ import {
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
-import { RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
+import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 
 export const dynamic = "force-dynamic";
 
@@ -527,11 +527,11 @@ export async function GET(request: Request) {
     }
   }
 
-  // ---- Weekly retainer billing: rolls a new $10 payment forward for
-  // every client currently on hold, one week after their last retainer
-  // payment's due date (the first week's payment is created immediately
-  // when the hold starts, in startClientHold -- this only ever adds the
-  // *next* one). ----
+  // ---- Weekly retainer billing: the first FREE_HOLD_DAYS of a hold are
+  // free (no payment created in startClientHold), so the first retainer
+  // payment is only due once a hold has run longer than that -- every
+  // week after, it rolls a new payment forward one week after the last
+  // one's due date, same as before. ----
   let retainerPayments = 0;
   const { data: onHoldClients } = await supabase
     .from("clients")
@@ -548,11 +548,16 @@ export async function GET(request: Request) {
       .limit(1)
       .maybeSingle();
 
-    const lastDueDate =
-      lastRetainer?.due_date ?? toDateString(new Date(client.hold_started_at!));
-    const nextDue = new Date(`${lastDueDate}T00:00:00Z`);
-    nextDue.setUTCDate(nextDue.getUTCDate() + 7);
-    const nextDueStr = toDateString(nextDue);
+    let nextDueStr: string;
+    if (lastRetainer) {
+      const nextDue = new Date(`${lastRetainer.due_date}T00:00:00Z`);
+      nextDue.setUTCDate(nextDue.getUTCDate() + 7);
+      nextDueStr = toDateString(nextDue);
+    } else {
+      const firstDue = new Date(client.hold_started_at!);
+      firstDue.setUTCDate(firstDue.getUTCDate() + FREE_HOLD_DAYS);
+      nextDueStr = toDateString(firstDue);
+    }
 
     if (nextDueStr <= todayDateStr) {
       try {

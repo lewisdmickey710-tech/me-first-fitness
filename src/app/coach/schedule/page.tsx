@@ -441,7 +441,8 @@ export default async function CoachSchedulePage({
               `${s.clientId}:${selectedCell.date}`
             );
             const status = occurrence?.status ?? "scheduled";
-            const cancellable = status === "scheduled" && selectedCell.date >= todayStr;
+            const isPast = selectedCell.date < todayStr;
+            const cancellable = status === "scheduled";
             return (
               <Card key={s.clientId} className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -467,7 +468,7 @@ export default async function CoachSchedulePage({
                       : ""}
                   </Badge>
                 </div>
-                {cancellable ? (
+                {cancellable && !isPast ? (
                   <div className="flex flex-wrap gap-2">
                     <form
                       action={async () => {
@@ -507,6 +508,56 @@ export default async function CoachSchedulePage({
                         Client emergency
                       </ConfirmButton>
                     </form>
+                  </div>
+                ) : null}
+                {cancellable && isPast ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-gray">
+                      This date&apos;s already passed — mark what actually happened,
+                      recorded quietly with no email to {s.clientName}.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <form
+                        action={async () => {
+                          "use server";
+                          await coachCancelSession(
+                            s.clientId,
+                            selectedCell.date,
+                            null,
+                            false,
+                            s.timeOfDay,
+                            true
+                          );
+                        }}
+                      >
+                        <ConfirmButton
+                          variant="secondary"
+                          confirmText={`Retroactively mark ${s.clientName}'s session on ${selectedCell.date} as cancelled? No email will be sent.`}
+                        >
+                          Retro-mark cancelled
+                        </ConfirmButton>
+                      </form>
+                      <form
+                        action={async () => {
+                          "use server";
+                          await coachCancelSession(
+                            s.clientId,
+                            selectedCell.date,
+                            null,
+                            true,
+                            s.timeOfDay,
+                            true
+                          );
+                        }}
+                      >
+                        <ConfirmButton
+                          variant="secondary"
+                          confirmText={`Retroactively mark ${s.clientName}'s session on ${selectedCell.date} as a client emergency? No email will be sent.`}
+                        >
+                          Retro-mark client emergency
+                        </ConfirmButton>
+                      </form>
+                    </div>
                   </div>
                 ) : null}
               </Card>
