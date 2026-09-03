@@ -217,4 +217,110 @@ const ES: Record<string, string> = {
   "Moved to {date}": "Movida al {date}",
   "No exact time on file for this one — cancelling won't be checked against the 12-hour notice window.":
     "No hay una hora exacta registrada para esta — cancelar no se verificará contra la ventana de aviso de 12 horas.",
+
+  // Phase names (PHASES in lib/constants.ts) -- shown via PhaseBanner
+  "Phase 1 — Stability": "Fase 1 — Estabilidad",
+  "Phase 2 — Strength": "Fase 2 — Fuerza",
+  "Phase 3 — Size": "Fase 3 — Volumen",
+  "Phase 4 — Power": "Fase 4 — Potencia",
+  "N/A": "N/D",
+
+  // Program
+  "Your program": "Tu programa",
+  "View past workouts →": "Ver entrenamientos pasados →",
+  "No program assigned yet": "Aún no hay un programa asignado",
+  "Once your coach builds out your care profile's program, it'll show up here.":
+    "Cuando tu entrenadora arme el programa de tu perfil, aparecerá aquí.",
+  "Day {n}: {label}": "Día {n}: {label}",
+  "Forgot to log it the same day? Change the date to when you actually did it — logging it late is totally fine.":
+    "¿Se te olvidó registrarlo el mismo día? Cambia la fecha a cuando realmente lo hiciste — registrarlo tarde está totalmente bien.",
+  "Before you start — how was your day outside the gym?":
+    "Antes de empezar — ¿cómo estuvo tu día fuera del gimnasio?",
+  "Sleep — e.g. 7 hrs": "Sueño — ej. 7 hrs",
+  "Water — e.g. 64 oz": "Agua — ej. 64 oz",
+  "Food — on track / off track": "Alimentación — en orden / fuera de orden",
+  "Energy — e.g. Good": "Energía — ej. Buena",
+  "Mood — e.g. Steady": "Ánimo — ej. Estable",
+  "Enter what you used and how it felt as you go, then log the whole day at the bottom.":
+    "Anota lo que usaste y cómo te sentiste a medida que avanzas, y registra todo el día al final.",
+  "Swapped from {name}": "Cambiado de {name}",
+  "About this movement": "Sobre este movimiento",
+  "▶ Watch demo": "▶ Ver demostración",
+  "Back to prescribed: {name}": "Volver al prescrito: {name}",
+  "Swap this movement": "Cambiar este movimiento",
+  "Easier: {name}": "Más fácil: {name}",
+  "Harder: {name}": "Más difícil: {name}",
+  "Weight used": "Peso usado",
+  "Notes (optional)": "Notas (opcional)",
+  "Photo or video of your form (optional)": "Foto o video de tu forma (opcional)",
+  "Anything else about how this session felt?": "¿Algo más sobre cómo se sintió esta sesión?",
+  "Rate this workout to complete it": "Califica este entrenamiento para completarlo",
+  "Log this workout": "Registrar este entrenamiento",
+  "Did something else active?": "¿Hiciste algo más activo?",
+  "A class, a walk, a workout with friends — log it from the Activity tab instead of here, so it doesn't get counted as one of your prescribed program days.":
+    "Una clase, una caminata, un entrenamiento con amigos — regístralo desde la pestaña de Actividad en vez de aquí, para que no cuente como uno de tus días de programa prescritos.",
+  "Go to Activity log →": "Ir al registro de actividad →",
+
+  // Habits
+  "Tap a day to cycle it through a level —": "Toca un día para cambiar entre niveles —",
+  teal: "verde azulado",
+  gold: "dorado",
+  pink: "rosa",
+  "→ clear. Use it however makes sense to you — done/not done, or how mild to severe something was.":
+    "→ vacío. Úsalo como te tenga sentido — hecho/no hecho, o qué tan leve a severo fue algo.",
+  "← Prev week": "← Semana anterior",
+  "Next week →": "Semana siguiente →",
+  "No habits yet": "Aún no hay hábitos",
+  "Add something you want to build consistency on — a stretch, a med, a walk, anything.":
+    "Añade algo en lo que quieras ser constante — un estiramiento, un medicamento, una caminata, lo que sea.",
+  "Delete {name}": "Eliminar {name}",
+  "Level {n} — tap to change": "Nivel {n} — toca para cambiar",
+  "Tap to log": "Toca para registrar",
+  "New habit (e.g. stretch before bed)": "Nuevo hábito (ej. estirar antes de dormir)",
+
+  // Symptoms
+  "Not turned on for your account": "No está activado para tu cuenta",
+  "This one's optional and off by default — ask your coach if you'd like it enabled.":
+    "Esto es opcional y está desactivado por defecto — pídele a tu entrenadora que lo active si lo deseas.",
+  "A private place to keep track of anything you might want to bring up with a doctor or physical therapist. Tap a day to cycle it through a level —":
+    "Un espacio privado para llevar registro de cualquier cosa que quieras mencionar a un médico o fisioterapeuta. Toca un día para cambiar entre niveles —",
+  "→ clear. Sharing with your coach is entirely up to you, day by day.":
+    "→ vacío. Compartir con tu entrenadora depende totalmente de ti, día a día.",
+  "Nothing tracked yet": "Aún no hay nada registrado",
+  "Add something you want to keep an eye on — a joint, a symptom, anything.":
+    "Añade algo que quieras vigilar — una articulación, un síntoma, lo que sea.",
+  "New symptom (e.g. right knee ache)": "Nuevo síntoma (ej. dolor en la rodilla derecha)",
+  "Notes & sharing this week": "Notas y compartidos esta semana",
+  "shared with coach": "compartido con la entrenadora",
+  "Optional — when it happens, what helps, etc.": "Opcional — cuándo sucede, qué ayuda, etc.",
+  "Share this entry with my coach": "Compartir esta entrada con mi entrenadora",
+
+  // Nutrition
+  "Nutrition log": "Registro de nutrición",
+  "Use whatever style fits you — a quick photo, hunger/fullness and satisfaction notes, numbers, or any mix. Nothing here is required.":
+    "Usa el estilo que mejor te funcione — una foto rápida, notas de hambre/saciedad y satisfacción, números, o cualquier combinación. Nada aquí es obligatorio.",
+  "Your daily calorie goal": "Tu meta diaria de calorías",
+  cal: "cal",
+  Meal: "Comida",
+  "e.g. Lunch": "ej. Almuerzo",
+  Photo: "Foto",
+  "(easiest option — just snap it, no description needed)":
+    "(la opción más fácil — solo tómala, no necesitas describirla)",
+  "What did you eat?": "¿Qué comiste?",
+  "Hunger before (1–10)": "Hambre antes (1–10)",
+  "Fullness after (1–10)": "Saciedad después (1–10)",
+  "Satisfaction (1–5)": "Satisfacción (1–5)",
+  Calories: "Calorías",
+  "Protein (g)": "Proteína (g)",
+  "Carbs (g)": "Carbohidratos (g)",
+  "Fat (g)": "Grasa (g)",
+  "Save entry": "Guardar entrada",
+  "Food photo": "Foto de comida",
+  "hunger {n}/10": "hambre {n}/10",
+  "fullness {n}/10": "saciedad {n}/10",
+  "satisfaction {n}/5": "satisfacción {n}/5",
+  "{n} cal": "{n} cal",
+  "{n}g protein": "{n}g proteína",
+  "{n}g carbs": "{n}g carbohidratos",
+  "{n}g fat": "{n}g grasa",
 };

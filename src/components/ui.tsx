@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { phaseInfo } from "@/lib/constants";
+import { makeT, type Locale } from "@/lib/i18n";
 
 export function Heart({ className = "" }: { className?: string }) {
   return <span className={`text-rose ${className}`}>♥</span>;
@@ -208,19 +209,22 @@ export function PhaseBanner({
   phase,
   title,
   subtitle,
+  locale,
 }: {
   phase: string;
   title: string;
   subtitle?: string;
+  locale?: Locale;
 }) {
   const { color, name } = phaseInfo(phase);
+  const t = makeT(locale);
   return (
     <div
       className="rounded-2xl px-5 py-4 text-white shadow-sm"
       style={{ backgroundColor: color }}
     >
       <p className="text-xs font-medium uppercase tracking-wide opacity-90">
-        {name}
+        {t(name)}
       </p>
       <h2 className="text-lg font-semibold">
         <Heart className="mr-1 text-white/80" />

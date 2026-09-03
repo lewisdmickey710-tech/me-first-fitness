@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { formatReps, phaseInfo } from "@/lib/constants";
 import { toDateString } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 
 interface ProgramDayJoinRow {
   id: string;
@@ -53,6 +54,7 @@ export default async function ClientProgramPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
   const currentPhase = await getCurrentPhase(supabase, me.id);
 
@@ -143,23 +145,24 @@ export default async function ClientProgramPage() {
     <div className="space-y-6">
       <PhaseBanner
         phase={currentPhase?.phase ?? "n/a"}
-        title="Your program"
+        title={t("Your program")}
         subtitle={
           currentPhase ? phaseInfo(currentPhase.phase).name : undefined
         }
+        locale={me.language}
       />
 
       <Link
         href="/client/history"
         className="inline-block text-sm text-gray hover:text-ink"
       >
-        View past workouts →
+        {t("View past workouts →")}
       </Link>
 
       {programDays.length === 0 ? (
         <EmptyState
-          title="No program assigned yet"
-          body="Once your coach builds out your care profile's program, it'll show up here."
+          title={t("No program assigned yet")}
+          body={t("Once your coach builds out your care profile's program, it'll show up here.")}
         />
       ) : (
         <div className="space-y-4">
@@ -174,6 +177,10 @@ export default async function ClientProgramPage() {
               );
             const logFormId = `log-day-${day.id}`;
             const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+            const dayLabelDisplay = t("Day {n}: {label}", {
+              n: day.day_number,
+              label: day.day_label,
+            });
             const isCompleted = completedDayLabels.has(dayLabel);
 
             return (
@@ -181,7 +188,7 @@ export default async function ClientProgramPage() {
                 <Collapsible
                   label={
                     <>
-                      {dayLabel}
+                      {dayLabelDisplay}
                       {isCompleted ? (
                         <span className="text-teal" aria-label="Completed">
                           {" "}
@@ -194,7 +201,7 @@ export default async function ClientProgramPage() {
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
-                      Date
+                      {t("Date")}
                     </label>
                     <Input
                       form={logFormId}
@@ -204,32 +211,30 @@ export default async function ClientProgramPage() {
                       defaultValue={today}
                     />
                     <p className="mt-1 text-xs text-gray">
-                      Forgot to log it the same day? Change the date to when
-                      you actually did it — logging it late is totally fine.
+                      {t("Forgot to log it the same day? Change the date to when you actually did it — logging it late is totally fine.")}
                     </p>
                   </div>
 
                   <div>
                     <p className="mb-2 text-sm font-medium text-ink">
-                      Before you start — how was your day outside the gym?
+                      {t("Before you start — how was your day outside the gym?")}
                     </p>
                     <div className="grid grid-cols-2 gap-3">
-                      <Input form={logFormId} name="sleep" placeholder="Sleep — e.g. 7 hrs" />
-                      <Input form={logFormId} name="water" placeholder="Water — e.g. 64 oz" />
+                      <Input form={logFormId} name="sleep" placeholder={t("Sleep — e.g. 7 hrs")} />
+                      <Input form={logFormId} name="water" placeholder={t("Water — e.g. 64 oz")} />
                       <Input
                         form={logFormId}
                         name="food"
-                        placeholder="Food — on track / off track"
+                        placeholder={t("Food — on track / off track")}
                       />
-                      <Input form={logFormId} name="energy" placeholder="Energy — e.g. Good" />
-                      <Input form={logFormId} name="mood" placeholder="Mood — e.g. Steady" />
+                      <Input form={logFormId} name="energy" placeholder={t("Energy — e.g. Good")} />
+                      <Input form={logFormId} name="mood" placeholder={t("Mood — e.g. Steady")} />
                     </div>
                   </div>
                 </div>
 
                 <p className="mt-3 text-xs text-gray">
-                  Enter what you used and how it felt as you go, then log
-                  the whole day at the bottom.
+                  {t("Enter what you used and how it felt as you go, then log the whole day at the bottom.")}
                 </p>
 
                 <div className="mt-3 space-y-4">
@@ -266,7 +271,7 @@ export default async function ClientProgramPage() {
                             </p>
                             {substitute ? (
                               <p className="text-xs text-gray">
-                                Swapped from {base?.name}
+                                {t("Swapped from {name}", { name: base?.name ?? "" })}
                               </p>
                             ) : null}
                           </div>
@@ -280,7 +285,7 @@ export default async function ClientProgramPage() {
                         </div>
 
                         {effective?.client_description ? (
-                          <Collapsible label="About this movement">
+                          <Collapsible label={t("About this movement")}>
                             <p className="whitespace-pre-wrap text-sm text-gray">
                               {effective.client_description}
                             </p>
@@ -294,7 +299,7 @@ export default async function ClientProgramPage() {
                             rel="noreferrer"
                             className="inline-block text-sm font-medium text-rose hover:underline"
                           >
-                            ▶ Watch demo
+                            {t("▶ Watch demo")}
                           </a>
                         ) : null}
 
@@ -306,11 +311,11 @@ export default async function ClientProgramPage() {
                             }}
                           >
                             <Button type="submit" variant="secondary">
-                              Back to prescribed: {base?.name}
+                              {t("Back to prescribed: {name}", { name: base?.name ?? "" })}
                             </Button>
                           </form>
                         ) : regress || progress ? (
-                          <Collapsible label="Swap this movement">
+                          <Collapsible label={t("Swap this movement")}>
                             <div className="flex flex-wrap gap-2">
                               {regress ? (
                                 <form
@@ -323,7 +328,7 @@ export default async function ClientProgramPage() {
                                   }}
                                 >
                                   <Button type="submit" variant="secondary">
-                                    Easier: {regress.name}
+                                    {t("Easier: {name}", { name: regress.name })}
                                   </Button>
                                 </form>
                               ) : null}
@@ -338,7 +343,7 @@ export default async function ClientProgramPage() {
                                   }}
                                 >
                                   <Button type="submit" variant="secondary">
-                                    Harder: {progress.name}
+                                    {t("Harder: {name}", { name: progress.name })}
                                   </Button>
                                 </form>
                               ) : null}
@@ -353,17 +358,17 @@ export default async function ClientProgramPage() {
                           <WeightInput
                             form={logFormId}
                             name={`weight_${pde.id}`}
-                            placeholder="Weight used"
+                            placeholder={t("Weight used")}
                           />
                           <Input
                             form={logFormId}
                             name={`notes_${pde.id}`}
-                            placeholder="Notes (optional)"
+                            placeholder={t("Notes (optional)")}
                           />
                         </div>
                         <div>
                           <label className="mb-1 block text-xs font-medium text-gray">
-                            Photo or video of your form (optional)
+                            {t("Photo or video of your form (optional)")}
                           </label>
                           <input
                             form={logFormId}
@@ -388,20 +393,20 @@ export default async function ClientProgramPage() {
                 >
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
-                      Anything else about how this session felt?
+                      {t("Anything else about how this session felt?")}
                     </label>
                     <Textarea name="day_notes" rows={2} />
                   </div>
 
                   <div>
                     <p className="mb-1 text-sm font-medium text-ink">
-                      Rate this workout to complete it
+                      {t("Rate this workout to complete it")}
                     </p>
                     <StarRatingInput name="rating" />
                   </div>
 
                   <Button type="submit" className="w-full">
-                    Log this workout
+                    {t("Log this workout")}
                   </Button>
                 </form>
                 </Collapsible>
@@ -413,18 +418,16 @@ export default async function ClientProgramPage() {
 
       <Card>
         <p className="text-sm font-medium text-ink">
-          Did something else active?
+          {t("Did something else active?")}
         </p>
         <p className="mt-1 text-sm text-gray">
-          A class, a walk, a workout with friends — log it from the Activity
-          tab instead of here, so it doesn&apos;t get counted as one of your
-          prescribed program days.
+          {t("A class, a walk, a workout with friends — log it from the Activity tab instead of here, so it doesn't get counted as one of your prescribed program days.")}
         </p>
         <Link
           href="/client/activity"
           className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
         >
-          Go to Activity log →
+          {t("Go to Activity log →")}
         </Link>
       </Card>
     </div>

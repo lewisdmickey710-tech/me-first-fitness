@@ -262,6 +262,7 @@ export default async function ClientDashboard() {
           phase={currentPhase?.phase ?? "n/a"}
           title={t("Hey, {name}", { name: me.name.split(" ")[0] })}
           subtitle={weekCycleLine}
+          locale={me.language}
         />
       </Link>
 

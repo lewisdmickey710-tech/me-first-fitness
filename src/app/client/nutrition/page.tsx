@@ -4,6 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { addNutritionLog, deleteNutritionLog } from "@/app/client/actions";
 import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type { ClientNutritionLog } from "@/lib/types";
 
 export default async function ClientNutritionPage() {
@@ -18,6 +19,7 @@ export default async function ClientNutritionPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
   const todayStr = toDateString(nowInBusinessTz());
 
@@ -50,20 +52,18 @@ export default async function ClientNutritionPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Nutrition log
+          {t("Nutrition log")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Use whatever style fits you — a quick photo, hunger/fullness and
-          satisfaction notes, numbers, or any mix. Nothing here is
-          required.
+          {t("Use whatever style fits you — a quick photo, hunger/fullness and satisfaction notes, numbers, or any mix. Nothing here is required.")}
         </p>
       </div>
 
       {me.calorie_goal_enabled && me.daily_calorie_goal ? (
         <Card className="border-teal/40 bg-teal/5">
-          <p className="text-sm text-gray">Your daily calorie goal</p>
+          <p className="text-sm text-gray">{t("Your daily calorie goal")}</p>
           <p className="text-2xl font-semibold text-ink">
-            {me.daily_calorie_goal} <span className="text-sm font-normal text-gray">cal</span>
+            {me.daily_calorie_goal} <span className="text-sm font-normal text-gray">{t("cal")}</span>
           </p>
         </Card>
       ) : null}
@@ -73,22 +73,22 @@ export default async function ClientNutritionPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Date
+                {t("Date")}
               </label>
               <Input name="log_date" type="date" required defaultValue={todayStr} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Meal
+                {t("Meal")}
               </label>
-              <Input name="meal_label" placeholder="e.g. Lunch" />
+              <Input name="meal_label" placeholder={t("e.g. Lunch")} />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Photo{" "}
+              {t("Photo")}{" "}
               <span className="font-normal text-gray">
-                (easiest option — just snap it, no description needed)
+                {t("(easiest option — just snap it, no description needed)")}
               </span>
             </label>
             <input
@@ -101,26 +101,26 @@ export default async function ClientNutritionPage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              What did you eat?
+              {t("What did you eat?")}
             </label>
-            <Textarea name="description" rows={2} placeholder="Optional" />
+            <Textarea name="description" rows={2} placeholder={t("Optional")} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Hunger before (1–10)
+                {t("Hunger before (1–10)")}
               </label>
               <Input name="hunger_before" type="number" min={1} max={10} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Fullness after (1–10)
+                {t("Fullness after (1–10)")}
               </label>
               <Input name="fullness_after" type="number" min={1} max={10} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Satisfaction (1–5)
+                {t("Satisfaction (1–5)")}
               </label>
               <Input name="satisfaction" type="number" min={1} max={5} />
             </div>
@@ -128,36 +128,36 @@ export default async function ClientNutritionPage() {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Calories
+                {t("Calories")}
               </label>
               <Input name="calories" type="number" min={0} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Protein (g)
+                {t("Protein (g)")}
               </label>
               <Input name="protein_g" type="number" min={0} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Carbs (g)
+                {t("Carbs (g)")}
               </label>
               <Input name="carbs_g" type="number" min={0} />
             </div>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Fat (g)
+              {t("Fat (g)")}
             </label>
             <Input name="fat_g" type="number" min={0} className="max-w-[8rem]" />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Notes
+              {t("Notes")}
             </label>
-            <Textarea name="notes" rows={2} placeholder="Optional" />
+            <Textarea name="notes" rows={2} placeholder={t("Optional")} />
           </div>
-          <Button type="submit">Save entry</Button>
+          <Button type="submit">{t("Save entry")}</Button>
         </form>
       </Card>
 
@@ -180,7 +180,7 @@ export default async function ClientNutritionPage() {
                     type="submit"
                     className="text-xs text-gray hover:text-pink"
                   >
-                    Delete
+                    {t("Delete")}
                   </button>
                 </form>
               </div>
@@ -188,7 +188,7 @@ export default async function ClientNutritionPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={photoUrlByPath.get(n.photo_path)}
-                  alt="Food photo"
+                  alt={t("Food photo")}
                   className="mt-2 max-h-64 w-full rounded-xl object-cover"
                 />
               ) : null}
@@ -197,13 +197,13 @@ export default async function ClientNutritionPage() {
               ) : null}
               <p className="mt-1 text-xs text-gray">
                 {[
-                  n.hunger_before ? `hunger ${n.hunger_before}/10` : null,
-                  n.fullness_after ? `fullness ${n.fullness_after}/10` : null,
-                  n.satisfaction ? `satisfaction ${n.satisfaction}/5` : null,
-                  n.calories ? `${n.calories} cal` : null,
-                  n.protein_g ? `${n.protein_g}g protein` : null,
-                  n.carbs_g ? `${n.carbs_g}g carbs` : null,
-                  n.fat_g ? `${n.fat_g}g fat` : null,
+                  n.hunger_before ? t("hunger {n}/10", { n: n.hunger_before }) : null,
+                  n.fullness_after ? t("fullness {n}/10", { n: n.fullness_after }) : null,
+                  n.satisfaction ? t("satisfaction {n}/5", { n: n.satisfaction }) : null,
+                  n.calories ? t("{n} cal", { n: n.calories }) : null,
+                  n.protein_g ? t("{n}g protein", { n: n.protein_g }) : null,
+                  n.carbs_g ? t("{n}g carbs", { n: n.carbs_g }) : null,
+                  n.fat_g ? t("{n}g fat", { n: n.fat_g }) : null,
                 ]
                   .filter(Boolean)
                   .join(" · ")}

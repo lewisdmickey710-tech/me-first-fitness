@@ -21,6 +21,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { nowInBusinessTz, toDateString, weekDates } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type { ClientSymptom, ClientSymptomDayLog } from "@/lib/types";
 
 const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
@@ -47,13 +48,15 @@ export default async function ClientSymptomsPage({
     );
   }
 
+  const t = makeT(me.language);
+
   if (!me.symptom_tracker_enabled) {
     return (
       <div className="space-y-6">
         <BackLink href="/client/dashboard" />
         <EmptyState
-          title="Not turned on for your account"
-          body="This one's optional and off by default — ask your coach if you'd like it enabled."
+          title={t("Not turned on for your account")}
+          body={t("This one's optional and off by default — ask your coach if you'd like it enabled.")}
         />
       </div>
     );
@@ -100,16 +103,13 @@ export default async function ClientSymptomsPage({
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Symptom log
+          {t("Symptom log")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          A private place to keep track of anything you might want to bring
-          up with a doctor or physical therapist. Tap a day to cycle it
-          through a level —{" "}
-          <span className="font-medium text-teal">teal</span> →{" "}
-          <span className="font-medium text-gold">gold</span> →{" "}
-          <span className="font-medium text-pink">pink</span> → clear.
-          Sharing with your coach is entirely up to you, day by day.
+          {t("A private place to keep track of anything you might want to bring up with a doctor or physical therapist. Tap a day to cycle it through a level —")}{" "}
+          <span className="font-medium text-teal">{t("teal")}</span> →{" "}
+          <span className="font-medium text-gold">{t("gold")}</span> →{" "}
+          <span className="font-medium text-pink">{t("pink")}</span> {t("→ clear. Sharing with your coach is entirely up to you, day by day.")}
         </p>
       </div>
 
@@ -118,7 +118,7 @@ export default async function ClientSymptomsPage({
           href={`/client/symptoms?week=${weekOffset - 1}`}
           className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
         >
-          ← Prev week
+          {t("← Prev week")}
         </Link>
         <p className="text-xs text-gray">
           {last7Days[0]} – {last7Days[6]}
@@ -128,17 +128,17 @@ export default async function ClientSymptomsPage({
             href={`/client/symptoms?week=${weekOffset + 1}`}
             className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
           >
-            Next week →
+            {t("Next week →")}
           </Link>
         ) : (
-          <span className="px-2 py-1 text-sm text-grayLt">Next week →</span>
+          <span className="px-2 py-1 text-sm text-grayLt">{t("Next week →")}</span>
         )}
       </div>
 
       {(symptoms ?? []).length === 0 ? (
         <EmptyState
-          title="Nothing tracked yet"
-          body="Add something you want to keep an eye on — a joint, a symptom, anything."
+          title={t("Nothing tracked yet")}
+          body={t("Add something you want to keep an eye on — a joint, a symptom, anything.")}
         />
       ) : (
         <Card className="space-y-3">
@@ -168,7 +168,7 @@ export default async function ClientSymptomsPage({
                     <button
                       type="submit"
                       className="shrink-0 text-xs text-gray hover:text-pink"
-                      aria-label={`Delete ${symptom.name}`}
+                      aria-label={t("Delete {name}", { name: symptom.name })}
                     >
                       ✕
                     </button>
@@ -191,7 +191,9 @@ export default async function ClientSymptomsPage({
                           log ? LEVEL_CLASS[log.level] : "border-grayLt bg-white hover:border-rose/40"
                         }`}
                         aria-label={
-                          log ? `Level ${log.level} — tap to change` : "Tap to log"
+                          log
+                            ? t("Level {n} — tap to change", { n: log.level })
+                            : t("Tap to log")
                         }
                       />
                     </form>
@@ -211,9 +213,9 @@ export default async function ClientSymptomsPage({
           }}
           className="flex gap-2"
         >
-          <Input name="name" placeholder="New symptom (e.g. right knee ache)" />
+          <Input name="name" placeholder={t("New symptom (e.g. right knee ache)")} />
           <Button type="submit" variant="secondary">
-            Add
+            {t("Add")}
           </Button>
         </form>
       </Card>
@@ -221,7 +223,7 @@ export default async function ClientSymptomsPage({
       {loggedDays.length > 0 ? (
         <div>
           <h2 className="mb-2 text-sm font-medium text-ink">
-            Notes &amp; sharing this week
+            {t("Notes & sharing this week")}
           </h2>
           <div className="space-y-2">
             {loggedDays.map((log) => {
@@ -237,7 +239,7 @@ export default async function ClientSymptomsPage({
                         />
                         {log.log_date} — {symptom.name}
                         {log.shared_with_coach ? (
-                          <Badge tone="teal">shared with coach</Badge>
+                          <Badge tone="teal">{t("shared with coach")}</Badge>
                         ) : null}
                       </span>
                     }
@@ -248,22 +250,22 @@ export default async function ClientSymptomsPage({
                       <input type="hidden" name="log_date" value={log.log_date} />
                       <div>
                         <label className="mb-1 block text-sm font-medium text-ink">
-                          Notes
+                          {t("Notes")}
                         </label>
                         <Textarea
                           name="note"
                           rows={2}
                           defaultValue={log.note ?? ""}
-                          placeholder="Optional — when it happens, what helps, etc."
+                          placeholder={t("Optional — when it happens, what helps, etc.")}
                         />
                       </div>
                       <Checkbox
                         name="shared_with_coach"
-                        label="Share this entry with my coach"
+                        label={t("Share this entry with my coach")}
                         defaultChecked={log.shared_with_coach}
                       />
                       <Button type="submit" variant="secondary">
-                        Save
+                        {t("Save")}
                       </Button>
                     </form>
                   </Collapsible>

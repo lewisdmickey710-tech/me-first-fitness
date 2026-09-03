@@ -6,6 +6,7 @@ import { getMyClient } from "@/lib/current-client";
 import { addHabit, cycleHabitLog, deleteHabit } from "@/app/client/actions";
 import { Button, Card, EmptyState, Heart, Input } from "@/components/ui";
 import { nowInBusinessTz, toDateString, weekDates } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type { ClientHabit, ClientHabitLog } from "@/lib/types";
 
 const WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
@@ -32,6 +33,7 @@ export default async function ClientHabitsPage({
     );
   }
 
+  const t = makeT(me.language);
   const { week: weekParam } = await searchParams;
   const weekOffset = Math.min(0, Math.trunc(Number(weekParam ?? 0)) || 0);
 
@@ -68,15 +70,13 @@ export default async function ClientHabitsPage({
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Habits
+          {t("Habits")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Tap a day to cycle it through a level —{" "}
-          <span className="font-medium text-teal">teal</span> →{" "}
-          <span className="font-medium text-gold">gold</span> →{" "}
-          <span className="font-medium text-pink">pink</span> → clear. Use it
-          however makes sense to you — done/not done, or how mild to severe
-          something was.
+          {t("Tap a day to cycle it through a level —")}{" "}
+          <span className="font-medium text-teal">{t("teal")}</span> →{" "}
+          <span className="font-medium text-gold">{t("gold")}</span> →{" "}
+          <span className="font-medium text-pink">{t("pink")}</span> {t("→ clear. Use it however makes sense to you — done/not done, or how mild to severe something was.")}
         </p>
       </div>
 
@@ -85,7 +85,7 @@ export default async function ClientHabitsPage({
           href={`/client/habits?week=${weekOffset - 1}`}
           className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
         >
-          ← Prev week
+          {t("← Prev week")}
         </Link>
         <p className="text-xs text-gray">
           {last7Days[0]} – {last7Days[6]}
@@ -95,17 +95,17 @@ export default async function ClientHabitsPage({
             href={`/client/habits?week=${weekOffset + 1}`}
             className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
           >
-            Next week →
+            {t("Next week →")}
           </Link>
         ) : (
-          <span className="px-2 py-1 text-sm text-grayLt">Next week →</span>
+          <span className="px-2 py-1 text-sm text-grayLt">{t("Next week →")}</span>
         )}
       </div>
 
       {(habits ?? []).length === 0 ? (
         <EmptyState
-          title="No habits yet"
-          body="Add something you want to build consistency on — a stretch, a med, a walk, anything."
+          title={t("No habits yet")}
+          body={t("Add something you want to build consistency on — a stretch, a med, a walk, anything.")}
         />
       ) : (
         <Card className="space-y-3">
@@ -135,7 +135,7 @@ export default async function ClientHabitsPage({
                     <button
                       type="submit"
                       className="shrink-0 text-xs text-gray hover:text-pink"
-                      aria-label={`Delete ${habit.name}`}
+                      aria-label={t("Delete {name}", { name: habit.name })}
                     >
                       ✕
                     </button>
@@ -160,7 +160,9 @@ export default async function ClientHabitsPage({
                             : "border-grayLt bg-white hover:border-rose/40"
                         }`}
                         aria-label={
-                          level ? `Level ${level} — tap to change` : "Tap to log"
+                          level
+                            ? t("Level {n} — tap to change", { n: level })
+                            : t("Tap to log")
                         }
                       />
                     </form>
@@ -180,9 +182,9 @@ export default async function ClientHabitsPage({
           }}
           className="flex gap-2"
         >
-          <Input name="name" placeholder="New habit (e.g. stretch before bed)" />
+          <Input name="name" placeholder={t("New habit (e.g. stretch before bed)")} />
           <Button type="submit" variant="secondary">
-            Add
+            {t("Add")}
           </Button>
         </form>
       </Card>
