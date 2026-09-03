@@ -323,4 +323,119 @@ const ES: Record<string, string> = {
   "{n}g protein": "{n}g proteína",
   "{n}g carbs": "{n}g carbohidratos",
   "{n}g fat": "{n}g grasa",
+
+  // Check-in
+  "Log a check-in": "Registrar un check-in",
+  Sleep: "Sueño",
+  "e.g. 7 hrs": "ej. 7 hrs",
+  Water: "Agua",
+  "e.g. 64 oz": "ej. 64 oz",
+  Food: "Alimentación",
+  "On track / off track": "En orden / fuera de orden",
+  Energy: "Energía",
+  "e.g. Good": "ej. Buena",
+  Mood: "Ánimo",
+  "e.g. Steady": "ej. Estable",
+  "Anything else?": "¿Algo más?",
+  "Totally optional": "Totalmente opcional",
+  "Save check-in": "Guardar check-in",
+
+  // Milestones
+  "Things to look forward to, and things we've already celebrated together.":
+    "Cosas por las que esperar, y cosas que ya hemos celebrado juntas.",
+  "To look forward to": "Por venir",
+  "Nothing set yet": "Aún no hay nada establecido",
+  "Your coach will add milestones here for you to work toward.":
+    "Tu entrenadora añadirá logros aquí para que trabajes hacia ellos.",
+  "Target: {date}": "Meta: {date}",
+  "Celebrated 🎉": "Celebrado 🎉",
+
+  // FAQ
+  "Using the app, what to expect from coaching with Mickey, and a few general fitness basics. Tap a question to expand it — for the full wellness education (movement, nutrition, mindset, recovery), see your":
+    "Cómo usar la aplicación, qué esperar del entrenamiento con Mickey, y algunos conceptos básicos de fitness. Toca una pregunta para expandirla — para la educación completa de bienestar (movimiento, nutrición, mentalidad, recuperación), consulta tu",
+  "Wellness Guide": "Guía de Bienestar",
+  "Using the App": "Usando la Aplicación",
+  "How do I log a workout?": "¿Cómo registro un entrenamiento?",
+  "Program → open the day you did, enter what you used and how it felt as you go, then log the whole day at the bottom. It saves to your history and marks that day complete.":
+    "Programa → abre el día que hiciste, anota lo que usaste y cómo te sentiste a medida que avanzas, y registra todo el día al final. Se guarda en tu historial y marca ese día como completo.",
+  "How do I request a different session time, or reschedule?": "¿Cómo solicito un horario de sesión diferente, o reprogramo?",
+  'Schedule → "Request time," or tap an upcoming session and choose "Request reschedule." Mickey will confirm or suggest another time — it\'s a request, not an automatic booking.':
+    'Horario → "Solicitar horario," o toca una próxima sesión y elige "Solicitar reprogramación." Mickey confirmará o sugerirá otro horario — es una solicitud, no una reserva automática.',
+  "How do I cancel a session?": "¿Cómo cancelo una sesión?",
+  "Schedule → tap the day → Cancel. Please give at least 12 hours notice if you can — see the cancellation policy below for what happens if you can't.":
+    "Horario → toca el día → Cancelar. Por favor avisa con al menos 12 horas de anticipación si puedes — consulta la política de cancelación abajo para saber qué pasa si no puedes.",
+  "What counts as a late cancellation?": "¿Qué cuenta como una cancelación tardía?",
+  "Cancelling with less than 12 hours notice, tracked on a rolling 16-week cycle. What happens next depends on your payment plan. Monthly: your first 2 in that window are just noted, no penalty — the 3rd adds a $10 fee. Pay-as-you-go: your first is noted, no penalty — the 2nd adds a $20 fee. Either way, your upcoming sessions pause until the fee is paid, and free cancellations don't roll over once a 16-week cycle passes with no late cancellation.":
+    "Cancelar con menos de 12 horas de aviso, registrado en un ciclo continuo de 16 semanas. Lo que pasa después depende de tu plan de pago. Mensual: tus primeras 2 en esa ventana solo se anotan, sin penalización — la 3ª añade un cargo de $10. Pago por sesión: la primera se anota, sin penalización — la 2ª añade un cargo de $20. De cualquier forma, tus próximas sesiones se pausan hasta que se pague el cargo, y las cancelaciones gratuitas no se acumulan una vez que pasa un ciclo de 16 semanas sin ninguna cancelación tardía.",
+  "Can I switch between monthly and pay-as-you-go?": "¿Puedo cambiar entre mensual y pago por sesión?",
+  "Yes, any time — Profile → Payment plan. You'll read and agree to the terms of whichever plan you're switching to before it takes effect. A fee that's already been charged stays owed no matter which plan you switch to afterward. Switching from monthly to pay-as-you-go forfeits any free cancellation beyond pay-as-you-go's smaller allotment (an unused first one still carries over) and moves you to the $20 rate. Switching from pay-as-you-go to monthly never restores a free cancellation you've already used — only your future fee rate drops, to $10.":
+    "Sí, en cualquier momento — Perfil → Plan de pago. Leerás y aceptarás los términos del plan al que te cambies antes de que entre en vigor. Un cargo que ya se haya generado permanece pendiente sin importar a qué plan te cambies después. Cambiar de mensual a pago por sesión hace que pierdas cualquier cancelación gratuita más allá del cupo menor de pago por sesión (una primera sin usar sí se traslada) y te mueve a la tarifa de $20. Cambiar de pago por sesión a mensual nunca restaura una cancelación gratuita que ya hayas usado — solo baja tu tarifa futura de cargo, a $10.",
+  "What if Mickey has to cancel on me instead?": "¿Qué pasa si Mickey tiene que cancelarme a mí?",
+  "You'll never be charged or lose anything for it — it's marked as her cancellation, you get a free reschedule, and no fee ever applies. You'll get an email as soon as it happens, and she'll usually follow up by text too.":
+    "Nunca se te cobrará ni perderás nada por eso — se marca como su cancelación, obtienes una reprogramación gratuita, y nunca aplica ningún cargo. Recibirás un correo tan pronto como suceda, y ella normalmente también te escribirá por mensaje de texto.",
+  "How do I track progress photos or measurements?": "¿Cómo hago seguimiento de fotos de progreso o medidas?",
+  "Progress → add a photo any time (front/side/back, whatever you want) right from your phone. Measurements are logged by Mickey during your check-ins and show up on the same page with trend lines.":
+    "Progreso → añade una foto en cualquier momento (de frente/lado/espalda, lo que quieras) directamente desde tu teléfono. Las medidas las registra Mickey durante tus controles y aparecen en la misma página con líneas de tendencia.",
+  "What's the Community board?": "¿Qué es el tablero de Comunidad?",
+  "An optional space to post wins, questions, or photos that every other client can see and support — not just Mickey. It asks you to read and sign a short agreement the first time you open it, since it's the one place your own posts are visible to people besides your coach. Nothing you track privately (progress photos, measurements, etc.) ever shows up there unless you choose to post it yourself.":
+    "Un espacio opcional para publicar logros, preguntas o fotos que todos los demás clientes pueden ver y apoyar — no solo Mickey. Te pide que leas y firmes un breve acuerdo la primera vez que lo abres, ya que es el único lugar donde tus propias publicaciones son visibles para personas además de tu entrenadora. Nada de lo que registras en privado (fotos de progreso, medidas, etc.) aparece ahí a menos que decidas publicarlo tú misma/o.",
+  "Can I get a copy of everything tracked about me?": "¿Puedo obtener una copia de todo lo registrado sobre mí?",
+  'Yes — Profile → "Download my data" gives you a full export of your sessions, check-ins, measurements, documents, and everything else, any time you want it.':
+    'Sí — Perfil → "Descargar mis datos" te da una exportación completa de tus sesiones, controles, medidas, documentos, y todo lo demás, cuando quieras.',
+  "I train virtually — will session times show up in my own timezone?": "Entreno virtualmente — ¿los horarios de sesión aparecerán en mi propia zona horaria?",
+  "Once your timezone is set on your Profile page, yes — your schedule, next-session card, and reminder emails all convert automatically. If a time still looks off, double check that field is set correctly.":
+    "Una vez que tu zona horaria esté configurada en tu página de Perfil, sí — tu horario, la tarjeta de próxima sesión, y los correos de recordatorio se convierten automáticamente. Si un horario todavía se ve incorrecto, verifica que ese campo esté configurado correctamente.",
+  "What's a check-in call?": "¿Qué es una llamada de seguimiento?",
+  "A one-time, {minutes}-minute call for anything that needs more time than a quick message — getting a home setup or equipment situated, going deep on something specific, whatever comes up. Available whether you train in-person or virtually. Book one anytime from your dashboard.":
+    "Una llamada única de {minutes} minutos para cualquier cosa que necesite más tiempo que un mensaje rápido — organizar tu configuración en casa o equipo, profundizar en algo específico, lo que surja. Disponible ya sea que entrenes en persona o virtualmente. Resérvala cuando quieras desde tu panel.",
+  "Can I pause training without losing my spot?": "¿Puedo pausar el entrenamiento sin perder mi lugar?",
+  "Yes — a membership hold. There's no session schedule while you're on hold, but a flat $10/week retainer keeps your app access active and reserves your spot rather than opening it up to someone else. Ask Mickey to start or end a hold for you.":
+    "Sí — una pausa de membresía. No hay horario de sesiones mientras estás en pausa, pero un pago fijo semanal de $10 mantiene tu acceso a la aplicación activo y reserva tu lugar en vez de abrirlo a alguien más. Pídele a Mickey que active o termine una pausa para ti.",
+  "Working With Mickey": "Trabajando con Mickey",
+  "What's your training philosophy?": "¿Cuál es tu filosofía de entrenamiento?",
+  "NASM-based strength and movement coaching built around four progressive phases — Stability, Strength, Size, and Speed — paired with Intuitive Eating nutrition guidance. Training with purpose and intention, not punishment or obsession.":
+    "Entrenamiento de fuerza y movimiento basado en NASM, construido alrededor de cuatro fases progresivas — Estabilidad, Fuerza, Volumen y Velocidad — junto con orientación nutricional de Alimentación Intuitiva. Entrenar con propósito e intención, no como castigo u obsesión.",
+  "What do the four phases mean?": "¿Qué significan las cuatro fases?",
+  "Stability builds control and movement quality first. Strength adds load once that foundation is solid. Size focuses on muscle-building volume. Speed layers in power and athleticism. Everyone starts wherever makes sense for their body, not necessarily at phase one.":
+    "Estabilidad primero construye control y calidad de movimiento. Fuerza añade carga una vez que esa base es sólida. Volumen se enfoca en el volumen de construcción muscular. Velocidad agrega potencia y capacidad atlética. Cada persona empieza donde tenga sentido para su cuerpo, no necesariamente en la fase uno.",
+  "Why don't we count calories or talk about earning/burning food?": "¿Por qué no contamos calorías ni hablamos de ganar/quemar comida?",
+  "Nutrition coaching here is based on Intuitive Eating — building body awareness and trusting your hunger and fullness cues instead of rules, guilt, or restriction. It's general wellness education, not medical nutrition therapy, and isn't a replacement for a licensed dietitian or physician if you need one.":
+    "El coaching de nutrición aquí se basa en Alimentación Intuitiva — construir conciencia corporal y confiar en tus señales de hambre y saciedad en vez de reglas, culpa o restricción. Es educación general de bienestar, no terapia nutricional médica, y no reemplaza a un dietista o médico con licencia si lo necesitas.",
+  "What certifications does Mickey hold?": "¿Qué certificaciones tiene Mickey?",
+  "NASM-based training plus certified specializations in Pain-Free Movement, Glute Development, Behavior Change, Senior Fitness, Bodybuilding, Strength & Conditioning, and Nutrition.":
+    "Entrenamiento basado en NASM más especializaciones certificadas en Movimiento Sin Dolor, Desarrollo de Glúteos, Cambio de Comportamiento, Fitness para Adultos Mayores, Fisicoculturismo, Fuerza y Acondicionamiento, y Nutrición.",
+  "What's the difference between in-person and virtual?": "¿Cuál es la diferencia entre en persona y virtual?",
+  "In-person means standing sessions with Mickey in person — hands-on support like assisted stretching, foam rolling, and Theragun work, billed per session. Virtual means your program is built and updated in the app on Mickey's own cadence, with no standing calls by default, for a flat $90/month. A standalone written program (no ongoing coaching at all) is also available.":
+    "En persona significa sesiones fijas con Mickey en persona — apoyo práctico como estiramiento asistido, rodillo de espuma, y trabajo con Theragun, facturado por sesión. Virtual significa que tu programa se arma y actualiza en la aplicación a su propio ritmo, sin llamadas fijas por defecto, por una tarifa fija de $90/mes. También hay disponible un programa escrito independiente (sin coaching continuo).",
+  "Can I add video sessions to either mode?": "¿Puedo añadir sesiones por video a cualquiera de los dos modos?",
+  'Yes, if Mickey\'s turned the video session add-on on for your profile — check your dashboard for a "Book a video session" option. It works the same whether you\'re in-person or virtual: propose a time, pay the ${rate} balance via Cash App or Zelle, and Mickey confirms the timeslot once it clears. Sessions run {minutes} minutes. Once confirmed, a "Join video call" link shows up on your dashboard and schedule for that session.':
+    'Sí, si Mickey activó la opción de sesión por video para tu perfil — revisa tu panel para ver la opción "Reservar una sesión por video." Funciona igual ya sea en persona o virtual: propón un horario, paga el saldo de ${rate} vía Cash App o Zelle, y Mickey confirma el horario una vez que se procese. Las sesiones duran {minutes} minutos. Una vez confirmado, aparecerá un enlace de "Unirse a la videollamada" en tu panel y horario para esa sesión.',
+  "I'm on the virtual plan with no session booked — what happens?": "Estoy en el plan virtual sin ninguna sesión reservada — ¿qué pasa?",
+  "Your dashboard shows when your program was last updated instead of a next-session time. Mickey updates it directly on her own cadence — nothing for you to schedule. Want dedicated time to talk something through? Book a check-in call, or a video session if you have the add-on.":
+    "Tu panel muestra cuándo se actualizó tu programa por última vez en vez de un horario de próxima sesión. Mickey lo actualiza directamente a su propio ritmo — no hay nada que tengas que programar. ¿Quieres tiempo dedicado para hablar de algo? Reserva una llamada de seguimiento, o una sesión por video si tienes esa opción.",
+  "What equipment do I need for a virtual session?": "¿Qué equipo necesito para una sesión virtual?",
+  "Depends entirely on what that session is for. Prop your phone up somewhere Mickey can see you clearly — at home or at your own gym — with whatever the session calls for. A check-in or form-coaching conversation needs nothing special, but if you're working a movement like a heavy deadlift, you'll need to be somewhere with weight heavy enough to actually show it. Ask ahead of time if you're not sure what a given session needs.":
+    "Depende totalmente de para qué sea esa sesión. Coloca tu teléfono en algún lugar donde Mickey pueda verte con claridad — en casa o en tu propio gimnasio — con lo que la sesión requiera. Una conversación de seguimiento o corrección de forma no necesita nada especial, pero si estás trabajando un movimiento como un peso muerto pesado, necesitarás estar en un lugar con peso suficiente para realmente mostrarlo. Pregunta con anticipación si no estás segura/o de qué necesita una sesión en particular.",
+  "Do you work with injuries, chronic conditions, or older adults?": "¿Trabajas con lesiones, condiciones crónicas, o adultos mayores?",
+  "Yes — programs are built around your actual health history and current limitations, not a generic template. Always tell Mickey about any condition, injury, or medication change as soon as it comes up, not just at intake.":
+    "Sí — los programas se construyen alrededor de tu historial de salud real y limitaciones actuales, no una plantilla genérica. Siempre cuéntale a Mickey sobre cualquier condición, lesión, o cambio de medicamento tan pronto como surja, no solo en la admisión inicial.",
+  "What's expected of me as a client?": "¿Qué se espera de mí como cliente?",
+  "Honesty, mainly. Say when something hurts, when life gets in the way, when motivation dips. Mickey can only adjust to what you actually tell her — she can't feel what's happening in your body, so communicating your limits in the moment is your job, not something to push through quietly.":
+    "Honestidad, principalmente. Di cuando algo duele, cuando la vida se interpone, cuando baja la motivación. Mickey solo puede ajustar según lo que realmente le digas — ella no puede sentir lo que pasa en tu cuerpo, así que comunicar tus límites en el momento es tu responsabilidad, no algo para aguantar en silencio.",
+  "General Fitness Basics": "Conceptos Básicos de Fitness",
+  "How often should I be training?": "¿Con qué frecuencia debería entrenar?",
+  "Depends entirely on your program, goals, and recovery — that's exactly what your care track and phase are built around. Ask Mickey directly if you're ever unsure whether to add or pull back a session.":
+    "Depende totalmente de tu programa, metas, y recuperación — eso es exactamente para lo que están construidos tu plan de cuidado y fase. Pregúntale directamente a Mickey si alguna vez no estás segura/o si añadir o reducir una sesión.",
+  "Is it normal to be sore after a session?": "¿Es normal tener dolor muscular después de una sesión?",
+  "Some soreness in the day or two after, especially with something new, is normal. Sharp pain, pain during the movement itself, or soreness that isn't easing up after a few days isn't — tell Mickey either way so she can adjust.":
+    "Algo de dolor muscular en el día o dos siguientes, especialmente con algo nuevo, es normal. El dolor agudo, dolor durante el movimiento mismo, o dolor que no mejora después de unos días no lo es — dile a Mickey de cualquier forma para que pueda ajustar.",
+  "What if an exercise feels like too much?": "¿Qué pasa si un ejercicio se siente como demasiado?",
+  "Say so, right then. Every program is guidance, not a demand — you're always free to modify, scale back, or skip a movement based on how your body actually feels that day.":
+    "Dilo, en ese momento. Todo programa es una guía, no una exigencia — siempre eres libre de modificar, reducir, o saltarte un movimiento según cómo se sienta realmente tu cuerpo ese día.",
+  "I'm nervous about starting — is that normal?": "Estoy nerviosa/o por empezar — ¿es normal?",
+  "Completely. Most people feel that way walking in. Sessions are built to meet you exactly where you are, not to prove anything.":
+    "Totalmente. La mayoría de las personas se sienten así al entrar. Las sesiones están diseñadas para encontrarte exactamente donde estás, no para demostrar nada.",
+  "Do I need to warm up or stretch on my own?": "¿Necesito calentar o estirar por mi cuenta?",
+  "Your program accounts for warm-up as part of each session — you don't need a separate routine unless Mickey specifically gives you one.":
+    "Tu programa incluye el calentamiento como parte de cada sesión — no necesitas una rutina separada a menos que Mickey te dé una específicamente.",
 };
