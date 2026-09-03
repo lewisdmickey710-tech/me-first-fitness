@@ -7,6 +7,7 @@ import {
   LOG_ENTRY_KIND_TONE,
   mergeLogEntries,
 } from "@/lib/log-entries";
+import { makeT } from "@/lib/i18n";
 import type { Activity, TrainingSession } from "@/lib/types";
 
 export default async function ClientHistoryPage() {
@@ -21,6 +22,7 @@ export default async function ClientHistoryPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
 
   const [{ data: sessions }, { data: activities }] = await Promise.all([
@@ -69,24 +71,24 @@ export default async function ClientHistoryPage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Past workouts
+        {t("Past workouts")}
       </h1>
       <p className="text-sm text-gray">
-        Everything you&apos;ve logged, most recent first.
+        {t("Everything you've logged, most recent first.")}
       </p>
 
       <div className="flex flex-wrap gap-3 text-xs text-gray">
         {(["coached", "solo", "activity"] as const).map((kind) => (
           <span key={kind} className="flex items-center gap-1">
-            <Badge tone={LOG_ENTRY_KIND_TONE[kind]}>{LOG_ENTRY_KIND_LABEL[kind]}</Badge>
+            <Badge tone={LOG_ENTRY_KIND_TONE[kind]}>{t(LOG_ENTRY_KIND_LABEL[kind])}</Badge>
           </span>
         ))}
       </div>
 
       {entries.length === 0 ? (
         <EmptyState
-          title="Nothing logged yet"
-          body="Once you log a workout from My program, or an activity from Activity log, it'll show up here."
+          title={t("Nothing logged yet")}
+          body={t("Once you log a workout from My program, or an activity from Activity log, it'll show up here.")}
         />
       ) : (
         <div className="space-y-3">
@@ -97,12 +99,12 @@ export default async function ClientHistoryPage() {
               <Card key={`${entry.kind === "activity" ? "a" : "s"}-${entry.id}`} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-medium text-ink">{s ? s.day_label : a!.type}</p>
+                    <p className="font-medium text-ink">{s ? s.day_label : t(a!.type)}</p>
                     <Badge tone={LOG_ENTRY_KIND_TONE[entry.kind]}>
-                      {LOG_ENTRY_KIND_LABEL[entry.kind]}
+                      {t(LOG_ENTRY_KIND_LABEL[entry.kind])}
                     </Badge>
                     {entry.loggedBy === "coach" ? (
-                      <Badge tone="gray">logged by your coach</Badge>
+                      <Badge tone="gray">{t("logged by your coach")}</Badge>
                     ) : null}
                   </div>
                   <p className="text-sm text-gray">{entry.date}</p>
@@ -122,7 +124,9 @@ export default async function ClientHistoryPage() {
                         {e.substitute_exercise_id ? (
                           <span className="text-xs text-rose">
                             {" "}
-                            (swapped from {e.prescribed_exercise || "prescribed movement"})
+                            {t("(swapped from {name})", {
+                              name: e.prescribed_exercise || t("prescribed movement"),
+                            })}
                           </span>
                         ) : null}
                         {e.notes ? (
@@ -142,7 +146,7 @@ export default async function ClientHistoryPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photoUrlByPath.get(a.photo_path)}
-                    alt="Activity photo"
+                    alt={t("Activity photo")}
                     className="max-h-64 w-full rounded-xl object-cover"
                   />
                 ) : null}

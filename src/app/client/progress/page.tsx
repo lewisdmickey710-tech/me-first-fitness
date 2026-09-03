@@ -13,6 +13,7 @@ import {
   Sparkline,
   Textarea,
 } from "@/components/ui";
+import { makeT } from "@/lib/i18n";
 import type { ClientProgressPhoto, Measurement, TrainingSession } from "@/lib/types";
 
 function parseWeight(raw: string): number | null {
@@ -39,6 +40,7 @@ export default async function ClientProgressPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -147,40 +149,40 @@ export default async function ClientProgressPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          My progress
+          {t("My progress")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Your measurement trends and strength progress, all in one place.
+          {t("Your measurement trends and strength progress, all in one place.")}
         </p>
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-gray">Progress photos</p>
+        <p className="text-sm font-medium text-gray">{t("Progress photos")}</p>
         <Card>
           <form action={addProgressPhoto} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink">
-                  Date
+                  {t("Date")}
                 </label>
                 <Input name="date" type="date" required defaultValue={today} />
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink">
-                  Angle
+                  {t("Angle")}
                 </label>
                 <Select name="angle" defaultValue="">
-                  <option value="">Not specified</option>
-                  <option value="front">Front</option>
-                  <option value="side">Side</option>
-                  <option value="back">Back</option>
-                  <option value="other">Other</option>
+                  <option value="">{t("Not specified")}</option>
+                  <option value="front">{t("Front")}</option>
+                  <option value="side">{t("Side")}</option>
+                  <option value="back">{t("Back (angle)")}</option>
+                  <option value="other">{t("Other")}</option>
                 </Select>
               </div>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Photo
+                {t("Photo")}
               </label>
               <input
                 type="file"
@@ -193,12 +195,12 @@ export default async function ClientProgressPage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Notes{" "}
-                <span className="font-normal text-gray">(optional)</span>
+                {t("Notes")}{" "}
+                <span className="font-normal text-gray">{t("(optional)")}</span>
               </label>
               <Textarea name="notes" rows={2} />
             </div>
-            <Button type="submit">Add photo</Button>
+            <Button type="submit">{t("Add photo")}</Button>
           </form>
         </Card>
 
@@ -210,13 +212,13 @@ export default async function ClientProgressPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photoUrlByPath.get(p.photo_path)}
-                    alt={`Progress photo ${p.date}`}
+                    alt={t("Progress photo {date}", { date: p.date })}
                     className="aspect-square w-full rounded-xl object-cover"
                   />
                 ) : null}
                 <p className="text-xs text-gray">
                   {p.date}
-                  {p.angle ? ` · ${p.angle}` : ""}
+                  {p.angle ? ` · ${t(p.angle)}` : ""}
                 </p>
                 <form
                   action={async () => {
@@ -228,7 +230,7 @@ export default async function ClientProgressPage() {
                     type="submit"
                     className="text-xs text-gray hover:text-pink"
                   >
-                    Delete
+                    {t("Delete")}
                   </button>
                 </form>
               </div>
@@ -238,29 +240,29 @@ export default async function ClientProgressPage() {
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-gray">Measurements</p>
+        <p className="text-sm font-medium text-gray">{t("Measurements")}</p>
         {allMeasurements.length === 0 ? (
           <EmptyState
-            title="No measurements yet"
-            body="Your coach logs these during your monthly assessment — they'll show up here once the first one's in."
+            title={t("No measurements yet")}
+            body={t("Your coach logs these during your monthly assessment — they'll show up here once the first one's in.")}
           />
         ) : (
           <>
             {weights.length >= 2 ? (
               <Card>
-                <p className="text-sm font-medium text-gray">Weight trend</p>
+                <p className="text-sm font-medium text-gray">{t("Weight trend")}</p>
                 <Sparkline values={weights} />
               </Card>
             ) : null}
 
             <Card>
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-gray">Latest</p>
+                <p className="text-sm font-medium text-gray">{t("Latest")}</p>
                 <p className="text-sm text-gray">{allMeasurements[0].date}</p>
               </div>
               <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
                 <DeltaField
-                  label="Weight"
+                  label={t("Weight")}
                   value={allMeasurements[0].weight}
                   previous={allMeasurements[1]?.weight ?? null}
                   unit="lb"
@@ -268,7 +270,7 @@ export default async function ClientProgressPage() {
                 {CIRCUMFERENCE_FIELDS.map((f) => (
                   <DeltaField
                     key={f.key}
-                    label={f.label}
+                    label={t(f.label)}
                     value={allMeasurements[0][f.key] as number | null}
                     previous={(allMeasurements[1]?.[f.key] as number | null) ?? null}
                     unit="in"
@@ -281,30 +283,30 @@ export default async function ClientProgressPage() {
       </div>
 
       <div className="space-y-3">
-        <p className="text-sm font-medium text-gray">Strength progress</p>
+        <p className="text-sm font-medium text-gray">{t("Strength progress")}</p>
         {exerciseTrends.length === 0 ? (
           <EmptyState
-            title="Nothing to show yet"
-            body="Once weights are logged with your sessions, each movement's progress will show up here."
+            title={t("Nothing to show yet")}
+            body={t("Once weights are logged with your sessions, each movement's progress will show up here.")}
           />
         ) : (
           <div className="space-y-2">
-            {exerciseTrends.map((t) => (
-              <Card key={t.name}>
+            {exerciseTrends.map((trend) => (
+              <Card key={trend.name}>
                 <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">{t.name}</p>
+                  <p className="font-medium text-ink">{trend.name}</p>
                   <p className="text-sm text-gray">
-                    PR: {t.pr} ({t.prDate})
+                    {t("PR: {weight} ({date})", { weight: trend.pr, date: trend.prDate })}
                   </p>
                 </div>
-                {t.points.length >= 2 ? (
+                {trend.points.length >= 2 ? (
                   <Sparkline
-                    values={t.points.map((p) => p.weight)}
+                    values={trend.points.map((p) => p.weight)}
                     color="#5EC4B6"
                   />
                 ) : (
                   <p className="mt-1 text-sm text-gray">
-                    Latest: {t.points.at(-1)?.weight}
+                    {t("Latest: {weight}", { weight: trend.points.at(-1)?.weight ?? "" })}
                   </p>
                 )}
               </Card>

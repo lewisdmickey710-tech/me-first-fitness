@@ -22,6 +22,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { toDateString } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type {
   ClientDocumentAcknowledgment,
   CommunityPost,
@@ -56,6 +57,7 @@ export default async function ClientCommunityPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
 
   const { data: agreement } = (await supabase
@@ -80,11 +82,10 @@ export default async function ClientCommunityPage() {
         <BackLink href="/client/dashboard" />
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Community
+          {t("Community")}
         </h1>
         <p className="text-sm text-gray">
-          Before you can post or read the community board, take a minute
-          to read and sign this — it explains what other clients can see.
+          {t("Before you can post or read the community board, take a minute to read and sign this — it explains what other clients can see.")}
         </p>
         <Card className="space-y-3">
           <p className="font-medium text-ink">{agreement.title}</p>
@@ -104,7 +105,7 @@ export default async function ClientCommunityPage() {
             {agreement.requires_signature ? (
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink">
-                  Type your full legal name to sign
+                  {t("Type your full legal name to sign")}
                 </label>
                 <Input name="signed_name" required />
               </div>
@@ -112,9 +113,9 @@ export default async function ClientCommunityPage() {
             <Checkbox
               name="agree"
               required
-              label="I have read and agree to the terms above"
+              label={t("I have read and agree to the terms above")}
             />
-            <Button type="submit">Sign & agree</Button>
+            <Button type="submit">{t("Sign & agree")}</Button>
           </form>
         </Card>
       </div>
@@ -179,12 +180,10 @@ export default async function ClientCommunityPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Community
+          {t("Community")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          A shared space for everyone Mickey coaches — post a win, a
-          question, a progress photo, or whatever&apos;s on your mind.
-          Totally optional, and separate from anything you track privately.
+          {t("A shared space for everyone Mickey coaches — post a win, a question, a progress photo, or whatever's on your mind. Totally optional, and separate from anything you track privately.")}
         </p>
       </div>
 
@@ -192,25 +191,25 @@ export default async function ClientCommunityPage() {
         <form action={addCommunityPost} className="space-y-3">
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              What kind of post is this?
+              {t("What kind of post is this?")}
             </label>
             <Select name="kind" defaultValue="general">
-              <option value="win">Win</option>
-              <option value="question">Question</option>
-              <option value="progress">Progress photo</option>
-              <option value="general">General</option>
+              <option value="win">{t(KIND_LABEL.win)}</option>
+              <option value="question">{t(KIND_LABEL.question)}</option>
+              <option value="progress">{t(KIND_LABEL.progress)}</option>
+              <option value="general">{t(KIND_LABEL.general)}</option>
             </Select>
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Share something
+              {t("Share something")}
             </label>
-            <Textarea name="body" rows={3} placeholder="Optional if you're just posting a photo" />
+            <Textarea name="body" rows={3} placeholder={t("Optional if you're just posting a photo")} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Photo{" "}
-              <span className="font-normal text-gray">(optional)</span>
+              {t("Photo")}{" "}
+              <span className="font-normal text-gray">{t("(optional)")}</span>
             </label>
             <input
               type="file"
@@ -220,14 +219,14 @@ export default async function ClientCommunityPage() {
               className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
             />
           </div>
-          <Button type="submit">Post</Button>
+          <Button type="submit">{t("Post")}</Button>
         </form>
       </Card>
 
       {(posts ?? []).length === 0 ? (
         <EmptyState
-          title="Nothing posted yet"
-          body="Be the first — a win, a question, anything at all."
+          title={t("Nothing posted yet")}
+          body={t("Be the first — a win, a question, anything at all.")}
         />
       ) : (
         <div className="space-y-4">
@@ -241,13 +240,13 @@ export default async function ClientCommunityPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium text-ink">
-                      {clientNameById.get(p.client_id) ?? "A client"}
+                      {clientNameById.get(p.client_id) ?? t("A client")}
                     </p>
                     <p className="text-xs text-gray">
                       {p.created_at.slice(0, 10)}
                     </p>
                   </div>
-                  <Badge tone={KIND_TONE[p.kind]}>{KIND_LABEL[p.kind]}</Badge>
+                  <Badge tone={KIND_TONE[p.kind]}>{t(KIND_LABEL[p.kind])}</Badge>
                 </div>
 
                 {p.body ? <p className="text-sm text-ink">{p.body}</p> : null}
@@ -255,7 +254,7 @@ export default async function ClientCommunityPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={photoUrlByPath.get(p.photo_path)}
-                    alt="Post photo"
+                    alt={t("Post photo")}
                     className="max-h-96 w-full rounded-xl object-cover"
                   />
                 ) : null}
@@ -273,7 +272,7 @@ export default async function ClientCommunityPage() {
                         iReacted ? "text-rose" : "text-gray hover:text-rose"
                       }`}
                     >
-                      <Heart /> {postReactions.length > 0 ? postReactions.length : "Support"}
+                      <Heart /> {postReactions.length > 0 ? postReactions.length : t("Support")}
                     </button>
                   </form>
                   {isMine ? (
@@ -287,7 +286,7 @@ export default async function ClientCommunityPage() {
                         type="submit"
                         className="text-xs text-gray hover:text-pink"
                       >
-                        Delete
+                        {t("Delete")}
                       </button>
                     </form>
                   ) : null}
@@ -301,7 +300,7 @@ export default async function ClientCommunityPage() {
                           <span className="font-medium">
                             {c.author_role === "coach"
                               ? "Mickey"
-                              : clientNameById.get(c.client_id ?? "") ?? "A client"}
+                              : clientNameById.get(c.client_id ?? "") ?? t("A client")}
                           </span>{" "}
                           {c.body}
                         </p>
@@ -316,7 +315,7 @@ export default async function ClientCommunityPage() {
                               type="submit"
                               className="shrink-0 text-xs text-gray hover:text-pink"
                             >
-                              Delete
+                              {t("Delete")}
                             </button>
                           </form>
                         ) : null}
@@ -333,9 +332,9 @@ export default async function ClientCommunityPage() {
                   className="flex items-center gap-2 border-t border-grayLt pt-3"
                 >
                   <input type="hidden" name="date" value={today} />
-                  <Input name="body" placeholder="Add a comment" className="flex-1" />
+                  <Input name="body" placeholder={t("Add a comment")} className="flex-1" />
                   <Button type="submit" variant="secondary">
-                    Send
+                    {t("Send")}
                   </Button>
                 </form>
               </Card>

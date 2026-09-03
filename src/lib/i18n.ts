@@ -438,4 +438,112 @@ const ES: Record<string, string> = {
   "Do I need to warm up or stretch on my own?": "¿Necesito calentar o estirar por mi cuenta?",
   "Your program accounts for warm-up as part of each session — you don't need a separate routine unless Mickey specifically gives you one.":
     "Tu programa incluye el calentamiento como parte de cada sesión — no necesitas una rutina separada a menos que Mickey te dé una específicamente.",
+
+  // Request a session time
+  "Booking is on hold": "Las reservas están en pausa",
+  "You have an outstanding balance, so new session requests are disabled until it's paid. Send it below and you're clear to book again right away.":
+    "Tienes un saldo pendiente, así que las nuevas solicitudes de sesión están deshabilitadas hasta que se pague. Envíalo abajo y podrás reservar de nuevo de inmediato.",
+  "Request to reschedule {date}": "Solicitar reprogramar {date}",
+  "Request a session time": "Solicitar un horario de sesión",
+  "Propose a time that works for you — your coach will confirm or suggest another.":
+    "Propón un horario que te funcione — tu entrenadora confirmará o sugerirá otro.",
+  "That didn't go through": "Eso no se procesó",
+  "New date": "Nueva fecha",
+  "Preferred date": "Fecha preferida",
+  "Preferred time": "Hora preferida",
+  "Time is in your timezone ({tz}).": "La hora está en tu zona horaria ({tz}).",
+  Note: "Nota",
+  "Anything your coach should know": "Cualquier cosa que tu entrenadora deba saber",
+  "Send request": "Enviar solicitud",
+
+  // History
+  "Past workouts": "Entrenamientos pasados",
+  "Everything you've logged, most recent first.": "Todo lo que has registrado, lo más reciente primero.",
+  "Coached session": "Sesión con entrenadora",
+  "Solo workout": "Entrenamiento en solitario",
+  Activity: "Actividad",
+  "Once you log a workout from My program, or an activity from Activity log, it'll show up here.":
+    "Cuando registres un entrenamiento desde Mi programa, o una actividad desde el registro de Actividad, aparecerá aquí.",
+  "logged by your coach": "registrado por tu entrenadora",
+  "(swapped from {name})": "(cambiado de {name})",
+  "prescribed movement": "movimiento prescrito",
+
+  // Activity log
+  "Activity log": "Registro de actividad",
+  "A class, a walk, a workout with friends — anything active that wasn't one of your prescribed program days. Log a prescribed workout from":
+    "Una clase, una caminata, un entrenamiento con amigos — cualquier cosa activa que no fue uno de tus días de programa prescritos. Registra un entrenamiento prescrito desde",
+  "instead, so it counts toward that.": "en su lugar, para que cuente para eso.",
+  "Choose one": "Elige uno",
+  Class: "Clase",
+  "Workout with friends": "Entrenamiento con amigos",
+  Mobility: "Movilidad",
+  "Active recovery / walk": "Recuperación activa / caminata",
+  Other: "Otro",
+  Type: "Tipo",
+  Duration: "Duración",
+  "e.g. 30 min": "ej. 30 min",
+  "Save activity": "Guardar actividad",
+  "Once you log an activity above, it'll show up here.": "Cuando registres una actividad arriba, aparecerá aquí.",
+  "Activity photo": "Foto de actividad",
+
+  // Progress
+  "Your measurement trends and strength progress, all in one place.":
+    "Tus tendencias de medidas y progreso de fuerza, todo en un solo lugar.",
+  "Progress photos": "Fotos de progreso",
+  Angle: "Ángulo",
+  "Not specified": "No especificado",
+  Front: "Frente",
+  Side: "Lado",
+  "Back (angle)": "Espalda",
+  front: "frente",
+  side: "lado",
+  back: "espalda",
+  other: "otro",
+  "Add photo": "Añadir foto",
+  "Progress photo {date}": "Foto de progreso {date}",
+  Measurements: "Medidas",
+  "No measurements yet": "Aún no hay medidas",
+  "Your coach logs these during your monthly assessment — they'll show up here once the first one's in.":
+    "Tu entrenadora registra esto durante tu evaluación mensual — aparecerán aquí una vez que se registre la primera.",
+  "Weight trend": "Tendencia de peso",
+  Latest: "Más reciente",
+  Weight: "Peso",
+  Neck: "Cuello",
+  Chest: "Pecho",
+  Waist: "Cintura",
+  Hips: "Cadera",
+  "Thigh L": "Muslo I",
+  "Thigh R": "Muslo D",
+  "Bicep L": "Bíceps I",
+  "Bicep R": "Bíceps D",
+  "Strength progress": "Progreso de fuerza",
+  "Nothing to show yet": "Aún no hay nada que mostrar",
+  "Once weights are logged with your sessions, each movement's progress will show up here.":
+    "Cuando se registren pesos con tus sesiones, el progreso de cada movimiento aparecerá aquí.",
+  "PR: {weight} ({date})": "PR: {weight} ({date})",
+  "Latest: {weight}": "Más reciente: {weight}",
+
+  // Community
+  "Before you can post or read the community board, take a minute to read and sign this — it explains what other clients can see.":
+    "Antes de poder publicar o leer el tablero de comunidad, tómate un minuto para leer y firmar esto — explica qué pueden ver los demás clientes.",
+  "Type your full legal name to sign": "Escribe tu nombre legal completo para firmar",
+  "I have read and agree to the terms above": "He leído y acepto los términos anteriores",
+  "Sign & agree": "Firmar y aceptar",
+  "A shared space for everyone Mickey coaches — post a win, a question, a progress photo, or whatever's on your mind. Totally optional, and separate from anything you track privately.":
+    "Un espacio compartido para todas las personas que Mickey entrena — publica un logro, una pregunta, una foto de progreso, o lo que tengas en mente. Totalmente opcional, y separado de todo lo que registras en privado.",
+  "What kind of post is this?": "¿Qué tipo de publicación es esta?",
+  Win: "Logro",
+  Question: "Pregunta",
+  "Progress photo": "Foto de progreso",
+  General: "General",
+  "Share something": "Comparte algo",
+  "Optional if you're just posting a photo": "Opcional si solo estás publicando una foto",
+  Post: "Publicar",
+  "Nothing posted yet": "Aún no hay publicaciones",
+  "Be the first — a win, a question, anything at all.": "Sé la primera persona — un logro, una pregunta, lo que sea.",
+  "A client": "Un cliente",
+  "Post photo": "Foto de publicación",
+  Support: "Apoyar",
+  "Add a comment": "Añadir un comentario",
+  Send: "Enviar",
 };
