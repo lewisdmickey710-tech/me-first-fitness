@@ -12,6 +12,7 @@ import {
   Heart,
   Input,
 } from "@/components/ui";
+import { makeT } from "@/lib/i18n";
 import type { LegalDocument, PaymentSchedule } from "@/lib/types";
 
 const PLAN_LABEL: Record<PaymentSchedule, string> = {
@@ -31,6 +32,7 @@ export default async function ClientPlanPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
   const { data: documents } = (await supabase
     .from("legal_documents")
@@ -52,21 +54,17 @@ export default async function ClientPlanPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Payment plan
+          {t("Payment plan")}
         </h1>
         <p className="mt-1 text-sm text-gray">
-          Switch between monthly and pay-as-you-go any time. A fee
-          already charged stays owed either way. Switching from monthly
-          to pay-as-you-go forfeits any free cancellation beyond
-          pay-as-you-go&apos;s smaller allotment and moves you to the
-          higher fee right away — read the terms below before confirming.
+          {t("Switch between monthly and pay-as-you-go any time. A fee already charged stays owed either way. Switching from monthly to pay-as-you-go forfeits any free cancellation beyond pay-as-you-go's smaller allotment and moves you to the higher fee right away — read the terms below before confirming.")}
         </p>
       </div>
 
       <Card className="flex items-center justify-between">
-        <p className="text-sm text-gray">Your current plan</p>
+        <p className="text-sm text-gray">{t("Your current plan")}</p>
         <Badge tone="green">
-          {me.payment_schedule ? PLAN_LABEL[me.payment_schedule] : "Not set yet"}
+          {me.payment_schedule ? t(PLAN_LABEL[me.payment_schedule]) : t("Not set yet")}
         </Badge>
       </Card>
 
@@ -76,8 +74,8 @@ export default async function ClientPlanPage() {
         return (
           <Card key={schedule} className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="font-medium text-ink">{PLAN_LABEL[schedule]}</p>
-              {isCurrent ? <Badge tone="green">current plan</Badge> : null}
+              <p className="font-medium text-ink">{t(PLAN_LABEL[schedule])}</p>
+              {isCurrent ? <Badge tone="green">{t("current plan")}</Badge> : null}
             </div>
             <DocumentBody text={doc.body} />
             {!isCurrent ? (
@@ -90,16 +88,18 @@ export default async function ClientPlanPage() {
               >
                 <div>
                   <label className="mb-1 block text-sm font-medium text-ink">
-                    Type your full legal name to confirm
+                    {t("Type your full legal name to confirm")}
                   </label>
                   <Input name="signed_name" required />
                 </div>
                 <Checkbox
                   name="agree"
                   required
-                  label={`I have read and agree to the ${PLAN_LABEL[schedule]} terms above`}
+                  label={t("I have read and agree to the {plan} terms above", {
+                    plan: t(PLAN_LABEL[schedule]),
+                  })}
                 />
-                <Button type="submit">Switch to {PLAN_LABEL[schedule]}</Button>
+                <Button type="submit">{t("Switch to {plan}", { plan: t(PLAN_LABEL[schedule]) })}</Button>
               </form>
             ) : null}
           </Card>

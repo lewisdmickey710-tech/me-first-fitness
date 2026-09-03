@@ -12,6 +12,7 @@ import {
   Input,
   Select,
 } from "@/components/ui";
+import { makeT } from "@/lib/i18n";
 import type { ClientMinorConsent, LegalDocument } from "@/lib/types";
 
 export default async function MinorConsentPage() {
@@ -26,6 +27,7 @@ export default async function MinorConsentPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
 
   const [{ data: doc }, { data: consent }] = await Promise.all([
@@ -47,32 +49,30 @@ export default async function MinorConsentPage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Minor Consent &amp; Intake Addendum
+        {t("Minor Consent & Intake Addendum")}
       </h1>
       <p className="text-sm text-gray">
-        Required in addition to the standard waiver — complete alongside
-        your child&apos;s standard intake. To be filled out by a parent or
-        legal guardian.
+        {t("Required in addition to the standard waiver — complete alongside your child's standard intake. To be filled out by a parent or legal guardian.")}
       </p>
 
       <form action={submitMinorConsent} className="space-y-6">
         <Card className="space-y-4">
-          <SectionTitle>Minor&apos;s information</SectionTitle>
-          <Field label="Full name">
+          <SectionTitle>{t("Minor's information")}</SectionTitle>
+          <Field label={t("Full name")}>
             <Input
               name="minor_full_name"
               defaultValue={consent?.minor_full_name ?? ""}
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Date of birth">
+            <Field label={t("Date of birth")}>
               <Input
                 name="minor_date_of_birth"
                 type="date"
                 defaultValue={consent?.minor_date_of_birth ?? ""}
               />
             </Field>
-            <Field label="Age">
+            <Field label={t("Age")}>
               <Input
                 name="minor_age"
                 type="number"
@@ -82,31 +82,31 @@ export default async function MinorConsentPage() {
             </Field>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Grade">
+            <Field label={t("Grade")}>
               <Input name="minor_grade" defaultValue={consent?.minor_grade ?? ""} />
             </Field>
-            <Field label="Sport(s)">
+            <Field label={t("Sport(s)")}>
               <Input name="minor_sports" defaultValue={consent?.minor_sports ?? ""} />
             </Field>
           </div>
         </Card>
 
         <Card className="space-y-4">
-          <SectionTitle>Parent / guardian information</SectionTitle>
-          <Field label="Full name">
+          <SectionTitle>{t("Parent / guardian information")}</SectionTitle>
+          <Field label={t("Full name")}>
             <Input
               name="guardian_full_name"
               defaultValue={consent?.guardian_full_name ?? ""}
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone">
+            <Field label={t("Phone")}>
               <Input
                 name="guardian_phone"
                 defaultValue={consent?.guardian_phone ?? ""}
               />
             </Field>
-            <Field label="Email">
+            <Field label={t("Email")}>
               <Input
                 name="guardian_email"
                 type="text"
@@ -119,44 +119,44 @@ export default async function MinorConsentPage() {
               />
             </Field>
           </div>
-          <Field label="Relationship to minor">
+          <Field label={t("Relationship to minor")}>
             <Input
               name="guardian_relationship"
               defaultValue={consent?.guardian_relationship ?? ""}
             />
           </Field>
-          <Field label="Preferred way to hear about progress updates">
+          <Field label={t("Preferred way to hear about progress updates")}>
             <Select
               name="guardian_update_preference"
               defaultValue={consent?.guardian_update_preference ?? ""}
             >
-              <option value="">— Choose one —</option>
-              <option value="text">Text</option>
-              <option value="email">Email</option>
-              <option value="in_person">In-person after sessions</option>
+              <option value="">{t("— Choose one —")}</option>
+              <option value="text">{t("Text")}</option>
+              <option value="email">{t("Email")}</option>
+              <option value="in_person">{t("In-person after sessions")}</option>
             </Select>
           </Field>
         </Card>
 
         <Card className="space-y-4">
-          <SectionTitle>Emergency contact</SectionTitle>
+          <SectionTitle>{t("Emergency contact")}</SectionTitle>
           <p className="text-sm text-gray">
-            If different from the parent/guardian above.
+            {t("If different from the parent/guardian above.")}
           </p>
-          <Field label="Name">
+          <Field label={t("Name")}>
             <Input
               name="emergency_contact_name"
               defaultValue={consent?.emergency_contact_name ?? ""}
             />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Relationship">
+            <Field label={t("Relationship")}>
               <Input
                 name="emergency_contact_relationship"
                 defaultValue={consent?.emergency_contact_relationship ?? ""}
               />
             </Field>
-            <Field label="Phone">
+            <Field label={t("Phone")}>
               <Input
                 name="emergency_contact_phone"
                 defaultValue={consent?.emergency_contact_phone ?? ""}
@@ -166,34 +166,34 @@ export default async function MinorConsentPage() {
         </Card>
 
         <Card className="space-y-4">
-          <SectionTitle>Medical information</SectionTitle>
+          <SectionTitle>{t("Medical information")}</SectionTitle>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Primary physician / pediatrician name">
+            <Field label={t("Primary physician / pediatrician name")}>
               <Input
                 name="physician_name"
                 defaultValue={consent?.physician_name ?? ""}
               />
             </Field>
-            <Field label="Physician phone">
+            <Field label={t("Physician phone")}>
               <Input
                 name="physician_phone"
                 defaultValue={consent?.physician_phone ?? ""}
               />
             </Field>
           </div>
-          <Field label="Relevant diagnosis and current treatment (PT, bracing, rest protocol, etc.)">
+          <Field label={t("Relevant diagnosis and current treatment (PT, bracing, rest protocol, etc.)")}>
             <Input
               name="diagnosis_treatment"
               defaultValue={consent?.diagnosis_treatment ?? ""}
             />
           </Field>
-          <Field label="Other medical conditions, medications, or allergies">
+          <Field label={t("Other medical conditions, medications, or allergies")}>
             <Input
               name="other_conditions_meds_allergies"
               defaultValue={consent?.other_conditions_meds_allergies ?? ""}
             />
           </Field>
-          <Field label="Athletic training clearance status">
+          <Field label={t("Athletic training clearance status")}>
             <Input
               name="athletic_training_clearance"
               defaultValue={consent?.athletic_training_clearance ?? ""}
@@ -203,12 +203,12 @@ export default async function MinorConsentPage() {
 
         {doc ? (
           <Card className="space-y-4">
-            <SectionTitle>Consent</SectionTitle>
+            <SectionTitle>{t("Consent")}</SectionTitle>
             <DocumentBody text={doc.body} />
             <div className="space-y-3 border-t border-grayLt pt-3">
               <div>
                 <label className="mb-1 block text-sm font-medium text-ink">
-                  Parent/guardian signature — type your full legal name
+                  {t("Parent/guardian signature — type your full legal name")}
                 </label>
                 <Input
                   name="guardian_signature_name"
@@ -219,7 +219,7 @@ export default async function MinorConsentPage() {
               <Checkbox
                 name="consent"
                 required
-                label="I have read and agree to the consent above"
+                label={t("I have read and agree to the consent above")}
                 defaultChecked={!!consent?.signed_at}
               />
             </div>
@@ -227,7 +227,7 @@ export default async function MinorConsentPage() {
         ) : null}
 
         <Button type="submit" className="w-full">
-          {consent?.signed_at ? "Update & re-sign" : "Sign & submit"}
+          {consent?.signed_at ? t("Update & re-sign") : t("Sign & submit")}
         </Button>
       </form>
     </div>

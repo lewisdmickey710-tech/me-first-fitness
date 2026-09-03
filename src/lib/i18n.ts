@@ -546,4 +546,105 @@ const ES: Record<string, string> = {
   Support: "Apoyar",
   "Add a comment": "Añadir un comentario",
   Send: "Enviar",
+
+  // Documents
+  "Documents & check-in": "Documentos y check-in",
+  "Service check-in": "Check-in de servicio",
+  "done this month": "hecho este mes",
+  due: "pendiente",
+  "A quick, honest read on how coaching's going overall — what's working, what's not.":
+    "Una lectura rápida y honesta de cómo va el coaching en general — qué funciona, qué no.",
+  "Review or update": "Revisar o actualizar",
+  "Do it now": "Hazlo ahora",
+  "Minor Consent & Intake Addendum": "Consentimiento de Menor y Anexo de Admisión",
+  "signed {date}": "firmado el {date}",
+  "Required alongside your child's standard intake.": "Requerido junto con la admisión estándar de tu hijo/a.",
+  "Fill it out": "Completarlo",
+  "read {date}": "leído el {date}",
+  "Signed by {name} on {date}": "Firmado por {name} el {date}",
+  "I have read this": "He leído esto",
+  "Mark as read": "Marcar como leído",
+
+  // Tip
+  "Support the work": "Apoyar el trabajo",
+  "This is completely optional and never expected — your sessions are never contingent on it. If you'd ever like to send something as thanks, here's where.":
+    "Esto es completamente opcional y nunca se espera — tus sesiones nunca dependen de esto. Si alguna vez quieres enviar algo como agradecimiento, aquí es donde.",
+  "Ways to send a tip": "Formas de enviar una propina",
+
+  // Payment plan
+  "Switch between monthly and pay-as-you-go any time. A fee already charged stays owed either way. Switching from monthly to pay-as-you-go forfeits any free cancellation beyond pay-as-you-go's smaller allotment and moves you to the higher fee right away — read the terms below before confirming.":
+    "Cambia entre mensual y pago por sesión en cualquier momento. Un cargo ya generado permanece pendiente de cualquier forma. Cambiar de mensual a pago por sesión hace que pierdas cualquier cancelación gratuita más allá del cupo menor de pago por sesión y te mueve a la tarifa más alta de inmediato — lee los términos abajo antes de confirmar.",
+  "Your current plan": "Tu plan actual",
+  Monthly: "Mensual",
+  "Pay-as-you-go": "Pago por sesión",
+  "Not set yet": "Aún no establecido",
+  "current plan": "plan actual",
+  "Type your full legal name to confirm": "Escribe tu nombre legal completo para confirmar",
+  "I have read and agree to the {plan} terms above": "He leído y acepto los términos de {plan} anteriores",
+  "Switch to {plan}": "Cambiar a {plan}",
+
+  // Video session
+  "Video sessions aren't enabled": "Las sesiones por video no están habilitadas",
+  "Ask Mickey to turn on the video session add-on for your profile if you'd like to book one.":
+    "Pídele a Mickey que active la opción de sesión por video para tu perfil si deseas reservar una.",
+  "A {minutes}-minute video call. Propose a time and pay the ${rate} session balance via Cash App or Zelle below. Mickey confirms your timeslot once the payment comes through, and you'll get her video call link right here once it's confirmed.":
+    "Una videollamada de {minutes} minutos. Propón un horario y paga el saldo de ${rate} de la sesión vía Cash App o Zelle abajo. Mickey confirma tu horario una vez que el pago se procese, y recibirás su enlace de videollamada aquí mismo una vez confirmado.",
+  "Request & go to payment": "Solicitar e ir al pago",
+  "Pay the ${rate} session balance": "Pagar el saldo de ${rate} de la sesión",
+  "Send this once you've submitted your request above, so Mickey knows which booking it's for.":
+    "Envía esto una vez que hayas enviado tu solicitud arriba, para que Mickey sepa a qué reserva corresponde.",
+
+  // Check-in call
+  "A one-time {minutes}-minute call for whatever needs extra time to sort out — getting equipment or a home setup situated, going over something in depth, or anything else a quick program note can't cover. Available whether you train in-person or virtually. Propose a time and your coach will confirm or suggest another.":
+    "Una llamada única de {minutes} minutos para lo que necesite tiempo extra para resolver — organizar equipo o tu configuración en casa, profundizar en algo, o cualquier otra cosa que una nota rápida del programa no pueda cubrir. Disponible ya sea que entrenes en persona o virtualmente. Propón un horario y tu entrenadora confirmará o sugerirá otro.",
+  "What do you need the call for?": "¿Para qué necesitas la llamada?",
+  "e.g. setting up my home gym space, going over form on something specific":
+    "ej. organizar mi espacio de gimnasio en casa, revisar la forma de algo específico",
+
+  // Service check-in
+  "How's it going?": "¿Cómo va todo?",
+  "A quick monthly pulse check, separate from your daily check-ins. Honest is exactly what's useful here.":
+    "Un control mensual rápido, separado de tus check-ins diarios. La honestidad es exactamente lo que es útil aquí.",
+  "Overall, how satisfied are you right now?": "En general, ¿qué tan satisfecha/o estás en este momento?",
+  "5 — Loving it": "5 — Me encanta",
+  "4 — Good": "4 — Bien",
+  "3 — Okay": "3 — Regular",
+  "2 — Not great": "2 — No muy bien",
+  "1 — Struggling": "1 — Batallando",
+  "What's changed for you since we started working together?": "¿Qué ha cambiado para ti desde que empezamos a trabajar juntas?",
+  "Physically, mentally, day-to-day — whatever comes to mind": "Físicamente, mentalmente, en el día a día — lo que se te ocurra",
+  "What would make this even better for you?": "¿Qué haría esto aún mejor para ti?",
+  "Anything you'd want to tell someone who's on the fence about working with a coach?":
+    "¿Algo que quisieras decirle a alguien que está indecisa/o sobre trabajar con una entrenadora?",
+  "I'm comfortable with Mickey sharing what I wrote above as a testimonial":
+    "Estoy de acuerdo con que Mickey comparta lo que escribí arriba como testimonio",
+  "She'll always check with you first on specifics like using your name or photo — this just lets her know your words here are fair game to ask about.":
+    "Ella siempre te consultará primero sobre detalles como usar tu nombre o foto — esto solo le indica que puede preguntarte sobre usar tus palabras aquí.",
+  "Send to my coach": "Enviar a mi entrenadora",
+
+  // Minor consent
+  "Minor's information": "Información del menor",
+  Age: "Edad",
+  Grade: "Grado",
+  "Sport(s)": "Deporte(s)",
+  "Parent / guardian information": "Información del padre/madre o tutor",
+  "Relationship to minor": "Relación con el menor",
+  "Preferred way to hear about progress updates": "Forma preferida de recibir actualizaciones de progreso",
+  "— Choose one —": "— Elige uno —",
+  Text: "Mensaje de texto",
+  "In-person after sessions": "En persona después de las sesiones",
+  "If different from the parent/guardian above.": "Si es diferente del padre/madre o tutor mencionado arriba.",
+  Relationship: "Relación",
+  "Medical information": "Información médica",
+  "Primary physician / pediatrician name": "Nombre del médico principal / pediatra",
+  "Physician phone": "Teléfono del médico",
+  "Relevant diagnosis and current treatment (PT, bracing, rest protocol, etc.)":
+    "Diagnóstico relevante y tratamiento actual (fisioterapia, uso de férulas, protocolo de reposo, etc.)",
+  "Other medical conditions, medications, or allergies": "Otras condiciones médicas, medicamentos, o alergias",
+  "Athletic training clearance status": "Estado de autorización de entrenamiento deportivo",
+  Consent: "Consentimiento",
+  "Parent/guardian signature — type your full legal name": "Firma del padre/madre o tutor — escribe tu nombre legal completo",
+  "I have read and agree to the consent above": "He leído y acepto el consentimiento anterior",
+  "Update & re-sign": "Actualizar y volver a firmar",
+  "Sign & submit": "Firmar y enviar",
 };

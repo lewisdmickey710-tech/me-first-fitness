@@ -14,6 +14,7 @@ import {
   Input,
 } from "@/components/ui";
 import { loggedThisMonth } from "@/lib/measurement-window";
+import { makeT } from "@/lib/i18n";
 import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
@@ -33,6 +34,7 @@ export default async function ClientDocumentsPage() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
 
   const [
@@ -110,26 +112,25 @@ export default async function ClientDocumentsPage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Documents &amp; check-in
+        {t("Documents & check-in")}
       </h1>
 
       <div className="space-y-4">
         <Card className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="font-medium text-ink">Service check-in</p>
+            <p className="font-medium text-ink">{t("Service check-in")}</p>
             {serviceCheckinDoneThisMonth ? (
-              <Badge tone="green">done this month</Badge>
+              <Badge tone="green">{t("done this month")}</Badge>
             ) : serviceCheckinDue ? (
-              <Badge tone="gold">due</Badge>
+              <Badge tone="gold">{t("due")}</Badge>
             ) : null}
           </div>
           <p className="text-sm text-gray">
-            A quick, honest read on how coaching&apos;s going overall — what&apos;s
-            working, what&apos;s not.
+            {t("A quick, honest read on how coaching's going overall — what's working, what's not.")}
           </p>
           <Link href="/client/service-checkin">
             <Button variant="secondary">
-              {serviceCheckinDoneThisMonth ? "Review or update" : "Do it now"}
+              {serviceCheckinDoneThisMonth ? t("Review or update") : t("Do it now")}
             </Button>
           </Link>
         </Card>
@@ -137,21 +138,21 @@ export default async function ClientDocumentsPage() {
         {minorConsentAssigned ? (
           <Card className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="font-medium text-ink">Minor Consent &amp; Intake Addendum</p>
+              <p className="font-medium text-ink">{t("Minor Consent & Intake Addendum")}</p>
               {minorConsent?.signed_at ? (
                 <Badge tone="green">
-                  signed {minorConsent.signed_at.slice(0, 10)}
+                  {t("signed {date}", { date: minorConsent.signed_at.slice(0, 10) })}
                 </Badge>
               ) : (
-                <Badge tone="gold">needs your review</Badge>
+                <Badge tone="gold">{t("needs your review")}</Badge>
               )}
             </div>
             <p className="text-sm text-gray">
-              Required alongside your child&apos;s standard intake.
+              {t("Required alongside your child's standard intake.")}
             </p>
             <Link href="/client/minor-consent">
               <Button variant="secondary">
-                {minorConsent?.signed_at ? "Review or update" : "Fill it out"}
+                {minorConsent?.signed_at ? t("Review or update") : t("Fill it out")}
               </Button>
             </Link>
           </Card>
@@ -166,17 +167,20 @@ export default async function ClientDocumentsPage() {
                 {ack ? (
                   <Badge tone="green">
                     {ack.signed_name
-                      ? `signed ${ack.acknowledged_at.slice(0, 10)}`
-                      : `read ${ack.acknowledged_at.slice(0, 10)}`}
+                      ? t("signed {date}", { date: ack.acknowledged_at.slice(0, 10) })
+                      : t("read {date}", { date: ack.acknowledged_at.slice(0, 10) })}
                   </Badge>
                 ) : (
-                  <Badge tone="gold">needs your review</Badge>
+                  <Badge tone="gold">{t("needs your review")}</Badge>
                 )}
               </div>
               <DocumentBody text={doc.body} />
               {ack?.signed_name ? (
                 <p className="text-xs text-gray">
-                  Signed by {ack.signed_name} on {ack.acknowledged_at.slice(0, 10)}
+                  {t("Signed by {name} on {date}", {
+                    name: ack.signed_name,
+                    date: ack.acknowledged_at.slice(0, 10),
+                  })}
                 </p>
               ) : null}
               {!ack ? (
@@ -195,7 +199,7 @@ export default async function ClientDocumentsPage() {
                   {doc.requires_signature ? (
                     <div>
                       <label className="mb-1 block text-sm font-medium text-ink">
-                        Type your full legal name to sign
+                        {t("Type your full legal name to sign")}
                       </label>
                       <Input name="signed_name" required />
                     </div>
@@ -205,12 +209,12 @@ export default async function ClientDocumentsPage() {
                     required
                     label={
                       doc.requires_signature
-                        ? "I have read and agree to the terms above"
-                        : "I have read this"
+                        ? t("I have read and agree to the terms above")
+                        : t("I have read this")
                     }
                   />
                   <Button type="submit">
-                    {doc.requires_signature ? "Sign & agree" : "Mark as read"}
+                    {doc.requires_signature ? t("Sign & agree") : t("Mark as read")}
                   </Button>
                 </form>
               ) : null}
