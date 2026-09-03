@@ -18,6 +18,7 @@ import { PaymentMethods } from "@/components/payment-methods";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type {
   BusinessSettings,
   ClientDocumentAcknowledgment,
@@ -44,6 +45,7 @@ export default async function ClientDashboard() {
     );
   }
 
+  const t = makeT(me.language);
   const supabase = await createClient();
 
   const today = toDateString(nowInBusinessTz());
@@ -240,12 +242,17 @@ export default async function ClientDashboard() {
     label: `${nutritionCount}/${NUTRITION_GOAL}`,
     sublabel:
       nutritionOverflow > 0
-        ? `+${nutritionOverflow} snack${nutritionOverflow > 1 ? "s" : ""} today`
-        : "meals today",
+        ? t(nutritionOverflow > 1 ? "+{n} snacks today" : "+{n} snack today", {
+            n: nutritionOverflow,
+          })
+        : t("meals today"),
   };
 
   const weekCycleLine = currentPhase
-    ? `Week ${weekInPhase(currentPhase.started_on)} of this phase · Cycle ${currentPhase.cycle_number}`
+    ? t("Week {week} of this phase · Cycle {cycle}", {
+        week: weekInPhase(currentPhase.started_on),
+        cycle: currentPhase.cycle_number,
+      })
     : undefined;
 
   return (
@@ -253,7 +260,7 @@ export default async function ClientDashboard() {
       <Link href="/client/profile">
         <PhaseBanner
           phase={currentPhase?.phase ?? "n/a"}
-          title={`Hey, ${me.name.split(" ")[0]}`}
+          title={t("Hey, {name}", { name: me.name.split(" ")[0] })}
           subtitle={weekCycleLine}
         />
       </Link>
@@ -261,7 +268,7 @@ export default async function ClientDashboard() {
       {recentlyAchieved.length > 0 ? (
         <Card className="border-gold/40 bg-gold/5">
           <p className="font-medium text-ink">
-            🎉 You hit {recentlyAchieved.length > 1 ? "milestones" : "a milestone"}!
+            🎉 {t(recentlyAchieved.length > 1 ? "You hit milestones!" : "You hit a milestone!")}
           </p>
           <ul className="mt-1 text-sm text-ink">
             {recentlyAchieved.map((m) => (
@@ -272,7 +279,7 @@ export default async function ClientDashboard() {
             href="/client/milestones"
             className="mt-2 inline-block text-sm text-rose hover:underline"
           >
-            View your milestones →
+            {t("View your milestones →")}
           </Link>
         </Card>
       ) : null}
@@ -281,19 +288,20 @@ export default async function ClientDashboard() {
         <Card className="space-y-3 border-gold/50 bg-gold/5">
           <p className="text-sm font-medium text-ink">
             <Heart className="mr-1" />
-            Needs your review
+            {t("Needs your review")}
           </p>
           {unacknowledgedCount > 0 ? (
             <div className="flex items-center justify-between">
               <p className="text-sm text-ink">
-                {unacknowledgedCount} document
-                {unacknowledgedCount > 1 ? "s" : ""} to review
+                {t(unacknowledgedCount > 1 ? "{count} documents to review" : "{count} document to review", {
+                  count: unacknowledgedCount,
+                })}
               </p>
               <Link
                 href="/client/documents"
                 className="text-sm font-medium text-rose hover:underline"
               >
-                Review →
+                {t("Review →")}
               </Link>
             </div>
           ) : null}
@@ -304,9 +312,14 @@ export default async function ClientDashboard() {
               }
             >
               <p className="text-sm text-ink">
-                <strong>${Number(overduePayment.amount).toFixed(2)} overdue</strong>{" "}
-                since {overduePayment.due_date} — training is on hold until
-                it&apos;s paid.
+                <strong>
+                  {t("{amount} overdue", {
+                    amount: `$${Number(overduePayment.amount).toFixed(2)}`,
+                  })}
+                </strong>{" "}
+                {t("since {date} — training is on hold until it's paid.", {
+                  date: overduePayment.due_date,
+                })}
               </p>
               <PaymentMethods settings={businessSettings} />
             </div>
@@ -316,29 +329,28 @@ export default async function ClientDashboard() {
 
       {me.hold_started_at ? (
         <Card className="space-y-1 border-gold/40 bg-gold/5">
-          <p className="font-medium text-ink">Your spot is on hold</p>
+          <p className="font-medium text-ink">{t("Your spot is on hold")}</p>
           <p className="text-sm text-gray">
-            You&apos;re not currently scheduled for sessions — the weekly
-            $10 retainer keeps your app access and reserves your spot for
-            whenever you&apos;re ready to come back. Reach out to Mickey
-            when you want to resume.
+            {t(
+              "You're not currently scheduled for sessions — the weekly $10 retainer keeps your app access and reserves your spot for whenever you're ready to come back. Reach out to Mickey when you want to resume."
+            )}
           </p>
         </Card>
       ) : null}
 
       {hasUnpaidLateFee ? (
         <Card className="space-y-1 border-pink/40 bg-pink/5">
-          <p className="font-medium text-pink">Sessions paused</p>
+          <p className="font-medium text-pink">{t("Sessions paused")}</p>
           <p className="text-sm text-ink">
-            A late cancellation fee is outstanding — your upcoming sessions
-            are paused until it&apos;s paid. Send it using one of the
-            methods below, then your schedule picks back up right away.
+            {t(
+              "A late cancellation fee is outstanding — your upcoming sessions are paused until it's paid. Send it using one of the methods below, then your schedule picks back up right away."
+            )}
           </p>
           <PaymentMethods settings={businessSettings} />
         </Card>
       ) : nextSession ? (
         <Card>
-          <p className="text-sm font-medium text-gray">Next session</p>
+          <p className="text-sm font-medium text-gray">{t("Next session")}</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             {nextSession.timeOfDay
               ? formatScheduleForClient(nextSession.date, nextSession.timeOfDay, me.timezone)
@@ -353,19 +365,20 @@ export default async function ClientDashboard() {
                 rel="noreferrer"
                 className="mt-2 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
-                Join video call →
+                {t("Join video call →")}
               </a>
             ) : (
               <p className="mt-1 text-sm text-gray">
-                This is a video session — Mickey will share the call link.
+                {t("This is a video session — Mickey will share the call link.")}
               </p>
             )
           ) : null}
 
           {nextSessionWouldBeLate ? (
             <p className="mt-2 text-xs text-pink">
-              Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours notice
-              — this will count as a late cancellation.
+              {t("Cancelling now is under {hours} hours notice — this will count as a late cancellation.", {
+                hours: LATE_CANCEL_NOTICE_HOURS,
+              })}
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -383,58 +396,63 @@ export default async function ClientDashboard() {
                 variant="danger"
                 confirmText={
                   nextSessionWouldBeLate
-                    ? `Cancelling now is under ${LATE_CANCEL_NOTICE_HOURS} hours notice and will count as a late cancellation. Cancel anyway?`
-                    : "Cancel this session? This can't be undone."
+                    ? t(
+                        "Cancelling now is under {hours} hours notice and will count as a late cancellation. Cancel anyway?",
+                        { hours: LATE_CANCEL_NOTICE_HOURS }
+                      )
+                    : t("Cancel this session? This can't be undone.")
                 }
               >
-                Cancel
+                {t("Cancel")}
               </ConfirmButton>
             </form>
             <Link href={`/client/request?reschedule_from=${nextSession.date}`}>
               <Button type="button" variant="secondary">
-                Request reschedule
+                {t("Request reschedule")}
               </Button>
             </Link>
             <Link
               href="/client/schedule"
               className="text-sm text-rose hover:underline"
             >
-              View your schedule →
+              {t("View your schedule →")}
             </Link>
           </div>
         </Card>
       ) : me.session_mode === "virtual" ? (
         <Card>
-          <p className="text-sm font-medium text-gray">Program</p>
+          <p className="text-sm font-medium text-gray">{t("Program")}</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             {me.program_last_updated_at
-              ? `Last updated ${me.program_last_updated_at.slice(0, 10)}`
-              : "Not updated yet"}
+              ? t("Last updated {date}", { date: me.program_last_updated_at.slice(0, 10) })
+              : t("Not updated yet")}
           </p>
           <p className="mt-1 text-sm text-gray">
-            No session booked right now — Mickey updates your program
-            directly on her own cadence.
+            {t("No session booked right now — Mickey updates your program directly on her own cadence.")}
             {me.video_sessions_enabled
-              ? " Want a video session or a check-in call? Book one above."
-              : " Need dedicated time to talk something through? Book a check-in call above."}
+              ? " " + t("Want a video session or a check-in call? Book one above.")
+              : " " + t("Need dedicated time to talk something through? Book a check-in call above.")}
           </p>
           <Link
             href="/client/program"
             className="mt-2 inline-block text-sm text-rose hover:underline"
           >
-            View your program →
+            {t("View your program →")}
           </Link>
         </Card>
       ) : null}
 
       {nextDue && nextDue.kind !== "late_cancellation_fee" && nextDue.due_date >= today ? (
         <Card>
-          <p className="text-sm font-medium text-gray">Payment due</p>
+          <p className="text-sm font-medium text-gray">{t("Payment due")}</p>
           <p className="mt-1 text-lg font-semibold text-ink">
             ${Number(nextDue.amount).toFixed(2)}
             <span className="text-base font-normal text-gray">
               {" "}
-              — {nextDue.description}, due {nextDue.due_date}
+              — {t("{description}, due {date}", {
+                description: nextDue.description,
+                date: nextDue.due_date,
+              })}
             </span>
           </p>
           <PaymentMethods settings={businessSettings} />
@@ -442,12 +460,12 @@ export default async function ClientDashboard() {
       ) : null}
 
       <Card>
-        <p className="mb-3 text-sm font-medium text-gray">Your goals</p>
+        <p className="mb-3 text-sm font-medium text-gray">{t("Your goals")}</p>
         <div className="flex items-center justify-around">
           <ProgressRing
             percent={(programmedDaysLogged / programmedDaysGoal) * 100}
             label={`${programmedDaysLogged}/${programmedDaysGoal}`}
-            sublabel="Programmed Days"
+            sublabel={t("Programmed Days")}
             color="#E75480"
           />
           <ProgressRing
@@ -460,7 +478,7 @@ export default async function ClientDashboard() {
           <ProgressRing
             percent={(coachedSessionsLogged / coachedSessionGoal) * 100}
             label={`${coachedSessionsLogged}/${coachedSessionGoal}`}
-            sublabel="Sessions with Mickey"
+            sublabel={t("Sessions with Mickey")}
             color="#D4A24C"
           />
         </div>
@@ -470,21 +488,23 @@ export default async function ClientDashboard() {
         <Card>
           <p className="text-sm font-medium text-gray">
             <Heart className="mr-1" />
-            Pending requests
+            {t("Pending requests")}
           </p>
           <div className="mt-2 space-y-3">
             {requests!.map((r) =>
               r.status === "countered" ? (
                 <div key={r.id} className="rounded-xl bg-purple/10 p-3">
                   <p className="text-sm text-ink">
-                    Mickey proposed a different time:{" "}
+                    {t("Mickey proposed a different time:")}{" "}
                     <strong>
                       {r.countered_date}
-                      {r.countered_time ? ` at ${r.countered_time}` : ""}
+                      {r.countered_time ? ` ${t("at {time}", { time: r.countered_time })}` : ""}
                     </strong>{" "}
                     <span className="text-gray">
-                      (you asked for {r.preferred_date}
-                      {r.preferred_time ? ` at ${r.preferred_time}` : ""})
+                      {t("(you asked for {date}{time})", {
+                        date: r.preferred_date,
+                        time: r.preferred_time ? ` ${t("at {time}", { time: r.preferred_time })}` : "",
+                      })}
                     </span>
                   </p>
                   <div className="mt-2 flex gap-2">
@@ -494,7 +514,7 @@ export default async function ClientDashboard() {
                         await respondToCounteredRequest(r.id, "accept");
                       }}
                     >
-                      <Button type="submit">Works for me</Button>
+                      <Button type="submit">{t("Works for me")}</Button>
                     </form>
                     <form
                       action={async () => {
@@ -503,7 +523,7 @@ export default async function ClientDashboard() {
                       }}
                     >
                       <Button type="submit" variant="secondary">
-                        Doesn&apos;t work
+                        {t("Doesn't work")}
                       </Button>
                     </form>
                   </div>
@@ -511,11 +531,11 @@ export default async function ClientDashboard() {
               ) : (
                 <div key={r.id} className="flex items-center justify-between">
                   <p className="text-sm text-ink">
-                    {r.request_type === "checkin_call" ? "Check-in call — " : ""}
+                    {r.request_type === "checkin_call" ? `${t("Check-in call")} — ` : ""}
                     {r.preferred_date}
-                    {r.preferred_time ? ` at ${r.preferred_time}` : ""}
+                    {r.preferred_time ? ` ${t("at {time}", { time: r.preferred_time })}` : ""}
                   </p>
-                  <Badge tone="gold">pending</Badge>
+                  <Badge tone="gold">{t("pending")}</Badge>
                 </div>
               )
             )}
@@ -526,63 +546,63 @@ export default async function ClientDashboard() {
       <div className="grid grid-cols-2 gap-3">
         <ActionTile
           href="/client/program"
-          label="My program"
-          description="This week's exercises & cues"
+          label={t("My program")}
+          description={t("This week's exercises & cues")}
         />
         <ActionTile
           href="/client/schedule"
-          label="My schedule"
-          description="View & manage your sessions"
+          label={t("My schedule")}
+          description={t("View & manage your sessions")}
         />
         <ActionTile
           href="/client/nutrition"
-          label="Nutrition"
+          label={t("Nutrition")}
           description={
             me.calorie_goal_enabled && me.daily_calorie_goal
-              ? `Goal: ${me.daily_calorie_goal} cal/day`
-              : "Log meals, hunger & fullness"
+              ? t("Goal: {n} cal/day", { n: me.daily_calorie_goal })
+              : t("Log meals, hunger & fullness")
           }
         />
-        <ActionTile href="/client/habits" label="Habits" description="Track your daily habits" />
+        <ActionTile href="/client/habits" label={t("Habits")} description={t("Track your daily habits")} />
         <ActionTile
           href="/client/progress"
-          label="My progress"
-          description="Photos, measurements & trends"
+          label={t("My progress")}
+          description={t("Photos, measurements & trends")}
         />
         <ActionTile
           href="/client/community"
-          label="Community"
-          description="See what the group's up to"
+          label={t("Community")}
+          description={t("See what the group's up to")}
         />
       </div>
 
-      <Collapsible label="More" labelClassName="text-sm font-medium text-gray">
+      <Collapsible label={t("More")} labelClassName="text-sm font-medium text-gray">
         <div className="rounded-xl border border-grayLt bg-white px-4">
-          <MoreLink href="/client/checkin" label="Log a daily check-in" />
+          <MoreLink href="/client/checkin" label={t("Log a daily check-in")} />
           {me.symptom_tracker_enabled ? (
-            <MoreLink href="/client/symptoms" label="Symptom log" />
+            <MoreLink href="/client/symptoms" label={t("Symptom log")} />
           ) : null}
-          <MoreLink href="/client/milestones" label="Milestones" />
-          <MoreLink href="/client/guide" label="Wellness guide" />
+          <MoreLink href="/client/milestones" label={t("Milestones")} />
+          <MoreLink href="/client/guide" label={t("Wellness guide")} />
           <MoreLink
             href="/client/documents"
-            label="Documents"
-            badge={unacknowledgedCount > 0 ? `${unacknowledgedCount} new` : undefined}
+            label={t("Documents")}
+            badge={unacknowledgedCount > 0 ? t("{n} new", { n: unacknowledgedCount }) : undefined}
           />
-          <MoreLink href="/client/plan" label="Payment plan" />
-          <MoreLink href="/client/checkin-call" label="Book a check-in call" />
+          <MoreLink href="/client/plan" label={t("Payment plan")} />
+          <MoreLink href="/client/checkin-call" label={t("Book a check-in call")} />
           {me.video_sessions_enabled ? (
-            <MoreLink href="/client/video-session" label="Book a video session" />
+            <MoreLink href="/client/video-session" label={t("Book a video session")} />
           ) : null}
         </div>
       </Collapsible>
 
       <div>
-        <p className="mb-2 text-sm font-medium text-gray">Recent sessions</p>
+        <p className="mb-2 text-sm font-medium text-gray">{t("Recent sessions")}</p>
         {!sessions || sessions.length === 0 ? (
           <EmptyState
-            title="No sessions yet"
-            body="Once your coach logs a session, it'll show up here."
+            title={t("No sessions yet")}
+            body={t("Once your coach logs a session, it'll show up here.")}
           />
         ) : (
           <div className="space-y-2">
@@ -594,7 +614,7 @@ export default async function ClientDashboard() {
                 </div>
                 {s.rating ? (
                   <p className="mt-1 text-sm text-gray">
-                    Rating: {s.rating}/5
+                    {t("Rating: {n}/5", { n: s.rating })}
                   </p>
                 ) : null}
               </Card>
@@ -606,7 +626,7 @@ export default async function ClientDashboard() {
       {me.pro_bono ? (
         <p className="pt-2 text-center text-xs text-gray">
           <Link href="/client/tip" className="hover:text-ink hover:underline">
-            Want to support the work?
+            {t("Want to support the work?")}
           </Link>
         </p>
       ) : null}

@@ -849,6 +849,8 @@ export async function submitClientProfile(formData: FormData) {
   const name = textOrNull("name");
   if (!name) throw new Error("Name is required.");
   const timezone = textOrNull("timezone") ?? "America/Chicago";
+  const languageRaw = textOrNull("language");
+  const language = languageRaw === "es" ? "es" : "en";
 
   const { error } = await supabase
     .from("clients")
@@ -863,6 +865,7 @@ export async function submitClientProfile(formData: FormData) {
       physician_name: textOrNull("physician_name"),
       physician_phone: textOrNull("physician_phone"),
       timezone,
+      language,
       profile_completed_at: me.profile_completed_at ?? new Date().toISOString(),
     })
     .eq("id", me.id);

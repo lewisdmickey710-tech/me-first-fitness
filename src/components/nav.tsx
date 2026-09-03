@@ -2,18 +2,22 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { Heart } from "@/components/ui";
+import { makeT, type Locale } from "@/lib/i18n";
 
 export function TopNav({
   title,
   links,
   faqHref,
   settingsHref,
+  locale,
 }: {
   title: string;
   links?: { href: string; label: string }[];
   faqHref?: string;
   settingsHref?: string;
+  locale?: Locale;
 }) {
+  const t = makeT(locale);
   return (
     <header className="border-b border-grayLt bg-pink/15 print:hidden">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
@@ -27,7 +31,7 @@ export function TopNav({
               href={settingsHref}
               className="rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
             >
-              Settings
+              {t("Settings")}
             </a>
           ) : null}
           {faqHref ? (
@@ -35,10 +39,10 @@ export function TopNav({
               href={faqHref}
               className="rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
             >
-              FAQ
+              {t("FAQ")}
             </a>
           ) : null}
-          <SignOutButton />
+          <SignOutButton locale={locale} />
         </div>
       </div>
       {links && links.length > 0 ? (
@@ -63,7 +67,8 @@ export function TopNav({
   );
 }
 
-function SignOutButton() {
+function SignOutButton({ locale }: { locale?: Locale }) {
+  const t = makeT(locale);
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -75,7 +80,7 @@ function SignOutButton() {
       onClick={handleSignOut}
       className="rounded-full bg-white px-3 py-1 text-sm font-medium text-ink shadow-sm hover:bg-rose hover:text-white"
     >
-      Sign out
+      {t("Sign out")}
     </button>
   );
 }

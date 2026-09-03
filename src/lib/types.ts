@@ -42,6 +42,7 @@ export interface Client {
   symptom_tracker_enabled: boolean;
   last_viewed_at: string | null;
   timezone: string;
+  language: "en" | "es";
   hold_started_at: string | null;
   program_last_updated_at: string | null;
   late_cancel_free_remaining: number | null;

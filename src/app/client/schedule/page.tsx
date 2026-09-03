@@ -9,14 +9,8 @@ import { ConfirmButton } from "@/components/confirm-button";
 import { DAY_NAMES, formatTimeOfDayForClient } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { makeT } from "@/lib/i18n";
 import type { BusinessSettings, ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
-
-const STATUS_LABEL: Record<string, string> = {
-  completed: "Completed",
-  cancelled: "Cancelled",
-  late_cancelled: "Late cancelled",
-  rescheduled: "Rescheduled",
-};
 
 const DOT_TONE: Record<string, string> = {
   scheduled: "bg-teal",
@@ -26,15 +20,13 @@ const DOT_TONE: Record<string, string> = {
   rescheduled: "bg-gold",
 };
 
-const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
-  month: "long",
-  year: "numeric",
-  timeZone: "UTC",
-});
-const WEEKDAY_SHORT = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY_SHORT_EN = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const WEEKDAY_SHORT_ES = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
 
 const SCHEDULE_QUOTE =
   "Motivation is what gets you started, habits are what keep you going.";
+const SCHEDULE_QUOTE_ES =
+  "La motivación es lo que te pone en marcha, los hábitos son lo que te mantiene en movimiento.";
 
 export default async function ClientSchedulePage({
   searchParams,
@@ -51,6 +43,21 @@ export default async function ClientSchedulePage({
       />
     );
   }
+
+  const t = makeT(me.language);
+  const isEs = me.language === "es";
+  const STATUS_LABEL: Record<string, string> = {
+    completed: t("Completed"),
+    cancelled: t("Cancelled"),
+    late_cancelled: t("Late cancelled"),
+    rescheduled: t("Rescheduled"),
+  };
+  const MONTH_LABEL_FMT = new Intl.DateTimeFormat(isEs ? "es" : "en-US", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const WEEKDAY_SHORT = isEs ? WEEKDAY_SHORT_ES : WEEKDAY_SHORT_EN;
 
   const supabase = await createClient();
 
@@ -82,15 +89,15 @@ export default async function ClientSchedulePage({
         <BackLink href="/client/dashboard" />
         <h1 className="text-xl font-semibold text-ink">
           <Heart className="mr-1.5" />
-          Your schedule
+          {t("Your schedule")}
         </h1>
         <Card className="space-y-2 border-pink/40">
-          <p className="font-medium text-pink">Sessions paused</p>
+          <p className="font-medium text-pink">{t("Sessions paused")}</p>
           <p className="text-sm text-ink">
-            A ${fee.amount} late cancellation fee is outstanding. Your
-            upcoming sessions are paused until it&apos;s paid — send it
-            using one of the methods below, and your schedule will pick
-            back up right away.
+            {t(
+              "A ${amount} late cancellation fee is outstanding. Your upcoming sessions are paused until it's paid — send it using one of the methods below, and your schedule will pick back up right away.",
+              { amount: fee.amount }
+            )}
           </p>
           <PaymentMethods settings={businessSettings} />
         </Card>
@@ -173,19 +180,19 @@ export default async function ClientSchedulePage({
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        Your schedule
+        {t("Your schedule")}
       </h1>
       <p className="text-sm italic text-gray">
         <Heart className="mr-1" />
-        &quot;{SCHEDULE_QUOTE}&quot;
+        &quot;{isEs ? SCHEDULE_QUOTE_ES : SCHEDULE_QUOTE}&quot;
       </p>
 
-      <Collapsible label="Cancellation policy">
+      <Collapsible label={t("Cancellation policy")}>
         <p className="text-sm text-gray">
-          Cancelling with less than {LATE_CANCEL_NOTICE_HOURS} hours notice
-          counts as a late cancellation. A first one is just noted — every
-          one after that within 16 weeks brings a $10 fee and pauses your
-          sessions until it&apos;s paid.
+          {t(
+            "Cancelling with less than {hours} hours notice counts as a late cancellation. A first one is just noted — every one after that within 16 weeks brings a $10 fee and pauses your sessions until it's paid.",
+            { hours: LATE_CANCEL_NOTICE_HOURS }
+          )}
         </p>
       </Collapsible>
 
@@ -193,15 +200,15 @@ export default async function ClientSchedulePage({
         <div>
           <p className="font-medium text-ink">
             <Heart className="mr-1.5" />
-            Want more &quot;me time&quot;?
+            {t('Want more "me time"?')}
           </p>
           <p className="mt-1 text-sm text-gray">
-            Ask for an extra session or a different time.
+            {t("Ask for an extra session or a different time.")}
           </p>
         </div>
         <Link href="/client/request" className="shrink-0">
           <Button type="button" variant="secondary">
-            Request time
+            {t("Request time")}
           </Button>
         </Link>
       </Card>
@@ -212,7 +219,7 @@ export default async function ClientSchedulePage({
             href={`/client/schedule?month=${prevMonthKey}`}
             className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
           >
-            ← Prev
+            {t("← Prev")}
           </Link>
           <p className="font-medium text-ink">
             {MONTH_LABEL_FMT.format(firstOfMonth)}
@@ -221,7 +228,7 @@ export default async function ClientSchedulePage({
             href={`/client/schedule?month=${nextMonthKey}`}
             className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink"
           >
-            Next →
+            {t("Next →")}
           </Link>
         </div>
 
@@ -270,14 +277,14 @@ export default async function ClientSchedulePage({
 
       {!selectedCell ? (
         <EmptyState
-          title="No session that day"
-          body="Tap a highlighted date on the calendar to see details."
+          title={t("No session that day")}
+          body={t("Tap a highlighted date on the calendar to see details.")}
         />
       ) : (
         <Card className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="font-medium text-ink">
-              {DAY_NAMES[new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()]},{" "}
+              {t(DAY_NAMES[new Date(`${selectedCell.date}T00:00:00Z`).getUTCDay()])},{" "}
               {selectedCell.date}
             </p>
             {selectedCell.status ? (
@@ -291,21 +298,21 @@ export default async function ClientSchedulePage({
                 }
               >
                 {selectedCell.status === "scheduled"
-                  ? "Scheduled"
+                  ? t("Scheduled")
                   : STATUS_LABEL[selectedCell.status]}
                 {(selectedCell.status === "cancelled" ||
                   selectedCell.status === "late_cancelled") &&
                 selectedOccurrence?.cancelled_by
                   ? selectedOccurrence.cancelled_by === "coach"
-                    ? " — Mickey cancelled"
-                    : " — you cancelled"
+                    ? ` — ${t("Mickey cancelled")}`
+                    : ` — ${t("you cancelled")}`
                   : ""}
               </Badge>
             ) : null}
           </div>
 
           {selectedCell.status === null ? (
-            <p className="text-sm text-gray">Nothing on the schedule this day.</p>
+            <p className="text-sm text-gray">{t("Nothing on the schedule this day.")}</p>
           ) : null}
 
           {selectedCell.status === "scheduled" &&
@@ -317,11 +324,11 @@ export default async function ClientSchedulePage({
                 rel="noreferrer"
                 className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
               >
-                Join video call →
+                {t("Join video call →")}
               </a>
             ) : (
               <p className="text-sm text-gray">
-                This is a video session — Mickey will share the call link.
+                {t("This is a video session — Mickey will share the call link.")}
               </p>
             )
           ) : null}
@@ -329,15 +336,16 @@ export default async function ClientSchedulePage({
           {selectedCell.status === "cancelled" &&
           selectedOccurrence?.cancelled_by === "coach" ? (
             <p className="text-sm text-gray">
-              Mickey cancelled this one — no fee, and you&apos;ve got a free
-              reschedule whenever works for you.
+              {t(
+                "Mickey cancelled this one — no fee, and you've got a free reschedule whenever works for you."
+              )}
             </p>
           ) : null}
 
           {selectedOccurrence?.status === "rescheduled" &&
           selectedOccurrence.rescheduled_to_date ? (
             <p className="text-sm text-gray">
-              Moved to {selectedOccurrence.rescheduled_to_date}
+              {t("Moved to {date}", { date: selectedOccurrence.rescheduled_to_date })}
             </p>
           ) : null}
 
@@ -379,13 +387,16 @@ export default async function ClientSchedulePage({
                 <div className="flex flex-wrap items-center gap-2 border-t border-grayLt pt-3">
                   {wouldBeLate ? (
                     <p className="w-full text-xs text-pink">
-                      Cancelling now is under {LATE_CANCEL_NOTICE_HOURS} hours
-                      notice — this will count as a late cancellation.
+                      {t(
+                        "Cancelling now is under {hours} hours notice — this will count as a late cancellation.",
+                        { hours: LATE_CANCEL_NOTICE_HOURS }
+                      )}
                     </p>
                   ) : timeOfDay === null ? (
                     <p className="w-full text-xs text-gray">
-                      No exact time on file for this one — cancelling won&apos;t
-                      be checked against the 12-hour notice window.
+                      {t(
+                        "No exact time on file for this one — cancelling won't be checked against the 12-hour notice window."
+                      )}
                     </p>
                   ) : null}
                   <form
@@ -396,14 +407,14 @@ export default async function ClientSchedulePage({
                   >
                     <ConfirmButton
                       variant="danger"
-                      confirmText="Cancel this session? This can't be undone."
+                      confirmText={t("Cancel this session? This can't be undone.")}
                     >
-                      Cancel
+                      {t("Cancel")}
                     </ConfirmButton>
                   </form>
                   <Link href={`/client/request?reschedule_from=${selectedCell.date}`}>
                     <Button type="button" variant="secondary">
-                      Request reschedule
+                      {t("Request reschedule")}
                     </Button>
                   </Link>
                 </div>

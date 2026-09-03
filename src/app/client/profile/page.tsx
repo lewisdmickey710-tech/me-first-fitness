@@ -5,6 +5,7 @@ import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
 import { Badge, Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
 import { US_TIMEZONES } from "@/lib/timezone";
+import { LANGUAGES, makeT } from "@/lib/i18n";
 import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
@@ -24,6 +25,7 @@ export default async function ClientProfilePage() {
     );
   }
 
+  const t = makeT(me.language);
   const isFirstTime = !me.profile_completed_at;
   const supabase = await createClient();
 
@@ -77,25 +79,25 @@ export default async function ClientProfilePage() {
 
       <h1 className="text-xl font-semibold text-ink">
         <Heart className="mr-1.5" />
-        {isFirstTime ? "Let's start with the basics" : "Your profile"}
+        {isFirstTime ? t("Let's start with the basics") : t("Your profile")}
       </h1>
       <p className="text-sm text-gray">
         {isFirstTime
-          ? "Just your contact info to start — quick and easy. You can update any of this any time it changes."
-          : "Update any of this any time it changes."}
+          ? t("Just your contact info to start — quick and easy. You can update any of this any time it changes.")
+          : t("Update any of this any time it changes.")}
       </p>
 
       <Card>
         <form action={submitClientProfile} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Full name
+              {t("Full name")}
             </label>
             <Input name="name" required defaultValue={me.name} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Preferred name / nickname
+              {t("Preferred name / nickname")}
             </label>
             <Input
               name="preferred_name"
@@ -104,7 +106,7 @@ export default async function ClientProfilePage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Date of birth
+              {t("Date of birth")}
             </label>
             <Input
               name="date_of_birth"
@@ -114,13 +116,13 @@ export default async function ClientProfilePage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Phone
+              {t("Phone")}
             </label>
             <Input name="phone" defaultValue={me.phone ?? ""} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Email
+              {t("Email")}
             </label>
             <Input
               name="email"
@@ -135,7 +137,7 @@ export default async function ClientProfilePage() {
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              Your timezone
+              {t("Your timezone")}
             </label>
             <Select name="timezone" defaultValue={me.timezone ?? "America/Chicago"}>
               {US_TIMEZONES.map((tz) => (
@@ -145,18 +147,29 @@ export default async function ClientProfilePage() {
               ))}
             </Select>
             <p className="mt-1 text-xs text-gray">
-              For virtual sessions — this is what session times get shown
-              in for you.
+              {t("For virtual sessions — this is what session times get shown in for you.")}
             </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              {t("App language")}
+            </label>
+            <Select name="language" defaultValue={me.language ?? "en"}>
+              {LANGUAGES.map((l) => (
+                <option key={l.value} value={l.value}>
+                  {l.label}
+                </option>
+              ))}
+            </Select>
           </div>
 
           <p className="pt-2 text-sm font-medium text-gray">
-            Emergency contact
+            {t("Emergency contact")}
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Name
+                {t("Name")}
               </label>
               <Input
                 name="emergency_contact_name"
@@ -165,7 +178,7 @@ export default async function ClientProfilePage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Phone
+                {t("Phone")}
               </label>
               <Input
                 name="emergency_contact_phone"
@@ -175,13 +188,13 @@ export default async function ClientProfilePage() {
           </div>
 
           <p className="pt-2 text-sm font-medium text-gray">
-            Physician / provider{" "}
-            <span className="font-normal text-gray">(optional)</span>
+            {t("Physician / provider")}{" "}
+            <span className="font-normal text-gray">{t("(optional)")}</span>
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Name
+                {t("Name")}
               </label>
               <Input
                 name="physician_name"
@@ -190,7 +203,7 @@ export default async function ClientProfilePage() {
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Phone
+                {t("Phone")}
               </label>
               <Input
                 name="physician_phone"
@@ -200,7 +213,7 @@ export default async function ClientProfilePage() {
           </div>
 
           <Button type="submit" className="w-full">
-            {isFirstTime ? "Continue" : "Save"}
+            {isFirstTime ? t("Continue") : t("Save")}
           </Button>
         </form>
       </Card>
@@ -208,13 +221,13 @@ export default async function ClientProfilePage() {
       {!isFirstTime ? (
         <Card className="space-y-2">
           <div className="flex items-center justify-between">
-            <p className="font-medium text-ink">Signed documents</p>
+            <p className="font-medium text-ink">{t("Signed documents")}</p>
             <Link href="/client/documents" className="text-sm text-rose hover:underline">
-              View all →
+              {t("View all →")}
             </Link>
           </div>
           {visibleDocuments.length === 0 ? (
-            <p className="text-sm text-gray">Nothing assigned yet.</p>
+            <p className="text-sm text-gray">{t("Nothing assigned yet.")}</p>
           ) : (
             <div className="space-y-1.5">
               {visibleDocuments.map((d) => {
@@ -224,10 +237,10 @@ export default async function ClientProfilePage() {
                     <span className="text-ink">{d.title}</span>
                     {ack ? (
                       <Badge tone="green">
-                        {ack.signed_name ? "signed" : "read"} {ack.acknowledged_at.slice(0, 10)}
+                        {ack.signed_name ? t("signed") : t("read")} {ack.acknowledged_at.slice(0, 10)}
                       </Badge>
                     ) : (
-                      <Badge tone="gold">needs review</Badge>
+                      <Badge tone="gold">{t("needs review")}</Badge>
                     )}
                   </div>
                 );
@@ -239,9 +252,9 @@ export default async function ClientProfilePage() {
 
       {!isFirstTime ? (
         <Card className="space-y-2">
-          <p className="font-medium text-ink">Payment history</p>
+          <p className="font-medium text-ink">{t("Payment history")}</p>
           {!paidPayments || paidPayments.length === 0 ? (
-            <p className="text-sm text-gray">No payments recorded yet.</p>
+            <p className="text-sm text-gray">{t("No payments recorded yet.")}</p>
           ) : (
             <div className="space-y-1.5">
               {paidPayments.map((p) => (
@@ -263,31 +276,30 @@ export default async function ClientProfilePage() {
       {!isFirstTime ? (
         <Card className="flex items-center justify-between">
           <div>
-            <p className="font-medium text-ink">Training history</p>
+            <p className="font-medium text-ink">{t("Training history")}</p>
             <p className="text-sm text-gray">
-              {sessionCount ?? 0} session{(sessionCount ?? 0) === 1 ? "" : "s"} logged
+              {(sessionCount ?? 0) === 1
+                ? t("{count} session logged", { count: sessionCount ?? 0 })
+                : t("{count} sessions logged", { count: sessionCount ?? 0 })}
             </p>
           </div>
           <Link href="/client/history" className="text-sm text-rose hover:underline">
-            View →
+            {t("View →")}
           </Link>
         </Card>
       ) : null}
 
       {!isFirstTime ? (
         <Card className="space-y-2">
-          <p className="font-medium text-ink">Your data</p>
+          <p className="font-medium text-ink">{t("Your data")}</p>
           <p className="text-sm text-gray">
-            Download everything tracked here for you — sessions, check-ins,
-            measurements, documents you&apos;ve signed, all of it — for
-            your own records any time, including if you ever stop
-            training with Mickey.
+            {t("Download everything tracked here for you — sessions, check-ins, measurements, documents you've signed, all of it — for your own records any time, including if you ever stop training with Mickey.")}
           </p>
           <a
             href="/api/client/export"
             className="inline-block rounded-xl border border-grayLt bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
           >
-            Download my data
+            {t("Download my data")}
           </a>
         </Card>
       ) : null}
