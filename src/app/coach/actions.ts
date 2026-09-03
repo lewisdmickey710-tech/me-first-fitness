@@ -209,7 +209,7 @@ export async function counterRequest(
   try {
     const { data: client } = await supabase
       .from("clients")
-      .select("name, user_id")
+      .select("name, user_id, language")
       .eq("id", clientId)
       .single();
     if (client) {
@@ -218,7 +218,8 @@ export async function counterRequest(
         await sendRequestCounteredEmail(
           email,
           client.name,
-          `${counteredDate} at ${formatTimeOfDay(counteredTime)}`
+          `${counteredDate} at ${formatTimeOfDay(counteredTime)}`,
+          client.language
         );
       }
     }
@@ -328,13 +329,13 @@ async function coachRescheduleSessionCore(
   try {
     const { data: client } = await supabase
       .from("clients")
-      .select("name, user_id")
+      .select("name, user_id, language")
       .eq("id", clientId)
       .single();
     if (client) {
       const email = await clientLoginEmail(client.user_id);
       if (email) {
-        await sendSessionRescheduledEmail(email, client.name, fromDate, whenText);
+        await sendSessionRescheduledEmail(email, client.name, fromDate, whenText, client.language);
       }
     }
   } catch (emailError) {
@@ -598,13 +599,13 @@ async function coachBookSessionCore(
   try {
     const { data: client } = await supabase
       .from("clients")
-      .select("name, user_id")
+      .select("name, user_id, language")
       .eq("id", clientId)
       .single();
     if (client) {
       const email = await clientLoginEmail(client.user_id);
       if (email) {
-        await sendSessionBookedEmail(email, client.name, whenText, kindLabel);
+        await sendSessionBookedEmail(email, client.name, whenText, kindLabel, client.language);
       }
     }
   } catch (emailError) {
@@ -1898,7 +1899,7 @@ export async function markMilestoneAchieved(
   try {
     const { data: client } = await supabase
       .from("clients")
-      .select("name, user_id")
+      .select("name, user_id, language")
       .eq("id", clientId)
       .single();
     if (client?.user_id) {
@@ -1909,7 +1910,8 @@ export async function markMilestoneAchieved(
           userResult.user.email,
           client.name,
           milestone.title,
-          achievedNote
+          achievedNote,
+          client.language
         );
       }
     }
@@ -2135,7 +2137,7 @@ export async function blockDate(formData: FormData) {
   if (affectedIds.size > 0) {
     const { data: affectedClients } = await supabase
       .from("clients")
-      .select("id, name, user_id")
+      .select("id, name, user_id, language")
       .in("id", [...affectedIds]);
 
     const dayName = DAY_NAMES[dayOfWeek];
@@ -2160,7 +2162,7 @@ export async function blockDate(formData: FormData) {
       try {
         const email = await clientLoginEmail(client.user_id);
         if (email) {
-          await sendDayBlockedEmail(email, client.name, whenText, reason);
+          await sendDayBlockedEmail(email, client.name, whenText, reason, client.language);
         }
       } catch (emailError) {
         console.error("Failed to send day-blocked email", emailError);
@@ -2216,16 +2218,16 @@ async function coachCancelSessionCore(
     try {
       const { data: client } = await supabase
         .from("clients")
-        .select("name, user_id")
+        .select("name, user_id, language")
         .eq("id", clientId)
         .single();
       if (client) {
         const email = await clientLoginEmail(client.user_id);
         if (email) {
           if (isEmergency) {
-            await sendEmergencyCancelledSessionEmail(email, client.name, occurrenceDate);
+            await sendEmergencyCancelledSessionEmail(email, client.name, occurrenceDate, client.language);
           } else {
-            await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate);
+            await sendCoachCancelledSessionEmail(email, client.name, occurrenceDate, client.language);
           }
         }
       }

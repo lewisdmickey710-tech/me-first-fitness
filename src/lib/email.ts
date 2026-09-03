@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
+import type { Locale } from "@/lib/i18n";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
@@ -7,15 +8,28 @@ const resend = process.env.RESEND_API_KEY
 
 const FROM = process.env.EMAIL_FROM ?? "MeFirstFitness <onboarding@resend.dev>";
 
-const BLOCKED_DATE_FMT = new Intl.DateTimeFormat("en-US", {
+const BLOCKED_DATE_FMT_EN = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
   month: "short",
   day: "numeric",
   timeZone: "UTC",
 });
-function formatBlockedDate(dateStr: string): string {
-  return BLOCKED_DATE_FMT.format(new Date(`${dateStr}T00:00:00Z`));
+const BLOCKED_DATE_FMT_ES = new Intl.DateTimeFormat("es", {
+  weekday: "long",
+  month: "short",
+  day: "numeric",
+  timeZone: "UTC",
+});
+function formatBlockedDate(dateStr: string, locale: Locale = "en"): string {
+  const fmt = locale === "es" ? BLOCKED_DATE_FMT_ES : BLOCKED_DATE_FMT_EN;
+  return fmt.format(new Date(`${dateStr}T00:00:00Z`));
 }
+
+const KIND_LABEL_ES: Record<string, string> = {
+  "video session": "sesión por video",
+  "check-in call": "llamada de seguimiento",
+  session: "sesión",
+};
 
 function wrapper(bodyHtml: string): string {
   return `
@@ -82,7 +96,8 @@ export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
 export async function sendSessionReminderEmail(
   to: string,
   clientName: string,
-  whenText: string
+  whenText: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping session reminder email");
@@ -91,16 +106,28 @@ export async function sendSessionReminderEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Your session is coming up",
-    html: wrapper(`
+    subject: locale === "es" ? "Tu sesión se acerca" : "Your session is coming up",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Solo un aviso — tu próxima sesión es <strong>${whenText}</strong>. ¡Nos vemos entonces!</p>
+      <p style="font-size: 13px; color: #8A8078;">¿Necesitas cancelar? Recuerda que avisar con menos de ${LATE_CANCEL_NOTICE_HOURS} horas cuenta como una cancelación tardía según nuestra política.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>Just a heads up — your next session is <strong>${whenText}</strong>. See you then!</p>
       <p style="font-size: 13px; color: #8A8078;">Need to cancel? Just a reminder that under ${LATE_CANCEL_NOTICE_HOURS} hours' notice counts as a late cancellation under our policy.</p>
-    `),
+    `
+    ),
   });
 }
 
-export async function sendInactivityNudgeEmail(to: string, clientName: string) {
+export async function sendInactivityNudgeEmail(
+  to: string,
+  clientName: string,
+  locale: Locale = "en"
+) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping inactivity nudge email");
     return;
@@ -108,12 +135,21 @@ export async function sendInactivityNudgeEmail(to: string, clientName: string) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Haven't seen you check in",
-    html: wrapper(`
+    subject:
+      locale === "es" ? "No te he visto registrar un check-in" : "Haven't seen you check in",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Solo quería saludar — no he visto un check-in o registro de actividad tuyo en un tiempo. Sin ninguna presión, solo quería que supieras que lo noté y que estoy aquí si algo ha surgido.</p>
+      <p>Cuando tengas oportunidad, registra un check-in rápido en la aplicación para que pueda ver cómo van las cosas.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>Just checking in — I haven't seen a check-in or activity log from you in a bit. No pressure at all, just wanted you to know I noticed and I'm here if anything's come up.</p>
       <p>Whenever you get a chance, log a quick check-in in the app so I can see how things are going.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -123,17 +159,40 @@ export async function sendPaymentReminderEmail(
   description: string,
   amount: number,
   dueDateText: string,
-  isOverdue: boolean
+  isOverdue: boolean,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping payment reminder email");
     return;
   }
+  const isEs = locale === "es";
   await resend.emails.send({
     from: FROM,
     to,
-    subject: isOverdue ? "Payment past due" : "Payment reminder",
-    html: wrapper(`
+    subject: isEs
+      ? isOverdue
+        ? "Pago vencido"
+        : "Recordatorio de pago"
+      : isOverdue
+        ? "Payment past due"
+        : "Payment reminder",
+    html: wrapper(
+      isEs
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>${
+        isOverdue
+          ? "Este es un recordatorio amistoso de que un pago está vencido:"
+          : "Este es un recordatorio amistoso sobre un próximo pago:"
+      }</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${description}</strong><br/>
+        $${amount.toFixed(2)} — vence el ${dueDateText}
+      </p>
+      <p>¡Avísame si tienes alguna pregunta!</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>${
         isOverdue
@@ -145,7 +204,8 @@ export async function sendPaymentReminderEmail(
         $${amount.toFixed(2)} — due ${dueDateText}
       </p>
       <p>Let me know if you have any questions!</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -170,7 +230,11 @@ export async function sendWelcomeToClientEmail(to: string, clientName: string) {
   });
 }
 
-export async function sendServiceCheckinDueEmail(to: string, clientName: string) {
+export async function sendServiceCheckinDueEmail(
+  to: string,
+  clientName: string,
+  locale: Locale = "en"
+) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping service check-in email");
     return;
@@ -178,16 +242,31 @@ export async function sendServiceCheckinDueEmail(to: string, clientName: string)
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Quick check-in — how's it going overall?",
-    html: wrapper(`
+    subject:
+      locale === "es"
+        ? "Check-in rápido — ¿cómo va todo en general?"
+        : "Quick check-in — how's it going overall?",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Ahora que las medidas de este mes ya están registradas, es un buen momento para tu check-in rápido de servicio — cómo se siente el coaching en general, qué está funcionando, qué no.</p>
+      <p>Inicia sesión y lo verás esperando en tu panel. Toma solo un minuto.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>Now that this month's measurements are in, it's a good time for your quick service check-in — how coaching's feeling overall, what's working, what's not.</p>
       <p>Log in and you'll see it waiting on your dashboard. Takes just a minute.</p>
-    `),
+    `
+    ),
   });
 }
 
-export async function sendDocumentsPendingEmail(to: string, clientName: string) {
+export async function sendDocumentsPendingEmail(
+  to: string,
+  clientName: string,
+  locale: Locale = "en"
+) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping documents pending email");
     return;
@@ -195,19 +274,28 @@ export async function sendDocumentsPendingEmail(to: string, clientName: string) 
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "A document needs your attention",
-    html: wrapper(`
+    subject: locale === "es" ? "Un documento necesita tu atención" : "A document needs your attention",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Tienes al menos un documento esperando tu revisión en la aplicación — nada urgente, solo quería mencionarlo para que no se pierda.</p>
+      <p>Inicia sesión y revisa tu pestaña de Documentos cuando tengas oportunidad.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>You've got at least one document waiting for your review in the app — nothing urgent, just wanted to flag it so it doesn't get lost.</p>
       <p>Log in and check your Documents tab whenever you get a chance.</p>
-    `),
+    `
+    ),
   });
 }
 
 export async function sendCoachCancelledSessionEmail(
   to: string,
   clientName: string,
-  whenText: string
+  whenText: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping coach-cancelled session email");
@@ -216,20 +304,33 @@ export async function sendCoachCancelledSessionEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "I had to cancel your upcoming session",
-    html: wrapper(`
+    subject:
+      locale === "es"
+        ? "Tuve que cancelar tu próxima sesión"
+        : "I had to cancel your upcoming session",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Necesito cancelar tu sesión el <strong>${whenText}</strong> — te escribiré por mensaje de texto para reprogramarte.</p>
+      <p>Esta cancelación es mía, así que no hay cargo por cancelación y tienes una reprogramación gratuita esperando para cuando te convenga.</p>
+      <p>Ya que no tendremos nuestra sesión, trata de todas formas de meter algo de movimiento por tu cuenta hoy — una caminata, algo de estiramiento, lo que tengas tiempo de hacer.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>I need to cancel your session on <strong>${whenText}</strong> — I'll follow up by text to get you rescheduled.</p>
       <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you.</p>
       <p>Since we won't get our session in, try to still sneak in some movement on your own today — a walk, some stretching, whatever you've got time for.</p>
-    `),
+    `
+    ),
   });
 }
 
 export async function sendEmergencyCancelledSessionEmail(
   to: string,
   clientName: string,
-  whenText: string
+  whenText: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping emergency-cancelled session email");
@@ -238,12 +339,23 @@ export async function sendEmergencyCancelledSessionEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Your session is cancelled — take care of what you need to",
-    html: wrapper(`
+    subject:
+      locale === "es"
+        ? "Tu sesión está cancelada — atiende lo que necesites"
+        : "Your session is cancelled — take care of what you need to",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>He cancelado tu sesión el <strong>${whenText}</strong> — sin cargo, sin preocupaciones. Atiende lo que necesites.</p>
+      <p>Cuando estés lista/o, busquemos un nuevo horario.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>I've cancelled your session on <strong>${whenText}</strong> — no charge, no worries at all. Take care of what you need to.</p>
       <p>Whenever you're ready, let's find a new time.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -251,7 +363,8 @@ export async function sendDayBlockedEmail(
   to: string,
   clientName: string,
   whenText: string,
-  reason: string | null
+  reason: string | null,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping day-blocked email");
@@ -260,13 +373,25 @@ export async function sendDayBlockedEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "I'm unavailable that day — your session moved",
-    html: wrapper(`
+    subject:
+      locale === "es"
+        ? "No estoy disponible ese día — tu sesión se movió"
+        : "I'm unavailable that day — your session moved",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>No estoy disponible el <strong>${whenText}</strong>${reason ? ` (${reason})` : ""}, así que tuve que cancelar tu sesión ese día.</p>
+      <p>Esta cancelación es mía, así que no hay cargo por cancelación y tienes una reprogramación gratuita esperando para cuando te convenga. Te escribiré para ponerte en un nuevo horario.</p>
+      <p>Ya que no tendremos nuestra sesión, trata de todas formas de meter algo de movimiento por tu cuenta ese día — una caminata, algo de estiramiento, lo que tengas tiempo de hacer.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>I'm unavailable on <strong>${whenText}</strong>${reason ? ` (${reason})` : ""}, so I had to cancel your session that day.</p>
       <p>This one's on me, so there's no cancellation fee and you've got a free reschedule waiting whenever works for you. I'll follow up to get you set up on a new time.</p>
       <p>Since we won't get our session in, try to still sneak in some movement on your own that day — a walk, some stretching, whatever you've got time for.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -304,29 +429,43 @@ export async function sendPacketEmail(
 export async function sendBlockedDatesReminderEmail(
   to: string,
   clientName: string,
-  dates: string[]
+  dates: string[],
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping blocked-date reminder email");
     return;
   }
+  const isEs = locale === "es";
   const sorted = [...dates].sort();
   const dateListHtml = sorted
-    .map((d) => `<li>${formatBlockedDate(d)}</li>`)
+    .map((d) => `<li>${formatBlockedDate(d, locale)}</li>`)
     .join("");
   await resend.emails.send({
     from: FROM,
     to,
-    subject:
-      sorted.length > 1
+    subject: isEs
+      ? sorted.length > 1
+        ? "Próximas fechas en las que no tendré sesión"
+        : "Próxima fecha en la que no tendré sesión"
+      : sorted.length > 1
         ? "Upcoming dates I won't be in session"
         : "Upcoming date I won't be in session",
-    html: wrapper(`
+    html: wrapper(
+      isEs
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Solo un aviso — no olvides que no tendré sesión el:</p>
+      <ul style="padding-left: 20px;">${dateListHtml}</ul>
+      <p>Cualquier cosa que normalmente caería en ${sorted.length > 1 ? "estas fechas" : "esta fecha"} ya está resuelta de mi lado — no necesitas hacer nada.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>Just a heads up — don't forget I won't be in session on:</p>
       <ul style="padding-left: 20px;">${dateListHtml}</ul>
       <p>Anything that would normally fall on ${sorted.length > 1 ? "these dates" : "this date"} is already taken care of on my end — no action needed from you.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -334,7 +473,8 @@ export async function sendSessionRescheduledEmail(
   to: string,
   clientName: string,
   fromDateStr: string,
-  toWhenText: string
+  toWhenText: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping session-rescheduled email");
@@ -343,15 +483,26 @@ export async function sendSessionRescheduledEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Your session time has changed",
-    html: wrapper(`
+    subject: locale === "es" ? "Tu horario de sesión cambió" : "Your session time has changed",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Moví tu sesión del <strong>${formatBlockedDate(fromDateStr, locale)}</strong> a:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${toWhenText}</strong>
+      </p>
+      <p>No necesitas hacer nada — solo quería que tuvieras el nuevo horario. Contáctame si no te funciona.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
-      <p>I moved your session on <strong>${formatBlockedDate(fromDateStr)}</strong> to:</p>
+      <p>I moved your session on <strong>${formatBlockedDate(fromDateStr, locale)}</strong> to:</p>
       <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
         <strong>${toWhenText}</strong>
       </p>
       <p>Nothing you need to do — just wanted you to have the new time. Reach out if it doesn't work for you.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -359,31 +510,46 @@ export async function sendSessionBookedEmail(
   to: string,
   clientName: string,
   whenText: string,
-  kindLabel: string
+  kindLabel: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping session-booked email");
     return;
   }
+  const isEs = locale === "es";
+  const label = isEs ? KIND_LABEL_ES[kindLabel] ?? kindLabel : kindLabel;
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "You're booked!",
-    html: wrapper(`
+    subject: isEs ? "¡Estás reservada/o!" : "You're booked!",
+    html: wrapper(
+      isEs
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Fui adelante y te reservé para <strong>${label}</strong>:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${whenText}</strong>
+      </p>
+      <p>¡Nos vemos entonces! Contáctame si este horario no te funciona.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
-      <p>I went ahead and got you booked in for a <strong>${kindLabel}</strong>:</p>
+      <p>I went ahead and got you booked in for a <strong>${label}</strong>:</p>
       <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
         <strong>${whenText}</strong>
       </p>
       <p>See you then! Reach out if this time doesn't work for you.</p>
-    `),
+    `
+    ),
   });
 }
 
 export async function sendRequestCounteredEmail(
   to: string,
   clientName: string,
-  proposedText: string
+  proposedText: string,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping request-countered email");
@@ -392,15 +558,29 @@ export async function sendRequestCounteredEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "A different time for your session request",
-    html: wrapper(`
+    subject:
+      locale === "es"
+        ? "Un horario diferente para tu solicitud de sesión"
+        : "A different time for your session request",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Tu horario solicitado no funciona del todo — me gustaría proponer en su lugar:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${proposedText}</strong>
+      </p>
+      <p>Inicia sesión y lo verás esperando en tu panel — acéptalo, o envía una nueva solicitud si no te funciona.</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p>Your requested time doesn't quite work — I'd like to propose instead:</p>
       <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
         <strong>${proposedText}</strong>
       </p>
       <p>Log in and you'll see it waiting on your dashboard — accept it, or send a new request if it doesn't work.</p>
-    `),
+    `
+    ),
   });
 }
 
@@ -408,22 +588,36 @@ export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,
   milestoneTitle: string,
-  achievedNote: string | null
+  achievedNote: string | null,
+  locale: Locale = "en"
 ) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping milestone email");
     return;
   }
+  const isEs = locale === "es";
   await resend.emails.send({
     from: FROM,
     to,
-    subject: `🎉 You hit a milestone — ${milestoneTitle}`,
-    html: wrapper(`
+    subject: isEs
+      ? `🎉 Alcanzaste un logro — ${milestoneTitle}`
+      : `🎉 You hit a milestone — ${milestoneTitle}`,
+    html: wrapper(
+      isEs
+        ? `
+      <p>Hola ${clientName},</p>
+      <p><strong>${milestoneTitle}</strong> — hecho. Estoy genuinamente orgullosa de ti, y quería que lo escucharas directamente de mí, no solo ver una marca en la aplicación.</p>
+      ${achievedNote ? `<p>${achievedNote}</p>` : ""}
+      <p>Inicia sesión para verlo marcado en tus logros — y sigamos adelante.</p>
+      <p>— Mickey</p>
+    `
+        : `
       <p>Hi ${clientName},</p>
       <p><strong>${milestoneTitle}</strong> — done. I'm genuinely proud of you, and I wanted you to hear it directly from me, not just see a checkmark in the app.</p>
       ${achievedNote ? `<p>${achievedNote}</p>` : ""}
       <p>Log in to see it marked on your milestones — and let's keep going.</p>
       <p>— Mickey</p>
-    `),
+    `
+    ),
   });
 }

@@ -93,13 +93,13 @@ export async function GET(request: Request) {
 
   const { data: schedules } = await supabase
     .from("client_schedules")
-    .select("id, client_id, time_of_day, label, clients(name, user_id, timezone)")
+    .select("id, client_id, time_of_day, label, clients(name, user_id, timezone, language)")
     .eq("active", true)
     .eq("day_of_week", tomorrowDayOfWeek);
 
   for (const schedule of schedules ?? []) {
     const client = (schedule as unknown as {
-      clients: { name: string; user_id: string | null; timezone: string } | null;
+      clients: { name: string; user_id: string | null; timezone: string; language: "en" | "es" } | null;
     }).clients;
     if (!client?.user_id) continue;
     // Sessions are paused app-wide while a late cancellation fee is
@@ -127,7 +127,8 @@ export async function GET(request: Request) {
         client.name,
         `tomorrow at ${formatTimeOfDayForClient(tomorrowDateStr, schedule.time_of_day, client.timezone)}${
           schedule.label ? ` (${schedule.label})` : ""
-        }`
+        }`,
+        client.language
       );
       await supabase.from("session_reminders_log").insert({
         client_schedule_id: schedule.id,
@@ -145,14 +146,14 @@ export async function GET(request: Request) {
   // session_reminders_log requires a client_schedule_id these don't have.
   const { data: oneOffOccurrences } = await supabase
     .from("session_occurrences")
-    .select("id, client_id, notes, reminder_sent_at, clients(name, user_id, timezone)")
+    .select("id, client_id, notes, reminder_sent_at, clients(name, user_id, timezone, language)")
     .eq("status", "scheduled")
     .eq("occurrence_date", tomorrowDateStr)
     .is("reminder_sent_at", null);
 
   for (const occurrence of oneOffOccurrences ?? []) {
     const client = (occurrence as unknown as {
-      clients: { name: string; user_id: string | null; timezone: string } | null;
+      clients: { name: string; user_id: string | null; timezone: string; language: "en" | "es" } | null;
     }).clients;
     if (!client?.user_id) continue;
     if (frozenClientIds.has(occurrence.client_id)) continue;
@@ -175,7 +176,8 @@ export async function GET(request: Request) {
       await sendSessionReminderEmail(
         userResult.user.email,
         client.name,
-        `tomorrow${timeText}`
+        `tomorrow${timeText}`,
+        client.language
       );
       await supabase
         .from("session_occurrences")
@@ -191,14 +193,14 @@ export async function GET(request: Request) {
   const { data: payments } = await supabase
     .from("payments")
     .select(
-      "id, description, amount, due_date, reminder_sent_at, clients(name, user_id, pro_bono)"
+      "id, description, amount, due_date, reminder_sent_at, clients(name, user_id, pro_bono, language)"
     )
     .is("paid_on", null)
     .lte("due_date", paymentLookaheadStr);
 
   for (const payment of payments ?? []) {
     const client = (payment as unknown as {
-      clients: { name: string; user_id: string | null; pro_bono: boolean } | null;
+      clients: { name: string; user_id: string | null; pro_bono: boolean; language: "en" | "es" } | null;
     }).clients;
     if (!client?.user_id || client.pro_bono) continue;
 
@@ -223,7 +225,8 @@ export async function GET(request: Request) {
         payment.description,
         Number(payment.amount),
         payment.due_date,
-        payment.due_date < todayDateStr
+        payment.due_date < todayDateStr,
+        client.language
       );
       await supabase
         .from("payments")
@@ -238,7 +241,7 @@ export async function GET(request: Request) {
   // ---- Inactivity nudges: no self-logged check-in/activity in a while ----
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, user_id, last_inactivity_nudge_sent_at")
+    .select("id, name, user_id, last_inactivity_nudge_sent_at, language")
     .not("user_id", "is", null);
 
   const activeClients = (clients ?? []).filter(
@@ -279,7 +282,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await sendInactivityNudgeEmail(userResult.user.email, client.name);
+        await sendInactivityNudgeEmail(userResult.user.email, client.name, client.language);
         await supabase
           .from("clients")
           .update({ last_inactivity_nudge_sent_at: new Date().toISOString() })
@@ -304,7 +307,7 @@ export async function GET(request: Request) {
   if (documents && documents.length > 0) {
     const { data: docClients } = await supabase
       .from("clients")
-      .select("id, name, user_id, last_document_nudge_sent_at")
+      .select("id, name, user_id, last_document_nudge_sent_at, language")
       .not("user_id", "is", null);
 
     const eligibleClients = (docClients ?? []).filter(
@@ -367,7 +370,7 @@ export async function GET(request: Request) {
         }
 
         try {
-          await sendDocumentsPendingEmail(userResult.user.email, client.name);
+          await sendDocumentsPendingEmail(userResult.user.email, client.name, client.language);
           await supabase
             .from("clients")
             .update({ last_document_nudge_sent_at: new Date().toISOString() })
@@ -386,7 +389,7 @@ export async function GET(request: Request) {
   // the same way a pending document does. ----
   const { data: checkinClients } = await supabase
     .from("clients")
-    .select("id, name, user_id, last_service_checkin_nudge_sent_at")
+    .select("id, name, user_id, last_service_checkin_nudge_sent_at, language")
     .not("user_id", "is", null);
 
   const serviceCheckinEligible = (checkinClients ?? []).filter(
@@ -435,7 +438,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await sendServiceCheckinDueEmail(userResult.user.email, client.name);
+        await sendServiceCheckinDueEmail(userResult.user.email, client.name, client.language);
         await supabase
           .from("clients")
           .update({ last_service_checkin_nudge_sent_at: new Date().toISOString() })
@@ -503,7 +506,7 @@ export async function GET(request: Request) {
     for (const [clientId, dates] of datesByClient) {
       const { data: client } = await supabase
         .from("clients")
-        .select("name, user_id")
+        .select("name, user_id, language")
         .eq("id", clientId)
         .single();
       if (!client?.user_id) continue;
@@ -516,7 +519,7 @@ export async function GET(request: Request) {
       }
 
       try {
-        await sendBlockedDatesReminderEmail(userResult.user.email, client.name, dates);
+        await sendBlockedDatesReminderEmail(userResult.user.email, client.name, dates, client.language);
         await supabase
           .from("blocked_date_reminders_log")
           .insert(dates.map((d) => ({ client_id: clientId, blocked_date: d })));
