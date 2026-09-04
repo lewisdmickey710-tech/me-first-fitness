@@ -485,6 +485,20 @@ const ES: Record<string, string> = {
   "Save activity": "Guardar actividad",
   "Once you log an activity above, it'll show up here.": "Cuando registres una actividad arriba, aparecerá aquí.",
   "Activity photo": "Foto de actividad",
+  "Log a workout (sets, reps, weight)": "Registra un entrenamiento (series, repeticiones, peso)",
+  "Track your own sets, reps, and weight for a workout you did on your own — no prescribed program needed, just fill in what you did.":
+    "Registra tus propias series, repeticiones y peso de un entrenamiento que hiciste por tu cuenta — no necesitas un programa prescrito, solo completa lo que hiciste.",
+  "Workout name": "Nombre del entrenamiento",
+  "e.g. Leg day": "ej. día de piernas",
+  Exercises: "Ejercicios",
+  Exercise: "Ejercicio",
+  Sets: "Series",
+  Reps: "Repeticiones",
+  "Leave a row blank to skip it.": "Deja una fila en blanco para omitirla.",
+  "Save workout": "Guardar entrenamiento",
+  "Logged workouts show up in": "Los entrenamientos registrados aparecen en",
+  "and feed your strength trends on": "y alimentan tus tendencias de fuerza en",
+  Progress: "Progreso",
 
   // Progress
   "Your measurement trends and strength progress, all in one place.":

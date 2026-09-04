@@ -16,7 +16,7 @@ import { BUSINESS_TIMEZONE, convertWallTime, toDateString, nowInBusinessTz } fro
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { safeFileName } from "@/lib/storage";
-import type { PaymentSchedule } from "@/lib/types";
+import type { PaymentSchedule, SessionEntry } from "@/lib/types";
 
 export async function logCheckin(formData: FormData) {
   const me = await getMyClient();
@@ -90,6 +90,60 @@ export async function logActivity(formData: FormData) {
 
   revalidatePath("/client/activity");
   revalidatePath("/client/dashboard");
+  redirect("/client/activity");
+}
+
+// A workout the client did entirely on her own -- no prescribed program day
+// behind it, just a blank template she fills in herself (exercise, sets,
+// reps, weight). Lands in the same `sessions` table as coached/program
+// sessions with session_type "freestyle" and coached: false, so it shows up
+// as a "Solo workout" in History and feeds the exercise weight trends/PRs on
+// Progress for free, same as any other logged session.
+export async function logFreestyleWorkout(formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const date = String(formData.get("date") ?? "");
+  const day_label = String(formData.get("day_label") ?? "").trim() || "Workout";
+  const day_notes = String(formData.get("day_notes") ?? "").trim();
+
+  if (!date) throw new Error("Date is required.");
+
+  const exercises = formData.getAll("exercise") as string[];
+  const sets = formData.getAll("sets") as string[];
+  const reps = formData.getAll("reps") as string[];
+  const weights = formData.getAll("weight") as string[];
+
+  const entries: SessionEntry[] = exercises
+    .map((exercise, i) => ({
+      exercise: exercise?.trim() ?? "",
+      sets: sets[i] ?? "",
+      reps: reps[i] ?? "",
+      weight: weights[i] ?? "",
+    }))
+    .filter((e) => e.exercise);
+
+  if (entries.length === 0) throw new Error("Add at least one exercise.");
+
+  const { error } = await supabase.from("sessions").insert({
+    client_id: me.id,
+    day_label,
+    date,
+    entries,
+    day_notes: day_notes || null,
+    logged_by: "client",
+    session_type: "freestyle",
+    coached: false,
+  });
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/activity");
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/progress");
+  revalidatePath("/client/history");
   redirect("/client/activity");
 }
 

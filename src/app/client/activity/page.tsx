@@ -1,7 +1,7 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { logActivity } from "@/app/client/actions";
+import { logActivity, logFreestyleWorkout } from "@/app/client/actions";
 import {
   Button,
   Card,
@@ -11,10 +11,13 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { WeightInput } from "@/components/weight-input";
 import { ACTIVITY_TYPES } from "@/lib/constants";
 import { toDateString } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
 import type { Activity } from "@/lib/types";
+
+const FREESTYLE_ROWS = 8;
 
 export default async function ClientActivityPage() {
   const me = await getMyClient();
@@ -128,6 +131,75 @@ export default async function ClientActivityPage() {
           <Button type="submit">{t("Save activity")}</Button>
         </form>
       </Card>
+
+      <div>
+        <h2 className="text-lg font-semibold text-ink">
+          {t("Log a workout (sets, reps, weight)")}
+        </h2>
+        <p className="mt-1 text-sm text-gray">
+          {t("Track your own sets, reps, and weight for a workout you did on your own — no prescribed program needed, just fill in what you did.")}
+        </p>
+      </div>
+
+      <Card>
+        <form action={logFreestyleWorkout} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              {t("Date")}
+            </label>
+            <Input name="date" type="date" required defaultValue={today} />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              {t("Workout name")}{" "}
+              <span className="font-normal text-gray">{t("(optional)")}</span>
+            </label>
+            <Input name="day_label" placeholder={t("e.g. Leg day")} />
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-ink">
+              {t("Exercises")}
+            </label>
+            <div className="space-y-2">
+              {Array.from({ length: FREESTYLE_ROWS }).map((_, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2">
+                  <Input
+                    name="exercise"
+                    placeholder={t("Exercise")}
+                    className="col-span-5"
+                  />
+                  <Input name="sets" placeholder={t("Sets")} className="col-span-2" />
+                  <Input name="reps" placeholder={t("Reps")} className="col-span-2" />
+                  <div className="col-span-3">
+                    <WeightInput name="weight" placeholder={t("Weight")} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-gray">
+              {t("Leave a row blank to skip it.")}
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              {t("Notes")}
+            </label>
+            <Textarea name="day_notes" rows={3} />
+          </div>
+          <Button type="submit">{t("Save workout")}</Button>
+        </form>
+      </Card>
+      <p className="text-sm text-gray">
+        {t("Logged workouts show up in")}{" "}
+        <a href="/client/history" className="text-rose hover:underline">
+          {t("Past workouts")}
+        </a>{" "}
+        {t("and feed your strength trends on")}{" "}
+        <a href="/client/progress" className="text-rose hover:underline">
+          {t("Progress")}
+        </a>
+        .
+      </p>
 
       {!activities || activities.length === 0 ? (
         <EmptyState
