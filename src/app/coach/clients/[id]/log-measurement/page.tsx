@@ -67,7 +67,7 @@ function NumField({ name, label }: { name: string; label: string }) {
       <label className="mb-1 block text-sm font-medium text-ink">
         {label}
       </label>
-      <Input name={name} type="number" step="0.1" inputMode="decimal" />
+      <Input name={name} type="number" step="any" inputMode="decimal" />
     </div>
   );
 }
