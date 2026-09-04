@@ -22,6 +22,7 @@ import {
   markPaymentPaid,
   setClientDocumentAssignment,
   setClientPartner,
+  setClientPhase,
   setLogEntryCoachNotes,
   setRequestStatus,
   startClientHold,
@@ -51,7 +52,7 @@ import {
 } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { CalorieGoalField } from "@/components/calorie-goal-field";
-import { ACTIVITY_TYPES, formatReps, phaseInfo } from "@/lib/constants";
+import { ACTIVITY_TYPES, formatReps, phaseInfo, PHASES } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
 import {
@@ -728,6 +729,37 @@ function Overview({
               </Button>
             </form>
           </div>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              const phase = String(formData.get("phase") ?? "") as
+                | "1"
+                | "2"
+                | "3"
+                | "4";
+              if (phase) await setClientPhase(client.id, phase);
+            }}
+            className="mt-4 flex flex-wrap items-end gap-2 border-t border-grayLt pt-4"
+          >
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Move to a different phase
+              </label>
+              <Select name="phase" defaultValue="" required>
+                <option value="" disabled>
+                  Choose a phase...
+                </option>
+                {PHASES.filter((p) => p.id !== "n/a").map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button type="submit" variant="secondary">
+              Set phase
+            </Button>
+          </form>
         </Card>
       ) : (
         <EmptyState

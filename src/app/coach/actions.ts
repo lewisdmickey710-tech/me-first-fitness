@@ -18,7 +18,7 @@ import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { safeFileName } from "@/lib/storage";
-import type { BodyMapMarker, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
+import type { BodyMapMarker, Phase, RequestStatus, SessionEntry, SessionType } from "@/lib/types";
 
 export async function addClient(formData: FormData) {
   const supabase = await createClient();
@@ -93,6 +93,39 @@ export async function advancePhase(clientId: string) {
         ? current.cycle_number + 1
         : current.cycle_number,
       phase: upcoming,
+      started_on: today,
+      planned_weeks: 4,
+    });
+
+  if (startError) throw new Error(startError.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+}
+
+export async function setClientPhase(clientId: string, phase: Phase) {
+  const supabase = await createClient();
+
+  const current = await getCurrentPhase(supabase, clientId);
+  if (!current) throw new Error("This client has no active phase to change.");
+
+  if (current.phase === phase) return;
+
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { error: endError } = await supabase
+    .from("client_phase_history")
+    .update({ ended_on: today })
+    .eq("id", current.id);
+
+  if (endError) throw new Error(endError.message);
+
+  const { error: startError } = await supabase
+    .from("client_phase_history")
+    .insert({
+      client_id: clientId,
+      cycle_number: current.cycle_number,
+      phase,
       started_on: today,
       planned_weeks: 4,
     });
