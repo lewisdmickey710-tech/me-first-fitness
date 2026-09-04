@@ -551,8 +551,9 @@ export default async function RosterPage({
   const inPersonClients = sortedClients.filter((c) => c.session_mode !== "virtual");
   const virtualClients = sortedClients.filter((c) => c.session_mode === "virtual");
 
-  function renderClientCard(client: ClientRow) {
-    const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
+  type Flag = { label: string; tone: "negative" | "positive" };
+
+  function computeFlags(client: ClientRow): Flag[] {
     const reqs = pendingRequestsByClient.get(client.id);
     const newRequests =
       (reqs?.total ?? 0) -
@@ -585,7 +586,6 @@ export default async function RosterPage({
     const notYetSeen = (at: string) =>
       !client.last_viewed_at || client.last_viewed_at < at;
 
-    type Flag = { label: string; tone: "negative" | "positive" };
     const flags: Flag[] = [];
     // Pushes a normally-negative flag unless she's already dismissed it
     // with a reason for this client -- shown as a calm teal note instead
@@ -701,6 +701,14 @@ export default async function RosterPage({
       });
     }
 
+    return flags;
+  }
+
+  function renderClientCard(client: ClientRow) {
+    const phase = phaseInfo(phaseByClient.get(client.id) ?? "n/a");
+    const risk = riskByClient.get(client.id) ?? { score: 0, level: "low" as RiskLevel };
+    const flags = computeFlags(client);
+
     return (
       <Link key={client.id} href={`/coach/clients/${client.id}`}>
         <Card className="transition hover:border-rose/40">
@@ -754,6 +762,11 @@ export default async function RosterPage({
     );
   }
 
+  const nextSessionClient = nextSession
+    ? (clients ?? []).find((c) => c.id === nextSession!.clientId)
+    : null;
+  const nextSessionFlags = nextSessionClient ? computeFlags(nextSessionClient) : [];
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -801,13 +814,30 @@ export default async function RosterPage({
               <Heart className="mr-1" />
               Next booked session
             </p>
-            <p className="mt-1 text-2xl font-semibold text-ink">
+            <Link
+              href={`/coach/clients/${nextSession.clientId}`}
+              className="mt-1 block text-2xl font-semibold text-ink hover:text-rose"
+            >
               {nextSession.clientName}
-            </p>
+            </Link>
             <p className="mt-0.5 text-sm text-gray">
               {nextSession.date === today ? "Today" : shortDate(nextSession.date)} at{" "}
               {formatTimeOfDay(nextSession.timeOfDay)}
             </p>
+            {nextSessionFlags.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                {nextSessionFlags.map((f) => (
+                  <span
+                    key={f.label}
+                    className={`text-sm font-medium before:mr-1 before:content-['•'] ${
+                      f.tone === "negative" ? "text-pink" : "text-teal"
+                    }`}
+                  >
+                    {f.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <Link
                 href={`/coach/clients/${nextSession.clientId}/log-session?date=${nextSession.date}`}
