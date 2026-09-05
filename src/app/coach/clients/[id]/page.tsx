@@ -15,6 +15,7 @@ import {
   confirmVideoSessionRequest,
   deleteClientNote,
   deleteLoggedSession,
+  deleteMeasurement,
   deleteMilestone,
   endClientHold,
   logSessionOccurrence,
@@ -2961,6 +2962,21 @@ function MeasurementsTab({
                   {m.notes ? (
                     <p className="mt-2 text-sm text-ink">{m.notes}</p>
                   ) : null}
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteMeasurement(clientId, m.id);
+                    }}
+                    className="mt-2"
+                  >
+                    <ConfirmButton
+                      variant="ghost"
+                      confirmText="Delete this measurement entry? This can't be undone."
+                      className="text-xs text-gray hover:text-pink"
+                    >
+                      Delete
+                    </ConfirmButton>
+                  </form>
                 </Card>
               );
             })}

@@ -925,6 +925,18 @@ export async function deleteLoggedSession(clientId: string, sessionId: string) {
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+export async function deleteMeasurement(clientId: string, measurementId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("measurements")
+    .delete()
+    .eq("id", measurementId)
+    .eq("client_id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 // Lets the coach log an out-of-session activity on a client's behalf --
 // e.g. re-recording something they mistakenly logged as a prescribed
 // session, or something they mentioned in person, without needing the
