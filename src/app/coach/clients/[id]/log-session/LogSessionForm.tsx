@@ -35,6 +35,7 @@ interface Row {
   sets: string;
   reps: string;
   weight: string;
+  notes: string;
   existingMediaPath?: string;
 }
 
@@ -46,6 +47,7 @@ function rowsFromEntries(entries: SessionEntry[]): Row[] {
     sets: e.sets,
     reps: e.reps,
     weight: e.weight,
+    notes: e.notes ?? "",
     existingMediaPath: e.media_path ?? undefined,
   }));
   return [...filled, ...blankRows(2)];
@@ -73,6 +75,7 @@ function blankRows(count: number): Row[] {
     sets: "",
     reps: "",
     weight: "",
+    notes: "",
   }));
 }
 
@@ -141,6 +144,7 @@ export function LogSessionForm({
       sets: e.sets,
       reps: e.reps,
       weight: "",
+      notes: "",
     }));
     setRows([...filled, ...blankRows(2)]);
   }
@@ -156,6 +160,7 @@ export function LogSessionForm({
       sets: e.sets,
       reps: e.reps,
       weight: "",
+      notes: "",
     }));
     setRows([...filled, ...blankRows(2)]);
   }
@@ -414,6 +419,12 @@ export function LogSessionForm({
                         />
                       </div>
                     </div>
+                    <Input
+                      name="exercise_notes"
+                      placeholder="Notes on this movement -- form cue, how it felt, a swap..."
+                      value={row.notes}
+                      onChange={(e) => updateRow(i, "notes", e.target.value)}
+                    />
                     <input
                       type="hidden"
                       name="existing_media_path"

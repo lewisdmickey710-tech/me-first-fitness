@@ -724,6 +724,7 @@ export async function logSession(clientId: string, formData: FormData) {
   const sets = formData.getAll("sets") as string[];
   const reps = formData.getAll("reps") as string[];
   const weights = formData.getAll("weight") as string[];
+  const exerciseNotes = formData.getAll("exercise_notes") as string[];
   const files = formData.getAll("file");
 
   const entries: SessionEntry[] = (
@@ -750,6 +751,8 @@ export async function logSession(clientId: string, formData: FormData) {
           weight: weights[i] ?? "",
         };
         if (media_path) entry.media_path = media_path;
+        const noteTrimmed = exerciseNotes[i]?.trim();
+        if (noteTrimmed) entry.notes = noteTrimmed;
         return entry;
       })
     )
@@ -838,6 +841,7 @@ export async function updateSession(
   const sets = formData.getAll("sets") as string[];
   const reps = formData.getAll("reps") as string[];
   const weights = formData.getAll("weight") as string[];
+  const exerciseNotes = formData.getAll("exercise_notes") as string[];
   const files = formData.getAll("file");
   const existingMediaPaths = formData.getAll("existing_media_path") as string[];
 
@@ -865,6 +869,8 @@ export async function updateSession(
           weight: weights[i] ?? "",
         };
         if (media_path) entry.media_path = media_path;
+        const noteTrimmed = exerciseNotes[i]?.trim();
+        if (noteTrimmed) entry.notes = noteTrimmed;
         return entry;
       })
     )
