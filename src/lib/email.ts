@@ -88,12 +88,12 @@ export async function sendPreviewAccessEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "A preview of what training with me looks like",
+    subject: "Test the Waters — your preview is ready",
     html: wrapper(`
       <p>Hi ${name},</p>
-      <p>While you think it over, I put together a preview so you can see exactly what you'd get as a client — your first workout day, laid out in full, plus a look at everything else the app tracks for you.</p>
+      <p>While you think it over, I put together your own "Test the Waters" profile so you can see exactly what you'd get as a client — your first workout day, laid out in full, plus a look at everything else the app tracks for you.</p>
       <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Take a look →</a></p>
-      <p style="font-size: 13px; color: #8A8078;">No pressure, no obligation — just a chance to see the value before you decide. This link works once and expires after a while; if it's stopped working, just reach out and I'll send a fresh one.</p>
+      <p style="font-size: 13px; color: #8A8078;">No pressure, no obligation — just a chance to see the value before you decide. Ready when you are? There's an "Unlock Our Partnership" button waiting for you in there. This link works once and expires after a while; if it's stopped working, just reach out and I'll send a fresh one.</p>
     `),
   });
 }

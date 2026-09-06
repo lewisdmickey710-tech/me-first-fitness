@@ -151,6 +151,30 @@ export async function requestPacket(formData: FormData) {
   revalidatePath("/lead/dashboard");
 }
 
+// The cutesy "Unlock Our Partnership" button on a Test the Waters preview --
+// just flags the lead as ready so it surfaces on the coach's "Waiting to
+// Transition" list. She still does the actual convert-to-client step
+// herself from there.
+export async function requestTransition() {
+  const lead = await getMyLead();
+  if (!lead) throw new Error("No linked lead profile found.");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("leads")
+    .update({
+      ready_to_transition: true,
+      ready_to_transition_at: new Date().toISOString(),
+    })
+    .eq("id", lead.id);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/lead/dashboard");
+  revalidatePath("/lead/preview/program");
+}
+
 export async function submitLeadProfile(formData: FormData) {
   const lead = await getMyLead();
   if (!lead) throw new Error("No linked lead profile found.");

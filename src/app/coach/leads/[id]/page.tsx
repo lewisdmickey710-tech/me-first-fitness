@@ -390,7 +390,7 @@ export default async function LeadDetailPage({
       {lead.status !== "converted" ? (
         <Card className={lead.previewing ? "border-teal/30 bg-teal/5" : ""}>
           <p className="font-medium text-ink">
-            {lead.previewing ? "Previewing" : "Preview access"}
+            {lead.previewing ? "🌊 Test the Waters" : "Give them Test the Waters"}
           </p>
           {lead.previewing ? (
             <>
@@ -401,6 +401,12 @@ export default async function LeadDetailPage({
                 ({phaseInfo(lead.preview_phase ?? "n/a").name}), with the rest
                 of that phase locked until they sign on.
               </p>
+              {lead.ready_to_transition ? (
+                <p className="mt-2 text-sm font-medium text-teal">
+                  💛 They&apos;ve pressed &quot;Unlock Our Partnership&quot; —
+                  ready for you to convert them below.
+                </p>
+              ) : null}
               <form
                 action={async () => {
                   "use server";
@@ -409,17 +415,18 @@ export default async function LeadDetailPage({
                 className="mt-3"
               >
                 <Button type="submit" variant="ghost">
-                  Turn off preview
+                  Turn off Test the Waters
                 </Button>
               </form>
             </>
           ) : (
             <>
               <p className="mt-1 text-sm text-gray">
-                Let {lead.name.split(" ")[0]} explore a read-only preview of
-                what training with you looks like — their dashboard, the
-                wellness guide, and Day 1 of a phase you pick, with the rest
-                locked until they sign on.
+                Didn&apos;t sign on right after the free consultation? Give{" "}
+                {lead.name.split(" ")[0]} a link to explore a read-only Test
+                the Waters profile instead — their dashboard, the wellness
+                guide, and Day 1 of a phase you pick, with the rest locked
+                until they&apos;re ready.
               </p>
               <form
                 action={async (formData: FormData) => {
@@ -452,7 +459,7 @@ export default async function LeadDetailPage({
                   ))}
                 </Select>
                 <Button type="submit" variant="secondary">
-                  Enable preview
+                  Send Test the Waters access
                 </Button>
               </form>
             </>

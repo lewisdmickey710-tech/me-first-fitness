@@ -32,17 +32,24 @@ function LeadStatusBadge({ status }: { status: Lead["status"] }) {
 export default async function SignOnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadsArchived?: string }>;
+  searchParams: Promise<{ leadsView?: string }>;
 }) {
-  const { leadsArchived: leadsArchivedParam } = await searchParams;
-  const showArchivedLeads = leadsArchivedParam === "1";
+  const { leadsView: leadsViewParam } = await searchParams;
+  const leadsView: "active" | "transition" | "archived" =
+    leadsViewParam === "transition" || leadsViewParam === "archived"
+      ? leadsViewParam
+      : "active";
 
   const supabase = await createClient();
 
   let leadsQuery = supabase.from("leads").select("*").order("created_at", { ascending: false });
-  leadsQuery = showArchivedLeads
-    ? leadsQuery.eq("status", "archived")
-    : leadsQuery.neq("status", "archived");
+  if (leadsView === "archived") {
+    leadsQuery = leadsQuery.eq("status", "archived");
+  } else if (leadsView === "transition") {
+    leadsQuery = leadsQuery.neq("status", "archived").eq("ready_to_transition", true);
+  } else {
+    leadsQuery = leadsQuery.neq("status", "archived").eq("ready_to_transition", false);
+  }
 
   const [
     { data: profiles },
@@ -50,6 +57,7 @@ export default async function SignOnsPage({
     { data: careProfiles },
     { data: leads },
     { data: pendingPackets },
+    { count: transitionCount },
   ] = await Promise.all([
     supabase.from("profiles").select("id, created_at").eq("role", "client"),
     supabase.from("clients").select("*") as unknown as Promise<{
@@ -63,6 +71,11 @@ export default async function SignOnsPage({
       .from("lead_packet_requests")
       .select("lead_id")
       .eq("status", "pending") as unknown as Promise<{ data: PendingPacketRow[] | null }>,
+    supabase
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .neq("status", "archived")
+      .eq("ready_to_transition", true) as unknown as Promise<{ count: number | null }>,
   ]);
 
   const pendingPacketLeadIds = new Set((pendingPackets ?? []).map((p) => p.lead_id));
@@ -233,41 +246,63 @@ export default async function SignOnsPage({
       </div>
 
       <div>
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Badge tone="gold">Leads</Badge>
-            <h2 className="text-base font-semibold text-ink">
-              {showArchivedLeads ? "Archived leads" : "Assessment requests"}
-            </h2>
-          </div>
-          {showArchivedLeads ? (
-            <Link href="/coach/sign-ons" className="text-sm text-gray hover:text-ink">
-              ← Back to leads
-            </Link>
-          ) : null}
+        <div className="mb-2 flex items-center gap-2">
+          <Badge tone="gold">Leads</Badge>
+          <h2 className="text-base font-semibold text-ink">
+            {leadsView === "archived"
+              ? "Archived leads"
+              : leadsView === "transition"
+                ? "Waiting to Transition 🌱"
+                : "Assessment requests"}
+          </h2>
         </div>
-        {!showArchivedLeads ? (
-          <>
-            <p className="mb-2 text-sm text-gray">
-              Everyone who&apos;s requested an assessment, with their intake
-              answers and screening notes in one place.
-            </p>
-            <Link
-              href="/coach/sign-ons?leadsArchived=1"
-              className="mb-3 inline-block text-sm text-gray hover:text-ink"
-            >
-              View archived leads →
-            </Link>
-          </>
+        <div className="mb-3 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/coach/sign-ons"
+            className={leadsView === "active" ? "font-medium text-ink" : "text-gray hover:text-ink"}
+          >
+            Assessment requests
+          </Link>
+          <Link
+            href="/coach/sign-ons?leadsView=transition"
+            className={leadsView === "transition" ? "font-medium text-ink" : "text-gray hover:text-ink"}
+          >
+            Waiting to Transition 🌱{transitionCount ? ` (${transitionCount})` : ""}
+          </Link>
+          <Link
+            href="/coach/sign-ons?leadsView=archived"
+            className={leadsView === "archived" ? "font-medium text-ink" : "text-gray hover:text-ink"}
+          >
+            Archived
+          </Link>
+        </div>
+        {leadsView === "active" ? (
+          <p className="mb-2 text-sm text-gray">
+            Everyone who&apos;s requested an assessment, with their intake
+            answers and screening notes in one place.
+          </p>
+        ) : leadsView === "transition" ? (
+          <p className="mb-2 text-sm text-gray">
+            They&apos;ve pressed &quot;Unlock Our Partnership&quot; on their
+            Test the Waters profile — ready when you are.
+          </p>
         ) : null}
 
         {!leads || leads.length === 0 ? (
           <EmptyState
-            title={showArchivedLeads ? "No archived leads" : "No leads yet"}
+            title={
+              leadsView === "archived"
+                ? "No archived leads"
+                : leadsView === "transition"
+                  ? "No one waiting yet"
+                  : "No leads yet"
+            }
             body={
-              showArchivedLeads
+              leadsView === "archived"
                 ? "Leads you archive show up here."
-                : "When someone requests an assessment through the app, they'll show up here."
+                : leadsView === "transition"
+                  ? "When someone presses \"Unlock Our Partnership\" from their Test the Waters profile, they'll show up here."
+                  : "When someone requests an assessment through the app, they'll show up here."
             }
           />
         ) : (
@@ -282,7 +317,7 @@ export default async function SignOnsPage({
                   {pendingPacketLeadIds.has(lead.id) ? (
                     <Badge tone="gold">packet requested</Badge>
                   ) : null}
-                  {lead.previewing ? <Badge tone="teal">previewing</Badge> : null}
+                  {lead.previewing ? <Badge tone="teal">test the waters</Badge> : null}
                   <LeadStatusBadge status={lead.status} />
                   <Link
                     href={`/coach/leads/${lead.id}`}

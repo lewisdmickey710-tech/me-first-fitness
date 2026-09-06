@@ -572,6 +572,8 @@ export interface Lead {
   previewing: boolean;
   preview_care_profile_id: string | null;
   preview_phase: Phase | null;
+  ready_to_transition: boolean;
+  ready_to_transition_at: string | null;
 }
 
 export type SlidingScaleStatus = "pending" | "approved" | "declined";

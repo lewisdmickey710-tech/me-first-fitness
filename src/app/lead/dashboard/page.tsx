@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyLead } from "@/lib/current-lead";
-import { requestPacket } from "@/app/lead/actions";
+import { requestPacket, requestTransition } from "@/app/lead/actions";
 import { Badge, Button, Card, EmptyState, Heart } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import type {
@@ -120,7 +120,7 @@ export default async function LeadDashboard() {
         <Card className="border-teal/40 bg-teal/5">
           <p className="text-sm font-medium text-ink">
             <Heart className="mr-1" />
-            Your preview is ready
+            Test the Waters
           </p>
           <p className="mt-1 text-sm text-gray">
             While you think it over, take a look at your first workout day —
@@ -132,6 +132,18 @@ export default async function LeadDashboard() {
           >
             See your Day 1 →
           </Link>
+          {lead.ready_to_transition ? (
+            <p className="mt-3 text-sm text-teal">
+              You&apos;ve let me know you&apos;re ready — I&apos;ll be in touch
+              to get you set up. 💛
+            </p>
+          ) : (
+            <form action={requestTransition} className="mt-3">
+              <Button type="submit" variant="secondary">
+                Unlock Our Partnership ✨
+              </Button>
+            </form>
+          )}
         </Card>
       ) : null}
 

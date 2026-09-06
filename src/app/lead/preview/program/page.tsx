@@ -2,8 +2,38 @@ import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyLead } from "@/lib/current-lead";
-import { Card, Collapsible, EmptyState, Heart, PhaseBanner } from "@/components/ui";
+import { requestTransition } from "@/app/lead/actions";
+import { Button, Card, Collapsible, EmptyState, Heart, PhaseBanner } from "@/components/ui";
 import { formatReps } from "@/lib/constants";
+
+// What's genuinely useful to know even if someone never signs up -- shown
+// as a "sneak peek" of everything else beyond this one workout day, since
+// that's exactly what a locked/empty tab can't show on its own.
+const PARTNERSHIP_PERKS = [
+  {
+    label: "Every day of this phase, programmed for you",
+    detail:
+      "Not just Day 1 -- the whole rotation, updated as you progress through phases.",
+  },
+  {
+    label: "Your actual numbers tracked over time",
+    detail:
+      "Weights, measurements, and progress photos with trend lines, so you can see the arc, not just today.",
+  },
+  {
+    label: "A real schedule, not a guess",
+    detail: "Book, reschedule, or cancel sessions right from your phone.",
+  },
+  {
+    label: "Direct feedback on your form and your plan",
+    detail:
+      "Notes on what to repeat or adjust after every session, plus check-ins between them.",
+  },
+  {
+    label: "The Community board",
+    detail: "Wins, questions, and support with other clients, not just me.",
+  },
+] as const;
 
 interface PreviewDayRow {
   id: string;
@@ -42,8 +72,8 @@ export default async function LeadPreviewProgramPage() {
       <div className="space-y-6">
         <BackLink href="/lead/dashboard" />
         <EmptyState
-          title="No preview set up yet"
-          body="Reach out and I can put a preview together for you."
+          title="No Test the Waters preview set up yet"
+          body="Reach out and I can put one together for you."
         />
       </div>
     );
@@ -67,7 +97,7 @@ export default async function LeadPreviewProgramPage() {
     <div className="space-y-6">
       <BackLink href="/lead/dashboard" />
 
-      <PhaseBanner phase={lead.preview_phase} title="Your Day 1 preview" />
+      <PhaseBanner phase={lead.preview_phase} title="Test the Waters — Day 1" />
 
       <p className="text-sm text-gray">
         This is a read-only look at what your program would actually be —
@@ -141,10 +171,29 @@ export default async function LeadPreviewProgramPage() {
                 {day.program_day_exercises.length} more exercises, locked
                 until you sign on.
               </p>
+              <p className="mt-2 text-xs italic text-gray">
+                💛 If you partnered with Mickey, this day would be unlocked
+                right alongside Day 1 — no guessing what comes next.
+              </p>
             </Card>
           ))}
         </div>
       )}
+
+      <div className="space-y-2">
+        <h2 className="text-lg font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          If you partnered with Mickey, you&apos;d also get...
+        </h2>
+        <Card className="divide-y divide-grayLt">
+          {PARTNERSHIP_PERKS.map((perk) => (
+            <div key={perk.label} className="py-3 first:pt-0 last:pb-0">
+              <p className="text-sm font-medium text-ink">{perk.label}</p>
+              <p className="mt-0.5 text-sm text-gray">{perk.detail}</p>
+            </div>
+          ))}
+        </Card>
+      </div>
 
       <Card className="border-rose/30 bg-rose/5">
         <p className="text-sm font-medium text-ink">Ready to unlock the rest?</p>
@@ -152,6 +201,16 @@ export default async function LeadPreviewProgramPage() {
           The rest of this phase, your full schedule, progress tracking, and
           everything else — all unlocked the moment we get you signed on.
         </p>
+        {lead.ready_to_transition ? (
+          <p className="mt-3 text-sm text-teal">
+            You&apos;ve let me know you&apos;re ready — I&apos;ll be in touch
+            to get you set up. 💛
+          </p>
+        ) : (
+          <form action={requestTransition} className="mt-3">
+            <Button type="submit">Unlock Our Partnership ✨</Button>
+          </form>
+        )}
         <Link
           href="/lead/dashboard"
           className="mt-3 inline-block text-sm font-medium text-rose hover:underline"
