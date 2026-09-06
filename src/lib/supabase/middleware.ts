@@ -9,6 +9,7 @@ const PUBLIC_PATHS = [
   "/auth/confirm",
   "/auth/reset-password",
   "/request-assessment",
+  "/sliding-scale",
 ];
 
 export async function updateSession(request: NextRequest) {

@@ -422,6 +422,10 @@ const ES: Record<string, string> = {
   "What's expected of me as a client?": "¿Qué se espera de mí como cliente?",
   "Honesty, mainly. Say when something hurts, when life gets in the way, when motivation dips. Mickey can only adjust to what you actually tell her — she can't feel what's happening in your body, so communicating your limits in the moment is your job, not something to push through quietly.":
     "Honestidad, principalmente. Di cuando algo duele, cuando la vida se interpone, cuando baja la motivación. Mickey solo puede ajustar según lo que realmente le digas — ella no puede sentir lo que pasa en tu cuerpo, así que comunicar tus límites en el momento es tu responsabilidad, no algo para aguantar en silencio.",
+  "Do you offer mutual aid, bartering, or sliding scale?":
+    "¿Ofreces ayuda mutua, trueque, o escala móvil?",
+  "Yes to all three. Mutual aid and bartering — trading a skill or service for sessions — is always welcome, just ask. If full price isn't an option at all right now, you (or someone new) can apply for sliding scale directly.":
+    "Sí a las tres. La ayuda mutua y el trueque — intercambiar una habilidad o servicio por sesiones — siempre son bienvenidos, solo pregunta. Si el precio completo no es una opción en este momento, tú (o alguien nuevo) puede solicitar la escala móvil directamente.",
   "General Fitness Basics": "Conceptos Básicos de Fitness",
   "How often should I be training?": "¿Con qué frecuencia debería entrenar?",
   "Depends entirely on your program, goals, and recovery — that's exactly what your care track and phase are built around. Ask Mickey directly if you're ever unsure whether to add or pull back a session.":

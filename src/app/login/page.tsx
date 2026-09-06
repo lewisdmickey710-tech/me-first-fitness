@@ -95,6 +95,18 @@ export default function LoginPage() {
                   paid session after you sign on. No pressure, no
                   obligation.
                 </p>
+                <p className="mt-2 text-xs text-gray">
+                  Mutual aid &amp; bartering welcome — trade a skill or
+                  service for sessions, ask me about it. Can&apos;t swing
+                  full price at all right now?{" "}
+                  <a
+                    href="/sliding-scale"
+                    className="text-rose hover:underline"
+                  >
+                    Apply for sliding scale
+                  </a>
+                  .
+                </p>
               </Collapsible>
             </div>
           </Card>

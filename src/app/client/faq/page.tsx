@@ -128,6 +128,9 @@ export default async function ClientFaqPage() {
         <Q q={t("What's expected of me as a client?")}>
           {t("Honesty, mainly. Say when something hurts, when life gets in the way, when motivation dips. Mickey can only adjust to what you actually tell her — she can't feel what's happening in your body, so communicating your limits in the moment is your job, not something to push through quietly.")}
         </Q>
+        <Q q={t("Do you offer mutual aid, bartering, or sliding scale?")}>
+          {t("Yes to all three. Mutual aid and bartering — trading a skill or service for sessions — is always welcome, just ask. If full price isn't an option at all right now, you (or someone new) can apply for sliding scale directly.")}
+        </Q>
       </Section>
 
       <Section title={t("General Fitness Basics")}>

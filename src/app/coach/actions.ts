@@ -1389,12 +1389,18 @@ export async function deleteCredential(credentialId: string) {
   revalidatePath("/coach/finances");
 }
 
+const MANUAL_PAYMENT_KINDS = ["session", "retainer", "barter"] as const;
+
 export async function addPayment(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
   const description = String(formData.get("description") ?? "").trim();
   const amount = String(formData.get("amount") ?? "");
   const dueDate = String(formData.get("due_date") ?? "");
+  const kindRaw = String(formData.get("kind") ?? "session");
+  const kind = (MANUAL_PAYMENT_KINDS as readonly string[]).includes(kindRaw)
+    ? kindRaw
+    : "session";
 
   if (!description || !amount || !dueDate) {
     throw new Error("Description, amount, and due date are required.");
@@ -1405,6 +1411,7 @@ export async function addPayment(clientId: string, formData: FormData) {
     description,
     amount: Number(amount),
     due_date: dueDate,
+    kind,
   });
 
   if (error) throw new Error(error.message);

@@ -3180,7 +3180,14 @@ function PaymentsTab({
                 className={overdue ? "border-pink/40 bg-pink/5" : ""}
               >
                 <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">{p.description}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-ink">{p.description}</p>
+                    {p.kind === "barter" ? (
+                      <Badge tone="teal">barter</Badge>
+                    ) : p.kind === "retainer" ? (
+                      <Badge tone="gray">retainer</Badge>
+                    ) : null}
+                  </div>
                   {p.paid_on ? (
                     <Badge tone="green">paid {p.paid_on}</Badge>
                   ) : overdue ? (

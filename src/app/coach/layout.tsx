@@ -16,6 +16,7 @@ export default function CoachLayout({
           { href: "/coach/roster", label: "Motherboard" },
           { href: "/coach/schedule", label: "Schedule" },
           { href: "/coach/sign-ons", label: "Sign-ons" },
+          { href: "/coach/sliding-scale", label: "Sliding Scale" },
           { href: "/coach/programs", label: "Programs" },
           { href: "/coach/community", label: "Community" },
           { href: "/coach/back-office", label: "Back Office" },

@@ -39,6 +39,14 @@ export default async function RequestAssessmentPage({
         <p className="mt-3 text-xs text-gray">
           $40/session in-person · $90/mo virtual · $50 self-led plan
         </p>
+        <p className="mt-2 text-xs text-gray">
+          Mutual aid &amp; bartering welcome — ask me about trading a skill
+          or service for sessions. Full price not an option right now?{" "}
+          <a href="/sliding-scale" className="text-rose hover:underline">
+            Apply for sliding scale
+          </a>
+          .
+        </p>
       </div>
 
       <Card className="w-full max-w-sm">

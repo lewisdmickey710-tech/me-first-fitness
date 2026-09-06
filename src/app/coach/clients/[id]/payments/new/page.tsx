@@ -1,7 +1,7 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { addPayment } from "@/app/coach/actions";
-import { Button, Card, Heart, Input } from "@/components/ui";
+import { Button, Card, Heart, Input, Select } from "@/components/ui";
 import type { Client } from "@/lib/types";
 
 export default async function NewPaymentPage({
@@ -34,12 +34,23 @@ export default async function NewPaymentPage({
         <form action={boundAdd} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
+              Type
+            </label>
+            <Select name="kind" defaultValue="session">
+              <option value="session">Session</option>
+              <option value="retainer">Retainer</option>
+              <option value="barter">Barter / mutual aid trade</option>
+            </Select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
               Description
             </label>
             <Input
               name="description"
               required
-              placeholder="e.g. August package — 8 sessions"
+              placeholder="e.g. August package — 8 sessions, or a barter trade like 3 hrs of graphic design"
             />
           </div>
 

@@ -66,9 +66,10 @@ function nextTaxDeadline(todayStr: string): { label: string; date: string } | nu
 export default async function FinancesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; status?: string }>;
+  searchParams: Promise<{ year?: string; status?: string; includeBarter?: string }>;
 }) {
-  const { year: yearParam, status: statusParam } = await searchParams;
+  const { year: yearParam, status: statusParam, includeBarter: includeBarterParam } =
+    await searchParams;
   const now = nowInBusinessTz();
   const todayStr = toDateString(now);
   const currentYear = now.getUTCFullYear();
@@ -76,6 +77,7 @@ export default async function FinancesPage({
     yearParam && /^\d{4}$/.test(yearParam) ? Number(yearParam) : currentYear;
   const paymentStatus: "unpaid" | "paid" | "all" =
     statusParam === "paid" || statusParam === "all" ? statusParam : "unpaid";
+  const includeBarter = includeBarterParam === "1";
 
   const yearStart = `${year}-01-01`;
   const yearEnd = `${year}-12-31`;
@@ -98,11 +100,13 @@ export default async function FinancesPage({
       .single() as unknown as Promise<{ data: BusinessFinanceSettings | null }>,
     supabase
       .from("payments")
-      .select("client_id, amount, paid_on")
+      .select("client_id, amount, paid_on, kind")
       .not("paid_on", "is", null)
       .gte("paid_on", yearStart)
       .lte("paid_on", yearEnd) as unknown as Promise<{
-      data: { client_id: string | null; amount: number; paid_on: string }[] | null;
+      data:
+        | { client_id: string | null; amount: number; paid_on: string; kind: string }[]
+        | null;
     }>,
     supabase
       .from("business_expenses")
@@ -163,11 +167,21 @@ export default async function FinancesPage({
     .filter((c) => !c.archived_at)
     .map((c) => ({ id: c.id, name: c.name }));
 
+  // Barter is tracked separately from cash income by default -- bartered
+  // goods/services are agreed-value trades, not money in hand, so blending
+  // them into "gross income" silently would misrepresent actual cash flow.
+  // The coach can opt into a combined total (the includeBarter toggle) when
+  // she's ready to report bartered value as taxable income at tax time.
   const incomeByMonth = Array(12).fill(0) as number[];
+  const barterByMonth = Array(12).fill(0) as number[];
   for (const p of payments ?? []) {
     if (p.client_id && testClientIds.has(p.client_id)) continue;
     const month = Number(p.paid_on.slice(5, 7)) - 1;
-    incomeByMonth[month] += Number(p.amount);
+    if (p.kind === "barter") {
+      barterByMonth[month] += Number(p.amount);
+    } else {
+      incomeByMonth[month] += Number(p.amount);
+    }
   }
 
   const expensesByMonth = Array(12).fill(0) as number[];
@@ -184,12 +198,21 @@ export default async function FinancesPage({
     proBonoByMonth[month] += rate;
   }
 
-  const netByMonth = incomeByMonth.map((income, i) => income - expensesByMonth[i]);
+  // The toggle blends barter into every downstream total (net, set-aside)
+  // that income feeds into, not just the headline number, since a merged
+  // view is meant to represent what she'd actually report at tax time.
+  const reportedIncomeByMonth = includeBarter
+    ? incomeByMonth.map((income, i) => income + barterByMonth[i])
+    : incomeByMonth;
+  const netByMonth = reportedIncomeByMonth.map(
+    (income, i) => income - expensesByMonth[i]
+  );
 
   const rate = settingsRow?.estimated_tax_rate ?? null;
   const setAsideByMonth = netByMonth.map((net) => (rate ? Math.max(net, 0) * (rate / 100) : 0));
 
-  const ytdIncome = incomeByMonth.reduce((a, b) => a + b, 0);
+  const ytdIncome = reportedIncomeByMonth.reduce((a, b) => a + b, 0);
+  const ytdBarter = barterByMonth.reduce((a, b) => a + b, 0);
   const ytdExpenses = expensesByMonth.reduce((a, b) => a + b, 0);
   const ytdNet = ytdIncome - ytdExpenses;
   const ytdProBono = proBonoByMonth.reduce((a, b) => a + b, 0);
@@ -221,10 +244,13 @@ export default async function FinancesPage({
         Bookkeeping
       </h1>
       <p className="text-sm text-gray">
-        Gross income is every payment actually marked paid — session
-        payments, late cancellation fees, retainers. Expenses and pro bono
-        value are tracked separately. This is a rough estimate for planning
-        purposes, not tax advice — Texas has no state income tax, but
+        Gross income is every cash payment actually marked paid — session
+        payments, late cancellation fees, retainers. Expenses, pro bono
+        value, and bartered/mutual-aid trades are all tracked separately
+        below and left out of income by default; merge barter in when
+        you&apos;re ready to report it. This is a rough estimate for
+        planning purposes, not tax advice — Texas has no state income tax,
+        but
         federal self-employment tax (15.3%) and federal income tax still
         apply, and a franchise tax filing may still be required depending on
         how your business is structured even when nothing is owed. Check
@@ -310,6 +336,7 @@ export default async function FinancesPage({
         <Card>
           <p className="text-sm font-medium text-gray">
             {isCurrentYear ? "Year to date" : `${year} total`} — gross income
+            {includeBarter ? " (cash + barter)" : ""}
           </p>
           <p className="mt-1 text-2xl font-semibold text-ink">
             ${ytdIncome.toFixed(2)}
@@ -324,6 +351,15 @@ export default async function FinancesPage({
         <Card className="border-teal/30 bg-teal/5">
           <p className="text-sm font-medium text-gray">Net income</p>
           <p className="mt-1 text-2xl font-semibold text-ink">${ytdNet.toFixed(2)}</p>
+        </Card>
+        <Card className="border-gold/30 bg-gold/5">
+          <p className="text-sm font-medium text-gray">Barter value</p>
+          <p className="mt-1 text-2xl font-semibold text-ink">
+            ${ytdBarter.toFixed(2)}
+          </p>
+          <p className="mt-1 text-xs text-gray">
+            {includeBarter ? "Included in totals above" : "Not counted in totals above"}
+          </p>
         </Card>
         <Card className="border-rose/30 bg-rose/5">
           <p className="text-sm font-medium text-gray">Pro bono value</p>
@@ -343,12 +379,22 @@ export default async function FinancesPage({
         </Card>
       </div>
 
+      <Link
+        href={`/coach/finances?year=${year}&includeBarter=${includeBarter ? "0" : "1"}`}
+        className="inline-block text-sm text-rose hover:underline"
+      >
+        {includeBarter
+          ? "← Back to cash-only totals"
+          : "Merge barter into these totals for tax time →"}
+      </Link>
+
       <Card className="overflow-x-auto">
         <table className="w-full min-w-[520px] text-sm">
           <thead>
             <tr className="border-b border-grayLt text-left text-xs uppercase tracking-wide text-gray">
               <th className="py-2 pr-2">Month</th>
-              <th className="px-2 py-2 text-right">Income</th>
+              <th className="px-2 py-2 text-right">Income{includeBarter ? " (+ barter)" : ""}</th>
+              <th className="px-2 py-2 text-right">Barter</th>
               <th className="px-2 py-2 text-right">Expenses</th>
               <th className="px-2 py-2 text-right">Net</th>
               <th className="px-2 py-2 text-right">Pro bono value</th>
@@ -360,7 +406,10 @@ export default async function FinancesPage({
               <tr key={name} className="border-b border-grayLt/50">
                 <td className="py-2 pr-2 text-ink">{name}</td>
                 <td className="px-2 py-2 text-right text-ink">
-                  ${incomeByMonth[i].toFixed(2)}
+                  ${reportedIncomeByMonth[i].toFixed(2)}
+                </td>
+                <td className="px-2 py-2 text-right text-gray">
+                  ${barterByMonth[i].toFixed(2)}
                 </td>
                 <td className="px-2 py-2 text-right text-gray">
                   ${expensesByMonth[i].toFixed(2)}
@@ -379,6 +428,7 @@ export default async function FinancesPage({
             <tr className="font-medium text-ink">
               <td className="pr-2 pt-2">Total</td>
               <td className="px-2 pt-2 text-right">${ytdIncome.toFixed(2)}</td>
+              <td className="px-2 pt-2 text-right">${ytdBarter.toFixed(2)}</td>
               <td className="px-2 pt-2 text-right">${ytdExpenses.toFixed(2)}</td>
               <td className="px-2 pt-2 text-right">${ytdNet.toFixed(2)}</td>
               <td className="px-2 pt-2 text-right">${ytdProBono.toFixed(2)}</td>

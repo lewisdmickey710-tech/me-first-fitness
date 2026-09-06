@@ -408,7 +408,11 @@ export interface ClientSchedule {
   created_at: string;
 }
 
-export type PaymentKind = "session" | "late_cancellation_fee" | "retainer";
+export type PaymentKind =
+  | "session"
+  | "late_cancellation_fee"
+  | "retainer"
+  | "barter";
 
 export interface Payment {
   id: string;
@@ -565,6 +569,22 @@ export interface Lead {
   physician_name: string | null;
   physician_phone: string | null;
   profile_completed_at: string | null;
+}
+
+export type SlidingScaleStatus = "pending" | "approved" | "declined";
+
+export interface SlidingScaleApplication {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  situation: string;
+  what_would_work: string;
+  status: SlidingScaleStatus;
+  approved_rate: number | null;
+  coach_notes: string | null;
+  decided_at: string | null;
+  created_at: string;
 }
 
 export interface LeadAssessmentRequest {
