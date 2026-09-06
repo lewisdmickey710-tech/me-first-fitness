@@ -116,6 +116,25 @@ export default async function LeadDashboard() {
         So glad you reached out. Here&apos;s where things stand.
       </p>
 
+      {lead.previewing ? (
+        <Card className="border-teal/40 bg-teal/5">
+          <p className="text-sm font-medium text-ink">
+            <Heart className="mr-1" />
+            Your preview is ready
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            While you think it over, take a look at your first workout day —
+            exactly what you&apos;d get as a client, no obligation.
+          </p>
+          <Link
+            href="/lead/preview/program"
+            className="mt-3 inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+          >
+            See your Day 1 →
+          </Link>
+        </Card>
+      ) : null}
+
       {latestRequest ? (
         <Card>
           <p className="text-sm font-medium text-gray">Assessment request</p>

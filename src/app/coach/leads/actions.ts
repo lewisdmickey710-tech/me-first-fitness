@@ -4,8 +4,112 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendPacketEmail, sendWelcomeToClientEmail } from "@/lib/email";
+import { sendPacketEmail, sendPreviewAccessEmail, sendWelcomeToClientEmail } from "@/lib/email";
 import type { RequestStatus } from "@/lib/types";
+
+const PREVIEW_PHASES = ["1", "2", "3", "4"] as const;
+
+// Grants (or updates) "while you think about it" preview access -- works
+// for a brand-new prospect (no leads row yet, e.g. someone she met in
+// person rather than through Request an Assessment) and for an existing
+// lead alike, since both just need a login + the preview fields set. The
+// login itself reuses the same generateLink pattern submitAssessmentRequest
+// uses for a public signup -- it creates the auth user if they don't have
+// one yet, or just returns a fresh link if they do.
+export async function enableLeadPreview(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const careProfileId = String(formData.get("care_profile_id") ?? "");
+  const phase = String(formData.get("phase") ?? "");
+
+  if (!name || !email || !careProfileId) {
+    throw new Error("Name, email, and a track are required.");
+  }
+  if (!(PREVIEW_PHASES as readonly string[]).includes(phase)) {
+    throw new Error("Choose a starting phase.");
+  }
+
+  const admin = createAdminClient();
+  const supabase = await createClient();
+
+  const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm`,
+    },
+  });
+  if (linkError) throw new Error(linkError.message);
+
+  const userId = linkData.user.id;
+  const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${linkData.properties.hashed_token}&type=${linkData.properties.verification_type}&next=/`;
+
+  // Never downgrade a real coach or client account that happens to reuse
+  // this email -- same guard submitAssessmentRequest uses.
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingProfile?.role !== "coach" && existingProfile?.role !== "client") {
+    const { error: profileError } = existingProfile
+      ? await admin.from("profiles").update({ role: "lead" }).eq("id", userId)
+      : await admin.from("profiles").insert({ id: userId, role: "lead" });
+    if (profileError) throw new Error(profileError.message);
+  }
+
+  const { data: existingLead } = await supabase
+    .from("leads")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const previewFields = {
+    previewing: true,
+    preview_care_profile_id: careProfileId,
+    preview_phase: phase,
+  };
+
+  let leadId: string;
+  if (existingLead) {
+    leadId = existingLead.id;
+    const { error } = await supabase
+      .from("leads")
+      .update({ name, phone: phone || null, ...previewFields })
+      .eq("id", leadId);
+    if (error) throw new Error(error.message);
+  } else {
+    const { data: newLead, error } = await supabase
+      .from("leads")
+      .insert({ user_id: userId, name, email, phone: phone || null, ...previewFields })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    leadId = newLead.id;
+  }
+
+  await sendPreviewAccessEmail(email, name, actionLink);
+
+  revalidatePath("/coach/sign-ons");
+  revalidatePath(`/coach/leads/${leadId}`);
+  redirect(`/coach/leads/${leadId}`);
+}
+
+export async function disableLeadPreview(leadId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("leads")
+    .update({ previewing: false })
+    .eq("id", leadId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/sign-ons");
+  revalidatePath(`/coach/leads/${leadId}`);
+}
 
 export async function setLeadRequestStatus(
   requestId: string,
@@ -204,7 +308,10 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
     .insert({
       client_id: client.id,
       cycle_number: 1,
-      phase: "1",
+      // Carries over whatever phase they were already previewing, rather
+      // than always restarting them at phase 1, so unlocking doesn't undo
+      // the starting point she already chose for them.
+      phase: lead.preview_phase ?? "1",
       started_on: new Date().toISOString().slice(0, 10),
       planned_weeks: 4,
     });

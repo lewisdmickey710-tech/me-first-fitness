@@ -282,6 +282,7 @@ export default async function SignOnsPage({
                   {pendingPacketLeadIds.has(lead.id) ? (
                     <Badge tone="gold">packet requested</Badge>
                   ) : null}
+                  {lead.previewing ? <Badge tone="teal">previewing</Badge> : null}
                   <LeadStatusBadge status={lead.status} />
                   <Link
                     href={`/coach/leads/${lead.id}`}

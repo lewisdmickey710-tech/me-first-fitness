@@ -6,6 +6,8 @@ import {
   archiveLead,
   convertLeadToClient,
   deleteLead,
+  disableLeadPreview,
+  enableLeadPreview,
   markPacketSent,
   setLeadRequestStatus,
 } from "@/app/coach/leads/actions";
@@ -20,6 +22,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { PHASES, phaseInfo } from "@/lib/constants";
 import type {
   CareProfile,
   Lead,
@@ -385,6 +388,79 @@ export default async function LeadDetailPage({
       </div>
 
       {lead.status !== "converted" ? (
+        <Card className={lead.previewing ? "border-teal/30 bg-teal/5" : ""}>
+          <p className="font-medium text-ink">
+            {lead.previewing ? "Previewing" : "Preview access"}
+          </p>
+          {lead.previewing ? (
+            <>
+              <p className="mt-1 text-sm text-gray">
+                {lead.name.split(" ")[0]} can see Day 1 of{" "}
+                {careProfileNameById.get(lead.preview_care_profile_id ?? "") ??
+                  "their assigned track"}{" "}
+                ({phaseInfo(lead.preview_phase ?? "n/a").name}), with the rest
+                of that phase locked until they sign on.
+              </p>
+              <form
+                action={async () => {
+                  "use server";
+                  await disableLeadPreview(id);
+                }}
+                className="mt-3"
+              >
+                <Button type="submit" variant="ghost">
+                  Turn off preview
+                </Button>
+              </form>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-gray">
+                Let {lead.name.split(" ")[0]} explore a read-only preview of
+                what training with you looks like — their dashboard, the
+                wellness guide, and Day 1 of a phase you pick, with the rest
+                locked until they sign on.
+              </p>
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  await enableLeadPreview(formData);
+                }}
+                className="mt-3 space-y-2"
+              >
+                <input type="hidden" name="name" value={lead.name} />
+                <input type="hidden" name="email" value={lead.email} />
+                <input type="hidden" name="phone" value={lead.phone ?? ""} />
+                <Select name="care_profile_id" required defaultValue="">
+                  <option value="" disabled>
+                    — Track —
+                  </option>
+                  {(careProfiles ?? []).map((cp) => (
+                    <option key={cp.id} value={cp.id}>
+                      {cp.name}
+                    </option>
+                  ))}
+                </Select>
+                <Select name="phase" required defaultValue="">
+                  <option value="" disabled>
+                    — Starting phase —
+                  </option>
+                  {PHASES.filter((p) => p.id !== "n/a").map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </Select>
+                <Button type="submit" variant="secondary">
+                  Enable preview
+                </Button>
+              </form>
+            </>
+          )}
+        </Card>
+      ) : null}
+
+      {lead.status !== "converted" ? (
         <Card>
           <p className="font-medium text-ink">Convert to client</p>
           <p className="mt-1 text-sm text-gray">
@@ -399,7 +475,11 @@ export default async function LeadDetailPage({
             }}
             className="mt-4 space-y-3"
           >
-            <Select name="care_profile_id" required defaultValue="">
+            <Select
+              name="care_profile_id"
+              required
+              defaultValue={lead.preview_care_profile_id ?? ""}
+            >
               <option value="" disabled>
                 — Care profile —
               </option>

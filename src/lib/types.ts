@@ -569,6 +569,9 @@ export interface Lead {
   physician_name: string | null;
   physician_phone: string | null;
   profile_completed_at: string | null;
+  previewing: boolean;
+  preview_care_profile_id: string | null;
+  preview_phase: Phase | null;
 }
 
 export type SlidingScaleStatus = "pending" | "approved" | "declined";

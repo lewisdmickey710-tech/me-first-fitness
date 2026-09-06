@@ -108,7 +108,14 @@ export async function updateSession(request: NextRequest) {
       // Same reasoning as the client-side intake gate below: the free
       // assessment is meant to start from the pre-assessment questionnaire
       // already filled out, not something asked about after the fact.
-      if (lead?.profile_completed_at && path !== "/lead/intake") {
+      // /lead/preview is exempt -- a "while you think about it" preview is
+      // meant to have zero friction, not gate behind the full intake
+      // questionnaire someone hasn't committed to yet.
+      if (
+        lead?.profile_completed_at &&
+        path !== "/lead/intake" &&
+        !path.startsWith("/lead/preview")
+      ) {
         const { data: leadIntake } = await supabase
           .from("lead_intake")
           .select("submitted_at")

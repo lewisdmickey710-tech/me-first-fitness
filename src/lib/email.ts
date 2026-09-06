@@ -76,6 +76,31 @@ export async function sendLeadInviteEmail(
 // Same reasoning as sendLeadInviteEmail -- delivered through Resend
 // instead of Supabase Auth's own (rate-limited, silently unreliable)
 // email sender.
+export async function sendPreviewAccessEmail(
+  to: string,
+  name: string,
+  actionLink: string
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping preview access email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: "A preview of what training with me looks like",
+    html: wrapper(`
+      <p>Hi ${name},</p>
+      <p>While you think it over, I put together a preview so you can see exactly what you'd get as a client — your first workout day, laid out in full, plus a look at everything else the app tracks for you.</p>
+      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Take a look →</a></p>
+      <p style="font-size: 13px; color: #8A8078;">No pressure, no obligation — just a chance to see the value before you decide. This link works once and expires after a while; if it's stopped working, just reach out and I'll send a fresh one.</p>
+    `),
+  });
+}
+
+// Same reasoning as sendLeadInviteEmail -- delivered through Resend
+// instead of Supabase Auth's own (rate-limited, silently unreliable)
+// email sender.
 export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping client login link email");
