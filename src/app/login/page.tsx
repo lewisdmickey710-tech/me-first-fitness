@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendClientLoginLink } from "@/app/login/actions";
-import { Button, Card, Heart, Input } from "@/components/ui";
+import { Button, Card, Collapsible, Heart, Input } from "@/components/ui";
 
 type Tab = "client" | "coach";
 
@@ -41,6 +41,66 @@ export default function LoginPage() {
         </div>
       ) : null}
 
+      {tab === "client" ? (
+        <div className="mb-4 w-full max-w-sm space-y-2">
+          <h2 className="text-center text-sm font-semibold text-gray">
+            New here? Here&apos;s what to expect.
+          </h2>
+          <Card className="divide-y divide-grayLt">
+            <div className="py-3 first:pt-0 last:pb-0">
+              <Collapsible label="What I do">
+                <p className="text-sm text-gray">
+                  NASM-based strength and movement coaching built around
+                  four progressive phases — Stability, Strength, Size, and
+                  Speed — paired with Intuitive Eating nutrition guidance.
+                  Training with purpose and intention, not punishment or
+                  obsession. Programs are built around your actual health
+                  history and current limitations, not a generic template —
+                  I work with injuries, chronic conditions, and older
+                  adults.
+                </p>
+              </Collapsible>
+            </div>
+            <div className="py-3 first:pt-0 last:pb-0">
+              <Collapsible label="Qualifications">
+                <p className="text-sm text-gray">
+                  NASM-based training plus certified specializations in
+                  Pain-Free Movement, Glute Development, Behavior Change,
+                  Senior Fitness, Bodybuilding, Strength &amp; Conditioning,
+                  and Nutrition.
+                </p>
+              </Collapsible>
+            </div>
+            <div className="py-3 first:pt-0 last:pb-0">
+              <Collapsible label="Pricing">
+                <ul className="space-y-1.5 text-sm text-gray">
+                  <li>
+                    <strong className="text-ink">$40/session</strong> —
+                    in-person, hands-on coaching (assisted stretching, foam
+                    rolling, Theragun work)
+                  </li>
+                  <li>
+                    <strong className="text-ink">$90/month</strong> —
+                    virtual, your program is built and updated in the app on
+                    my own cadence
+                  </li>
+                  <li>
+                    <strong className="text-ink">$50</strong> — a standalone
+                    written program, no ongoing coaching
+                  </li>
+                </ul>
+                <p className="mt-2 text-xs text-gray">
+                  Every new client starts with a free assessment —
+                  movement, posture &amp; goals — then 50% off your first
+                  paid session after you sign on. No pressure, no
+                  obligation.
+                </p>
+              </Collapsible>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
       <Card className="w-full max-w-sm">
         <div className="mb-5 flex rounded-xl bg-bg p-1">
           <button
@@ -62,6 +122,15 @@ export default function LoginPage() {
         </div>
 
         {tab === "client" ? (
+          <a
+            href="/request-assessment"
+            className="mb-4 block rounded-xl bg-rose px-4 py-2 text-center text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+          >
+            New here? Book a free consultation ♥
+          </a>
+        ) : null}
+
+        {tab === "client" ? (
           <p className="mb-3 text-sm font-medium text-ink">
             Already have an account?
           </p>
@@ -69,74 +138,6 @@ export default function LoginPage() {
 
         {tab === "client" ? <ClientLogin /> : <CoachLogin />}
       </Card>
-
-      {tab === "client" ? (
-        <p className="mt-4 text-center text-sm text-gray">
-          New here?{" "}
-          <a
-            href="/request-assessment"
-            className="inline-block rounded-full bg-rose px-4 py-1.5 font-bold text-white shadow-sm transition hover:scale-105 hover:opacity-90"
-          >
-            Book a free consultation ♥
-          </a>
-        </p>
-      ) : null}
-
-      {tab === "client" ? (
-        <div className="mt-10 w-full max-w-md space-y-4">
-          <h2 className="text-center text-lg font-semibold text-ink">
-            New here? Here&apos;s what to expect.
-          </h2>
-
-          <Card className="space-y-2">
-            <p className="font-medium text-rose">What I do</p>
-            <p className="text-sm text-gray">
-              NASM-based strength and movement coaching built around four
-              progressive phases — Stability, Strength, Size, and Speed —
-              paired with Intuitive Eating nutrition guidance. Training with
-              purpose and intention, not punishment or obsession. Programs
-              are built around your actual health history and current
-              limitations, not a generic template — I work with injuries,
-              chronic conditions, and older adults.
-            </p>
-          </Card>
-
-          <Card className="space-y-2">
-            <p className="font-medium text-rose">Qualifications</p>
-            <p className="text-sm text-gray">
-              NASM-based training plus certified specializations in
-              Pain-Free Movement, Glute Development, Behavior Change, Senior
-              Fitness, Bodybuilding, Strength &amp; Conditioning, and
-              Nutrition.
-            </p>
-          </Card>
-
-          <Card className="space-y-2">
-            <p className="font-medium text-rose">Pricing</p>
-            <ul className="space-y-1.5 text-sm text-gray">
-              <li>
-                <strong className="text-ink">$40/session</strong> —
-                in-person, hands-on coaching (assisted stretching, foam
-                rolling, Theragun work)
-              </li>
-              <li>
-                <strong className="text-ink">$90/month</strong> — virtual,
-                your program is built and updated in the app on my own
-                cadence
-              </li>
-              <li>
-                <strong className="text-ink">$50</strong> — a standalone
-                written program, no ongoing coaching
-              </li>
-            </ul>
-            <p className="text-xs text-gray">
-              Every new client starts with a free assessment — movement,
-              posture &amp; goals — then 50% off your first paid session
-              after you sign on. No pressure, no obligation.
-            </p>
-          </Card>
-        </div>
-      ) : null}
     </div>
   );
 }
