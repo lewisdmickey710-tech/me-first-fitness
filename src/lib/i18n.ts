@@ -222,7 +222,7 @@ const ES: Record<string, string> = {
   "Phase 1 — Stability": "Fase 1 — Estabilidad",
   "Phase 2 — Strength": "Fase 2 — Fuerza",
   "Phase 3 — Size": "Fase 3 — Volumen",
-  "Phase 4 — Power": "Fase 4 — Potencia",
+  "Phase 4 — Speed": "Fase 4 — Velocidad",
   "N/A": "N/D",
 
   // Program

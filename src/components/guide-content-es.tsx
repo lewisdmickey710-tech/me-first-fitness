@@ -170,7 +170,7 @@ export function GuideContentEs() {
             body="Maximizar el desarrollo muscular. El volumen aumenta mientras seguimos construyendo fuerza. Esta fase es para clientes que quieren más definición y tamaño muscular. Combina muy bien con el trabajo de nutrición — alimentarse para crecer es parte del plan."
           />
           <PhaseRow
-            name="Fase 4 — Velocidad y Potencia"
+            name="Fase 4 — Velocidad"
             detail="3–5 series | 1–10 repeticiones | Explosivo, velocidad máxima"
             body="Potencia explosiva, agilidad, y rendimiento atlético. Pliometría, trabajo de velocidad, y movimientos de potencia. En esta fase tu cuerpo es una máquina bien afinada — fuerte, estable, y lista para moverse rápido."
           />
@@ -267,7 +267,7 @@ export function GuideContentEs() {
             </li>
             <li>
               <span className="font-medium text-ink">
-                Fase 4 — Velocidad y Potencia → Cambio de crecimiento/identidad:
+                Fase 4 — Velocidad → Cambio de crecimiento/identidad:
               </span>{" "}
               tu cuerpo se mueve con potencia porque la base es
               inquebrantable. Tus hábitos se sienten automáticos porque

@@ -164,7 +164,7 @@ export function GuideContent() {
             body="Maximize muscle development. Volume increases while we continue building strength. This phase is for clients who want more muscle definition and size. Pairs beautifully with the nutrition work — fueling for growth is part of the plan."
           />
           <PhaseRow
-            name="Phase 4 — Speed & Power"
+            name="Phase 4 — Speed"
             detail="3–5 sets | 1–10 reps | Explosive, max velocity"
             body="Explosive power, agility, and athletic performance. Plyometrics, speed work, and power movements. By this phase your body is a well-oiled machine — strong, stable, and ready to move fast."
           />
@@ -258,7 +258,7 @@ export function GuideContent() {
             </li>
             <li>
               <span className="font-medium text-ink">
-                Phase 4 — Speed &amp; Power → Growth/Identity shift:
+                Phase 4 — Speed → Growth/Identity shift:
               </span>{" "}
               your body moves with power because the foundation is
               unshakeable. Your habits feel automatic because they&apos;re

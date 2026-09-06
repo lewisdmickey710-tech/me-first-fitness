@@ -187,7 +187,7 @@ export default async function LeadDashboard() {
           </p>
           <p>
             Every program moves through the same four phases (Stability →
-            Strength → Size → Power), built around movement quality, not
+            Strength → Size → Speed), built around movement quality, not
             motivation or how you feel on a given day. Nutrition coaching is
             built on Intuitive Eating rather than calorie restriction by
             default — you choose the style that actually works for you:
