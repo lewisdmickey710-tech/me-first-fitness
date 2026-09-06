@@ -25,6 +25,9 @@ export default function LoginPage() {
           MeFirstFitness
         </h1>
         <p className="mt-1 text-sm text-gray">Mind &amp; Muscle Mechanics</p>
+        <p className="mt-2 text-base font-medium text-rose">
+          Feel Strong. Feel Free. Feel You.
+        </p>
       </div>
 
       {callbackError ? (
@@ -77,6 +80,62 @@ export default function LoginPage() {
             Book a free consultation ♥
           </a>
         </p>
+      ) : null}
+
+      {tab === "client" ? (
+        <div className="mt-10 w-full max-w-md space-y-4">
+          <h2 className="text-center text-lg font-semibold text-ink">
+            New here? Here&apos;s what to expect.
+          </h2>
+
+          <Card className="space-y-2">
+            <p className="font-medium text-rose">What I do</p>
+            <p className="text-sm text-gray">
+              NASM-based strength and movement coaching built around four
+              progressive phases — Stability, Strength, Size, and Speed —
+              paired with Intuitive Eating nutrition guidance. Training with
+              purpose and intention, not punishment or obsession. Programs
+              are built around your actual health history and current
+              limitations, not a generic template — I work with injuries,
+              chronic conditions, and older adults.
+            </p>
+          </Card>
+
+          <Card className="space-y-2">
+            <p className="font-medium text-rose">Qualifications</p>
+            <p className="text-sm text-gray">
+              NASM-based training plus certified specializations in
+              Pain-Free Movement, Glute Development, Behavior Change, Senior
+              Fitness, Bodybuilding, Strength &amp; Conditioning, and
+              Nutrition.
+            </p>
+          </Card>
+
+          <Card className="space-y-2">
+            <p className="font-medium text-rose">Pricing</p>
+            <ul className="space-y-1.5 text-sm text-gray">
+              <li>
+                <strong className="text-ink">$40/session</strong> —
+                in-person, hands-on coaching (assisted stretching, foam
+                rolling, Theragun work)
+              </li>
+              <li>
+                <strong className="text-ink">$90/month</strong> — virtual,
+                your program is built and updated in the app on my own
+                cadence
+              </li>
+              <li>
+                <strong className="text-ink">$50</strong> — a standalone
+                written program, no ongoing coaching
+              </li>
+            </ul>
+            <p className="text-xs text-gray">
+              Every new client starts with a free assessment — movement,
+              posture &amp; goals — then 50% off your first paid session
+              after you sign on. No pressure, no obligation.
+            </p>
+          </Card>
+        </div>
       ) : null}
     </div>
   );
