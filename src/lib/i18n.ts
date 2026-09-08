@@ -256,6 +256,21 @@ const ES: Record<string, string> = {
   "Anything else about how this session felt?": "¿Algo más sobre cómo se sintió esta sesión?",
   "Rate this workout to complete it": "Califica este entrenamiento para completarlo",
   "Log this workout": "Registrar este entrenamiento",
+  "✓ Saved — Day {n} is logged.": "✓ Guardado — el Día {n} está registrado.",
+  Check: "Revisa",
+  "your history": "tu historial",
+  "if you want to double check or remove an entry.": "si quieres verificar o eliminar un registro.",
+  "✓ Already logged today — logging again below will add a second entry.":
+    "✓ Ya registrado hoy — registrar de nuevo abajo añadirá una segunda entrada.",
+  "You already logged this day today — save a second entry anyway?":
+    "Ya registraste este día hoy — ¿guardar una segunda entrada de todos modos?",
+  "Log this workout again": "Registrar este entrenamiento de nuevo",
+  "Adjust sets (currently {sets})": "Ajustar series (actualmente {sets})",
+  "Adjust sets": "Ajustar series",
+  "e.g. 4": "ej. 4",
+  "Reset to prescribed ({sets})": "Restablecer al prescrito ({sets})",
+  "Delete this logged workout? This can't be undone.":
+    "¿Eliminar este entrenamiento registrado? Esto no se puede deshacer.",
   "Did something else active?": "¿Hiciste algo más activo?",
   "A class, a walk, a workout with friends — log it from the Activity tab instead of here, so it doesn't get counted as one of your prescribed program days.":
     "Una clase, una caminata, un entrenamiento con amigos — regístralo desde la pestaña de Actividad en vez de aquí, para que no cuente como uno de tus días de programa prescritos.",

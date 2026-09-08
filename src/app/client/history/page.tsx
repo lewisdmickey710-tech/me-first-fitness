@@ -1,6 +1,8 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
+import { deleteMyLoggedSession } from "@/app/client/actions";
+import { ConfirmButton } from "@/components/confirm-button";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
 import {
   LOG_ENTRY_KIND_LABEL,
@@ -151,6 +153,22 @@ export default async function ClientHistoryPage() {
                   />
                 ) : null}
                 {a?.notes ? <p className="text-sm text-ink">{a.notes}</p> : null}
+                {s && entry.loggedBy === "client" ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await deleteMyLoggedSession(s.id);
+                    }}
+                  >
+                    <ConfirmButton
+                      variant="ghost"
+                      confirmText={t("Delete this logged workout? This can't be undone.")}
+                      className="text-xs text-gray hover:text-pink"
+                    >
+                      {t("Delete")}
+                    </ConfirmButton>
+                  </form>
+                ) : null}
               </Card>
             );
           })}

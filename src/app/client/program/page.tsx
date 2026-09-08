@@ -2,8 +2,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
-import { logMyWorkout, setProgramExerciseSwap } from "@/app/client/actions";
+import {
+  logMyWorkout,
+  setProgramExerciseSets,
+  setProgramExerciseSwap,
+} from "@/app/client/actions";
 import { WeightInput } from "@/components/weight-input";
+import { ConfirmButton } from "@/components/confirm-button";
 import {
   Button,
   Card,
@@ -42,7 +47,12 @@ interface ProgramDayJoinRow {
   }[];
 }
 
-export default async function ClientProgramPage() {
+export default async function ClientProgramPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ logged?: string }>;
+}) {
+  const { logged } = await searchParams;
   const me = await getMyClient();
 
   if (!me) {
@@ -140,9 +150,30 @@ export default async function ClientProgramPage() {
     .eq("client_id", me.id)
     .gte("date", sevenDaysAgo);
   const completedDayLabels = new Set((recentSessions ?? []).map((s) => s.day_label));
+  // Specifically "logged today" (not just within the last week) drives the
+  // duplicate-guard notice below -- a log from three days ago shouldn't
+  // make today's submit button suspicious of itself.
+  const loggedTodayDayLabels = new Set(
+    (recentSessions ?? []).filter((s) => s.date === today).map((s) => s.day_label)
+  );
 
   return (
     <div className="space-y-6">
+      {logged ? (
+        <div className="rounded-xl border border-teal/40 bg-teal/5 px-4 py-3 text-sm text-ink">
+          <p className="font-medium">
+            {t("✓ Saved — Day {n} is logged.", { n: logged })}
+          </p>
+          <p className="mt-0.5 text-gray">
+            {t("Check")}{" "}
+            <Link href="/client/history" className="text-rose hover:underline">
+              {t("your history")}
+            </Link>{" "}
+            {t("if you want to double check or remove an entry.")}
+          </p>
+        </div>
+      ) : null}
+
       <PhaseBanner
         phase={currentPhase?.phase ?? "n/a"}
         title={t("Your program")}
@@ -182,6 +213,7 @@ export default async function ClientProgramPage() {
               label: day.day_label,
             });
             const isCompleted = completedDayLabels.has(dayLabel);
+            const loggedToday = loggedTodayDayLabels.has(dayLabel);
 
             return (
               <Card key={day.id}>
@@ -198,6 +230,11 @@ export default async function ClientProgramPage() {
                     </>
                   }
                 >
+                {loggedToday ? (
+                  <p className="mb-3 rounded-lg bg-teal/10 px-3 py-2 text-sm text-teal">
+                    {t("✓ Already logged today — logging again below will add a second entry.")}
+                  </p>
+                ) : null}
                 <div className="space-y-3">
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
@@ -351,6 +388,56 @@ export default async function ClientProgramPage() {
                           </Collapsible>
                         ) : null}
 
+                        <Collapsible
+                          label={
+                            override?.sets_override
+                              ? t("Adjust sets (currently {sets})", {
+                                  sets: override.sets_override,
+                                })
+                              : t("Adjust sets")
+                          }
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <form
+                              action={async (formData: FormData) => {
+                                "use server";
+                                await setProgramExerciseSets(
+                                  pde.id,
+                                  String(formData.get("sets") ?? "")
+                                );
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Input
+                                name="sets"
+                                placeholder={t("e.g. 4")}
+                                defaultValue={override?.sets_override ?? ""}
+                                className="w-24"
+                              />
+                              <Button type="submit" variant="secondary">
+                                {t("Save")}
+                              </Button>
+                            </form>
+                            {override?.sets_override ? (
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await setProgramExerciseSets(pde.id, null);
+                                }}
+                              >
+                                <button
+                                  type="submit"
+                                  className="text-sm text-gray hover:text-ink"
+                                >
+                                  {t("Reset to prescribed ({sets})", {
+                                    sets: pde.sets ?? "",
+                                  })}
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        </Collapsible>
+
                         {/* These belong to the day's log form below (via
                             the form= attribute) even though they render
                             here, right in this exercise's own box. */}
@@ -405,9 +492,18 @@ export default async function ClientProgramPage() {
                     <StarRatingInput name="rating" />
                   </div>
 
-                  <Button type="submit" className="w-full">
-                    {t("Log this workout")}
-                  </Button>
+                  {loggedToday ? (
+                    <ConfirmButton
+                      className="w-full"
+                      confirmText={t("You already logged this day today — save a second entry anyway?")}
+                    >
+                      {t("Log this workout again")}
+                    </ConfirmButton>
+                  ) : (
+                    <Button type="submit" className="w-full">
+                      {t("Log this workout")}
+                    </Button>
+                  )}
                 </form>
                 </Collapsible>
               </Card>

@@ -996,6 +996,16 @@ export async function setProgramExerciseSwap(
 
   const supabase = await createClient();
 
+  // A sets override can coexist on the same override row -- read it first
+  // so un-swapping (substituteExerciseId: null) doesn't also deactivate an
+  // unrelated sets adjustment sharing this row.
+  const { data: existing } = await supabase
+    .from("client_program_overrides")
+    .select("sets_override")
+    .eq("client_id", me.id)
+    .eq("program_day_exercise_id", programDayExerciseId)
+    .maybeSingle();
+
   // The DB trigger enforces that substituteExerciseId can only ever be
   // this exercise's own designated regress_to/progress_to target (or
   // null, to revert to the prescribed movement) -- this isn't a free
@@ -1006,7 +1016,44 @@ export async function setProgramExerciseSwap(
       program_day_exercise_id: programDayExerciseId,
       substitute_exercise_id: substituteExerciseId,
       edited_by: "client",
-      active: substituteExerciseId !== null,
+      active: substituteExerciseId !== null || !!existing?.sets_override,
+    },
+    { onConflict: "client_id,program_day_exercise_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/program");
+}
+
+export async function setProgramExerciseSets(
+  programDayExerciseId: string,
+  sets: string | null
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const trimmed = sets?.trim() || null;
+
+  // A movement swap can coexist on the same override row -- read it first
+  // so clearing the sets override doesn't also deactivate an unrelated
+  // active swap sharing this row.
+  const { data: existing } = await supabase
+    .from("client_program_overrides")
+    .select("substitute_exercise_id")
+    .eq("client_id", me.id)
+    .eq("program_day_exercise_id", programDayExerciseId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("client_program_overrides").upsert(
+    {
+      client_id: me.id,
+      program_day_exercise_id: programDayExerciseId,
+      sets_override: trimmed,
+      edited_by: "client",
+      active: trimmed !== null || !!existing?.substitute_exercise_id,
     },
     { onConflict: "client_id,program_day_exercise_id" }
   );
@@ -1046,12 +1093,15 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
 
   const { data: overrides } = await supabase
     .from("client_program_overrides")
-    .select("program_day_exercise_id, substitute_exercise_id")
+    .select("program_day_exercise_id, substitute_exercise_id, sets_override")
     .eq("client_id", me.id)
     .eq("active", true);
 
   const overrideMap = new Map(
     (overrides ?? []).map((o) => [o.program_day_exercise_id, o.substitute_exercise_id])
+  );
+  const setsOverrideMap = new Map(
+    (overrides ?? []).map((o) => [o.program_day_exercise_id, o.sets_override])
   );
 
   const substituteIds = [...overrideMap.values()].filter(
@@ -1103,7 +1153,7 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
         prescribed_exercise: pde.exercises?.name ?? "",
         exercise_id: pde.exercise_id,
         substitute_exercise_id: substituteId,
-        sets: pde.sets ?? "",
+        sets: setsOverrideMap.get(pde.id) || pde.sets || "",
         reps: pde.reps ?? "",
         weight,
         notes,
@@ -1177,6 +1227,37 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
 
   revalidatePath("/client/program");
   revalidatePath("/client/dashboard");
+  // Nothing on the page visibly changed before this -- the same log form
+  // just sat there looking submittable, which made it easy to hit "Log
+  // this workout" a second time and end up with a duplicate. Redirecting
+  // (instead of just revalidating in place) forces a fresh page load with
+  // a clear confirmation banner and collapses the just-logged day's form
+  // behind a deliberate "log it again" disclosure.
+  redirect(`/client/program?logged=${encodeURIComponent(day.day_number)}`);
+}
+
+// Lets a client remove a workout she logged herself -- most often an
+// accidental duplicate from re-submitting the log form. Scoped to her own
+// client-logged sessions only; a coach-logged session can't be touched
+// here (matches the "sessions: client deletes own logged" RLS policy).
+export async function deleteMyLoggedSession(sessionId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("sessions")
+    .delete()
+    .eq("id", sessionId)
+    .eq("client_id", me.id)
+    .eq("logged_by", "client");
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/history");
+  revalidatePath("/client/dashboard");
+  revalidatePath("/client/progress");
 }
 
 export async function addHabit(name: string) {
