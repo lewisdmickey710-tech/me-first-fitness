@@ -484,6 +484,7 @@ const ES: Record<string, string> = {
   "Once you log a workout from My program, or an activity from Activity log, it'll show up here.":
     "Cuando registres un entrenamiento desde Mi programa, o una actividad desde el registro de Actividad, aparecerá aquí.",
   "logged by your coach": "registrado por tu entrenadora",
+  "💛 Waived through Give Back To Community": "💛 Exonerado a través de Give Back To Community",
   "(swapped from {name})": "(cambiado de {name})",
   "prescribed movement": "movimiento prescrito",
 

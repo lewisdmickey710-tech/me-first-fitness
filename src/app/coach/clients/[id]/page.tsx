@@ -853,7 +853,7 @@ function Overview({
         <Card className="border-rose/30 bg-rose/5">
           <p className="text-sm font-medium text-gray">
             <Heart className="mr-1" />
-            Pro bono value
+            GBTC value
           </p>
           {client.pro_bono_rate ? (
             <p className="mt-1 text-2xl font-semibold text-ink">
@@ -1270,7 +1270,7 @@ function ProfileTab({
           <div>
             <Checkbox
               name="pro_bono"
-              label="Pro bono client (charity work)"
+              label="GBTC client (Give Back To Community)"
               defaultChecked={client.pro_bono}
             />
             <p className="mt-1 text-xs text-gray">
@@ -1301,7 +1301,7 @@ function ProfileTab({
             />
             <p className="mt-1 text-xs text-gray">
               For your own QA/demo use. Excluded from roster and finances
-              stats (pro bono impact, monthly check-in nudges, etc.) —
+              stats (GBTC impact, monthly check-in nudges, etc.) —
               everything else about the profile still works normally.
             </p>
           </div>

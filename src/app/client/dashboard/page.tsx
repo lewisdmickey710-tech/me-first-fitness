@@ -618,6 +618,11 @@ export default async function ClientDashboard() {
                     {t("Rating: {n}/5", { n: s.rating })}
                   </p>
                 ) : null}
+                {s.payment_status === "waived" ? (
+                  <p className="mt-1 text-sm text-gold">
+                    {t("💛 Waived through Give Back To Community")}
+                  </p>
+                ) : null}
               </Card>
             ))}
           </div>

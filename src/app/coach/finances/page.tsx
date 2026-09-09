@@ -245,7 +245,7 @@ export default async function FinancesPage({
       </h1>
       <p className="text-sm text-gray">
         Gross income is every cash payment actually marked paid — session
-        payments, late cancellation fees, retainers. Expenses, pro bono
+        payments, late cancellation fees, retainers. Expenses, GBTC
         value, and bartered/mutual-aid trades are all tracked separately
         below and left out of income by default; merge barter in when
         you&apos;re ready to report it. This is a rough estimate for
@@ -362,7 +362,7 @@ export default async function FinancesPage({
           </p>
         </Card>
         <Card className="border-rose/30 bg-rose/5">
-          <p className="text-sm font-medium text-gray">Pro bono value</p>
+          <p className="text-sm font-medium text-gray">GBTC value</p>
           <p className="mt-1 text-2xl font-semibold text-ink">
             ${ytdProBono.toFixed(2)}
           </p>
@@ -397,7 +397,7 @@ export default async function FinancesPage({
               <th className="px-2 py-2 text-right">Barter</th>
               <th className="px-2 py-2 text-right">Expenses</th>
               <th className="px-2 py-2 text-right">Net</th>
-              <th className="px-2 py-2 text-right">Pro bono value</th>
+              <th className="px-2 py-2 text-right">GBTC value</th>
               <th className="py-2 pl-2 text-right">Est. set-aside</th>
             </tr>
           </thead>

@@ -108,6 +108,11 @@ export default async function ClientHistoryPage() {
                     {entry.loggedBy === "coach" ? (
                       <Badge tone="gray">{t("logged by your coach")}</Badge>
                     ) : null}
+                    {s?.payment_status === "waived" ? (
+                      <Badge tone="gold">
+                        {t("💛 Waived through Give Back To Community")}
+                      </Badge>
+                    ) : null}
                   </div>
                   <p className="text-sm text-gray">{entry.date}</p>
                 </div>
