@@ -15,6 +15,7 @@ import {
   ProgressRing,
 } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
+import { gbtcCoverage } from "@/lib/payment-status";
 import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
@@ -591,6 +592,7 @@ export default async function ClientDashboard() {
             badge={unacknowledgedCount > 0 ? t("{n} new", { n: unacknowledgedCount }) : undefined}
           />
           <MoreLink href="/client/plan" label={t("Payment plan")} />
+          <MoreLink href="/client/payment-history" label={t("Payment history")} />
           <MoreLink href="/client/checkin-call" label={t("Book a check-in call")} />
           {me.video_sessions_enabled ? (
             <MoreLink href="/client/video-session" label={t("Book a video session")} />
@@ -607,24 +609,31 @@ export default async function ClientDashboard() {
           />
         ) : (
           <div className="space-y-2">
-            {sessions.map((s) => (
-              <Card key={s.id}>
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-ink">{s.day_label}</p>
-                  <p className="text-sm text-gray">{s.date}</p>
-                </div>
-                {s.rating ? (
-                  <p className="mt-1 text-sm text-gray">
-                    {t("Rating: {n}/5", { n: s.rating })}
-                  </p>
-                ) : null}
-                {s.payment_status === "waived" ? (
-                  <p className="mt-1 text-sm text-gold">
-                    {t("💛 Waived through Give Back To Community")}
-                  </p>
-                ) : null}
-              </Card>
-            ))}
+            {sessions.map((s) => {
+              const coverage = gbtcCoverage(me, s);
+              return (
+                <Card key={s.id}>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-ink">{s.day_label}</p>
+                    <p className="text-sm text-gray">{s.date}</p>
+                  </div>
+                  {s.rating ? (
+                    <p className="mt-1 text-sm text-gray">
+                      {t("Rating: {n}/5", { n: s.rating })}
+                    </p>
+                  ) : null}
+                  {coverage.covered ? (
+                    <p className="mt-1 text-sm text-gold">
+                      {coverage.value
+                        ? t("💛 ${amount} value — covered through Give Back To Community", {
+                            amount: coverage.value.toFixed(2),
+                          })
+                        : t("💛 Covered through Give Back To Community")}
+                    </p>
+                  ) : null}
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

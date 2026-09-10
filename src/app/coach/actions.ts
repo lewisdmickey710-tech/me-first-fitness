@@ -29,6 +29,7 @@ export async function addClient(formData: FormData) {
   const session_mode = String(formData.get("session_mode") ?? "");
   const sessionsAllottedRaw = String(formData.get("sessions_allotted") ?? "");
   const notes = String(formData.get("notes") ?? "").trim();
+  const self_led = formData.get("self_led") === "on";
 
   if (!name || !care_profile_id) {
     throw new Error("Name and care profile are required.");
@@ -45,6 +46,7 @@ export async function addClient(formData: FormData) {
         ? Number(sessionsAllottedRaw)
         : null,
       notes: notes || null,
+      self_led,
     })
     .select("id")
     .single();
@@ -1717,6 +1719,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       daily_calorie_goal: daily_calorie_goal_raw ? Number(daily_calorie_goal_raw) : null,
       is_test: formData.get("is_test") === "on",
       session_rate: session_rate_raw ? Number(session_rate_raw) : null,
+      self_led: formData.get("self_led") === "on",
     })
     .eq("id", clientId);
 
@@ -1881,6 +1884,31 @@ export async function addClientNote(clientId: string, formData: FormData) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Stamps today as the last time she checked on a self-led client, and
+// (if she wrote anything) drops it in the same client_notes list every
+// other note lives in -- a self-led check-in is really just a note with
+// a timestamp the roster flag can watch.
+export async function logSelfLedCheckin(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+  const note = String(formData.get("note") ?? "").trim();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ self_led_last_checkin: new Date().toISOString().slice(0, 10) })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  if (note) {
+    const { error: noteError } = await supabase
+      .from("client_notes")
+      .insert({ client_id: clientId, note: `Self-led check-in: ${note}` });
+    if (noteError) throw new Error(noteError.message);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
 }
 
 export async function deleteClientNote(clientId: string, noteId: string) {

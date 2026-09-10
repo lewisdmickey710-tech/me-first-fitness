@@ -485,6 +485,9 @@ const ES: Record<string, string> = {
     "Cuando registres un entrenamiento desde Mi programa, o una actividad desde el registro de Actividad, aparecerá aquí.",
   "logged by your coach": "registrado por tu entrenadora",
   "💛 Waived through Give Back To Community": "💛 Exonerado a través de Give Back To Community",
+  "💛 ${amount} value — covered through Give Back To Community":
+    "💛 valor de ${amount} — cubierto a través de Give Back To Community",
+  "💛 Covered through Give Back To Community": "💛 Cubierto a través de Give Back To Community",
   "(swapped from {name})": "(cambiado de {name})",
   "prescribed movement": "movimiento prescrito",
 
@@ -519,6 +522,18 @@ const ES: Record<string, string> = {
   "Logged workouts show up in": "Los entrenamientos registrados aparecen en",
   "and feed your strength trends on": "y alimentan tus tendencias de fuerza en",
   Progress: "Progreso",
+
+  // Payment History
+  "Payment History": "Historial de Pagos",
+  "Every payment on your account, plus any sessions covered through Give Back To Community.":
+    "Cada pago en tu cuenta, más cualquier sesión cubierta a través de Give Back To Community.",
+  "Total received through Give Back To Community": "Total recibido a través de Give Back To Community",
+  "Nothing here yet": "Nada aquí todavía",
+  "Payments and covered sessions will show up here as they happen.":
+    "Los pagos y sesiones cubiertas aparecerán aquí a medida que ocurran.",
+  "paid {date}": "pagado {date}",
+  "due {date}": "vence {date}",
+  value: "valor",
 
   // Progress
   "Your measurement trends and strength progress, all in one place.":

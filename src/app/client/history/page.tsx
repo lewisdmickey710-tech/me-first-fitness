@@ -4,6 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { deleteMyLoggedSession } from "@/app/client/actions";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { gbtcCoverage } from "@/lib/payment-status";
 import {
   LOG_ENTRY_KIND_LABEL,
   LOG_ENTRY_KIND_TONE,
@@ -97,6 +98,7 @@ export default async function ClientHistoryPage() {
           {entries.map((entry) => {
             const s = entry.session;
             const a = entry.activity;
+            const coverage = s ? gbtcCoverage(me, s) : { covered: false, value: null };
             return (
               <Card key={`${entry.kind === "activity" ? "a" : "s"}-${entry.id}`} className="space-y-2">
                 <div className="flex items-center justify-between">
@@ -108,9 +110,13 @@ export default async function ClientHistoryPage() {
                     {entry.loggedBy === "coach" ? (
                       <Badge tone="gray">{t("logged by your coach")}</Badge>
                     ) : null}
-                    {s?.payment_status === "waived" ? (
+                    {coverage.covered ? (
                       <Badge tone="gold">
-                        {t("💛 Waived through Give Back To Community")}
+                        {coverage.value
+                          ? t("💛 ${amount} value — covered through Give Back To Community", {
+                              amount: coverage.value.toFixed(2),
+                            })
+                          : t("💛 Covered through Give Back To Community")}
                       </Badge>
                     ) : null}
                   </div>

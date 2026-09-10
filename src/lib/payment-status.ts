@@ -5,6 +5,27 @@ export type PaymentStatusBadge = {
   tone: "teal" | "gold" | "pink" | "gray";
 } | null;
 
+// Whether a given logged session was covered rather than paid for, and what
+// it was worth -- true for every session of a GBTC (Give Back To Community)
+// client automatically, not just the ones manually marked "waived" on that
+// one session, plus any one-off waiver a non-GBTC client happens to get.
+export function gbtcCoverage(
+  client: {
+    pro_bono: boolean;
+    pro_bono_rate: number | null;
+    session_rate: number | null;
+  },
+  session: { payment_status: "paid" | "unpaid" | "waived" | null }
+): { covered: boolean; value: number | null } {
+  if (client.pro_bono) {
+    return { covered: true, value: client.pro_bono_rate };
+  }
+  if (session.payment_status === "waived") {
+    return { covered: true, value: client.session_rate };
+  }
+  return { covered: false, value: null };
+}
+
 // Used to gate new self-service booking requests -- a client shouldn't be
 // able to request more session time while an existing payment is overdue.
 // Late cancellation fees have their own dedicated "sessions paused" flow

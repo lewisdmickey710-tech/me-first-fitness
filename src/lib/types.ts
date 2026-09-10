@@ -53,6 +53,8 @@ export interface Client {
   is_test: boolean;
   partner_client_id: string | null;
   session_rate: number | null;
+  self_led: boolean;
+  self_led_last_checkin: string | null;
 }
 
 export interface SessionEntry {
@@ -337,7 +339,7 @@ export interface ClientProgressPhoto {
 export interface ClientFlagOverride {
   id: string;
   client_id: string;
-  flag_key: "inactive" | "high_risk" | "session_not_logged";
+  flag_key: "inactive" | "high_risk" | "session_not_logged" | "self_led_no_checkin";
   reason: string;
   until_date: string | null;
   created_at: string;

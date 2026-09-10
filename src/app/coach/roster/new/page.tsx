@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { addClient } from "@/app/coach/actions";
-import { Button, Card, Heart, Input, Select, Textarea } from "@/components/ui";
+import { Button, Card, Checkbox, Heart, Input, Select, Textarea } from "@/components/ui";
 import type { CareProfile } from "@/lib/types";
 import { CareProfilePicker } from "./CareProfilePicker";
 
@@ -78,6 +78,15 @@ export default async function NewClientPage() {
               <span className="font-normal text-gray">(coach-only)</span>
             </label>
             <Textarea name="notes" rows={3} />
+          </div>
+
+          <div>
+            <Checkbox name="self_led" label="Self-Led (standalone program, no ongoing coaching)" />
+            <p className="mt-1 text-xs text-gray">
+              For someone who bought the self-led program — pair this with
+              Virtual mode above. Shows up flagged on the Motherboard if you
+              haven&apos;t checked in on them in a while.
+            </p>
           </div>
 
           <Button type="submit">Add client</Button>

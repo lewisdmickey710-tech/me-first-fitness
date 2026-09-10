@@ -18,6 +18,7 @@ import {
   deleteMeasurement,
   deleteMilestone,
   endClientHold,
+  logSelfLedCheckin,
   logSessionOccurrence,
   markMilestoneAchieved,
   markPaymentPaid,
@@ -769,6 +770,37 @@ function Overview({
         />
       )}
 
+      {client.self_led ? (
+        <Card className="border-gold/40 bg-gold/5">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-gray">
+              <Heart className="mr-1" />
+              Self-Led — last checked in
+            </p>
+            <Badge tone="gold">Self-Led</Badge>
+          </div>
+          <p className="mt-1 text-lg font-semibold text-ink">
+            {client.self_led_last_checkin ?? "Never yet"}
+          </p>
+          <form
+            action={async (formData: FormData) => {
+              "use server";
+              await logSelfLedCheckin(client.id, formData);
+            }}
+            className="mt-3 space-y-2"
+          >
+            <Textarea
+              name="note"
+              rows={2}
+              placeholder="What'd you hear from them? (optional — adds to Notes)"
+            />
+            <Button type="submit" variant="secondary">
+              Mark checked in today
+            </Button>
+          </form>
+        </Card>
+      ) : null}
+
       <Card>
         <div className="flex items-center justify-between">
           <div>
@@ -994,6 +1026,7 @@ const OVERRIDABLE_FLAG_LABEL: Record<ClientFlagOverride["flag_key"], string> = {
   inactive: "Inactive",
   high_risk: "High risk",
   session_not_logged: "Session not logged",
+  self_led_no_checkin: "No self-led check-in",
 };
 
 function ProfileTab({
@@ -1177,6 +1210,18 @@ function ProfileTab({
               while none is scheduled. Video sessions below work for
               either mode.
             </p>
+            <div className="mt-3">
+              <Checkbox
+                name="self_led"
+                label="Self-Led (standalone program, no ongoing coaching)"
+                defaultChecked={client.self_led}
+              />
+              <p className="mt-1 text-xs text-gray">
+                For someone who bought the self-led program — pair with
+                Virtual mode. Flags on the Motherboard if you haven&apos;t
+                checked in on them in a while.
+              </p>
+            </div>
             <div className="mt-2">
               <Checkbox
                 name="video_sessions_enabled"

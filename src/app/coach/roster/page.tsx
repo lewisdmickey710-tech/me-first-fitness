@@ -633,6 +633,24 @@ export default async function RosterPage({
       });
     }
     if (client.hold_started_at) flags.push({ label: "On hold", tone: "negative" });
+    // Self-led clients have no sessions to go quiet on, so the usual
+    // "inactive" flag below doesn't fit them -- this tracks the same idea
+    // off self_led_last_checkin (or signup date, if she's never checked in
+    // yet) instead.
+    const SELF_LED_CHECKIN_WINDOW_DAYS = 30;
+    if (client.self_led) {
+      const lastCheckin = client.self_led_last_checkin ?? client.created_at.slice(0, 10);
+      const daysSinceCheckin = Math.floor(
+        (new Date(today).getTime() - new Date(lastCheckin).getTime()) /
+          (1000 * 60 * 60 * 24)
+      );
+      if (daysSinceCheckin >= SELF_LED_CHECKIN_WINDOW_DAYS) {
+        pushOverridableFlag(
+          "self_led_no_checkin",
+          `No check-in in ${daysSinceCheckin}+ days`
+        );
+      }
+    }
     if (risk.level === "high") pushOverridableFlag("high_risk", "High risk");
     if (owesPayment) flags.push({ label: paymentStatus!.label, tone: "negative" });
     if (lateCancelFeeDueByClient.has(client.id)) {
@@ -730,6 +748,7 @@ export default async function RosterPage({
                 </p>
                 <p className="mt-0.5 text-sm text-gray">
                   {client.care_profiles?.name ?? "No care profile set"}
+                  {client.self_led ? " · Self-Led" : ""}
                   {client.partner_client_id && clientNameById.get(client.partner_client_id)
                     ? ` · paired with ${clientNameById.get(client.partner_client_id)}`
                     : ""}
