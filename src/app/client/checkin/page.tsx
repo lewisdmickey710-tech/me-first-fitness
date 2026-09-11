@@ -1,13 +1,26 @@
 import { BackLink } from "@/components/back-link";
+import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { logCheckin } from "@/app/client/actions";
-import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
 import { makeT } from "@/lib/i18n";
+import type { Checkin } from "@/lib/types";
 
 export default async function ClientCheckinPage() {
   const me = await getMyClient();
   const t = makeT(me?.language);
   const today = new Date().toISOString().slice(0, 10);
+
+  let checkins: Checkin[] = [];
+  if (me) {
+    const supabase = await createClient();
+    const { data } = (await supabase
+      .from("checkins")
+      .select("*")
+      .eq("client_id", me.id)
+      .order("date", { ascending: false })) as unknown as { data: Checkin[] | null };
+    checkins = data ?? [];
+  }
 
   return (
     <div className="space-y-6">
@@ -70,6 +83,45 @@ export default async function ClientCheckinPage() {
           <Button type="submit">{t("Save check-in")}</Button>
         </form>
       </Card>
+
+      <h2 className="text-lg font-semibold text-ink">{t("Past check-ins")}</h2>
+
+      {checkins.length === 0 ? (
+        <EmptyState
+          title={t("No check-ins yet")}
+          body={t("Check-ins you or your coach log will show up here.")}
+        />
+      ) : (
+        <div className="space-y-3">
+          {checkins.map((c) => (
+            <Card key={c.id}>
+              <div className="flex items-center justify-between">
+                <p className="font-medium text-ink">{c.date}</p>
+                <Badge tone={c.logged_by === "coach" ? "rose" : "teal"}>
+                  {c.logged_by === "coach" ? t("logged by your coach") : t("logged by you")}
+                </Badge>
+              </div>
+              <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray sm:grid-cols-3">
+                {c.sleep ? <CheckinField label={t("Sleep")} value={c.sleep} /> : null}
+                {c.water ? <CheckinField label={t("Water")} value={c.water} /> : null}
+                {c.food ? <CheckinField label={t("Food")} value={c.food} /> : null}
+                {c.energy ? <CheckinField label={t("Energy")} value={c.energy} /> : null}
+                {c.mood ? <CheckinField label={t("Mood")} value={c.mood} /> : null}
+              </dl>
+              {c.notes ? <p className="mt-2 text-sm text-ink">{c.notes}</p> : null}
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CheckinField({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-gray">{label}</dt>
+      <dd className="text-ink">{value}</dd>
     </div>
   );
 }

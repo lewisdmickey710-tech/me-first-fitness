@@ -354,6 +354,12 @@ const ES: Record<string, string> = {
   "Anything else?": "¿Algo más?",
   "Totally optional": "Totalmente opcional",
   "Save check-in": "Guardar check-in",
+  "Past check-ins": "Check-ins anteriores",
+  "No check-ins yet": "Aún no hay check-ins",
+  "Check-ins you or your coach log will show up here.":
+    "Los check-ins que registres tú o tu entrenadora aparecerán aquí.",
+  "logged by you": "registrado por ti",
+  "logged by your coach": "registrado por tu entrenadora",
 
   // Milestones
   "Things to look forward to, and things we've already celebrated together.":
@@ -483,7 +489,6 @@ const ES: Record<string, string> = {
   Activity: "Actividad",
   "Once you log a workout from My program, or an activity from Activity log, it'll show up here.":
     "Cuando registres un entrenamiento desde Mi programa, o una actividad desde el registro de Actividad, aparecerá aquí.",
-  "logged by your coach": "registrado por tu entrenadora",
   "💛 Waived through Give Back To Community": "💛 Exonerado a través de Give Back To Community",
   "💛 ${amount} value — covered through Give Back To Community":
     "💛 valor de ${amount} — cubierto a través de Give Back To Community",
