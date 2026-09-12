@@ -6,7 +6,7 @@ import { Card, Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
 import { formatReps } from "@/lib/constants";
 import { mergeLogEntries } from "@/lib/log-entries";
-import type { Activity, Client, TrainingSession } from "@/lib/types";
+import type { Activity, Client, CompSessionPackage, TrainingSession } from "@/lib/types";
 import { LogSessionForm, type ProgramDayOption } from "./LogSessionForm";
 
 interface ProgramDayJoinRow {
@@ -81,6 +81,13 @@ export default async function LogSessionPage({
     ]);
 
   const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
+
+  const { data: activeCompPackage } = (await supabase
+    .from("comp_session_packages")
+    .select("*")
+    .eq("client_id", id)
+    .is("completed_at", null)
+    .maybeSingle()) as { data: CompSessionPackage | null };
 
   const allPdeIds = (days ?? []).flatMap((d) =>
     d.program_day_exercises.map((pde) => pde.id)
@@ -175,6 +182,7 @@ export default async function LogSessionPage({
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={lastEntry}
+        activeCompPackage={activeCompPackage}
       />
     </div>
   );

@@ -10,6 +10,7 @@ import {
   addFlagOverride,
   advancePhase,
   archiveClient,
+  cancelCompPackage,
   clearFlagOverride,
   coachCancelSession,
   confirmVideoSessionRequest,
@@ -20,6 +21,7 @@ import {
   endClientHold,
   logSelfLedCheckin,
   logSessionOccurrence,
+  markCompPackageConverted,
   markMilestoneAchieved,
   markPaymentPaid,
   setClientDocumentAssignment,
@@ -94,6 +96,7 @@ import type {
   ClientProgramOverride,
   ClientSchedule,
   ClientSymptomDayLog,
+  CompSessionPackage,
   LegalDocument,
   Measurement,
   OccurrenceStatus,
@@ -311,6 +314,13 @@ export default async function ClientDetailPage({
     .select("*")
     .eq("client_id", id)
     .maybeSingle()) as { data: ClientIntake | null };
+
+  const { data: activeCompPackage } = (await supabase
+    .from("comp_session_packages")
+    .select("*")
+    .eq("client_id", id)
+    .is("completed_at", null)
+    .maybeSingle()) as { data: CompSessionPackage | null };
 
   const [
     { data: allDocuments },
@@ -548,7 +558,11 @@ export default async function ClientDetailPage({
         <RequestsTab clientId={id} requests={requests ?? []} payments={payments ?? []} />
       )}
       {tab === "payments" && (
-        <PaymentsTab clientId={id} payments={payments ?? []} />
+        <PaymentsTab
+          clientId={id}
+          payments={payments ?? []}
+          compPackage={activeCompPackage}
+        />
       )}
     </div>
   );
@@ -3195,14 +3209,18 @@ function RequestsTab({
 function PaymentsTab({
   clientId,
   payments,
+  compPackage,
 }: {
   clientId: string;
   payments: Payment[];
+  compPackage: CompSessionPackage | null;
 }) {
   const today = toDateString(new Date());
 
   return (
     <div className="space-y-4">
+      <CompPackageCard clientId={clientId} compPackage={compPackage} />
+
       <Link
         href={`/coach/clients/${clientId}/payments/new`}
         className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
@@ -3263,6 +3281,76 @@ function PaymentsTab({
         </div>
       )}
     </div>
+  );
+}
+
+function CompPackageCard({
+  clientId,
+  compPackage,
+}: {
+  clientId: string;
+  compPackage: CompSessionPackage | null;
+}) {
+  if (!compPackage) {
+    return (
+      <Link
+        href={`/coach/clients/${clientId}/comp-package/new`}
+        className="inline-block rounded-xl border border-grayLt px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
+      >
+        + Start a comp session package
+      </Link>
+    );
+  }
+
+  const hasDiscountPhase =
+    compPackage.discount_rate != null && compPackage.discount_sessions_total > 0;
+  const converted = !!compPackage.signed_on_recurring_at;
+
+  return (
+    <Card className="border-gold/40 bg-gold/5">
+      <div className="flex items-center justify-between">
+        <p className="font-medium text-ink">{compPackage.label}</p>
+        <Badge tone="gold">comp package</Badge>
+      </div>
+      <p className="mt-2 text-sm text-ink">
+        {compPackage.comp_sessions_used} of {compPackage.comp_sessions_total} comp
+        sessions used (${Number(compPackage.session_value).toFixed(2)} each)
+      </p>
+      {hasDiscountPhase ? (
+        <p className="mt-1 text-sm text-gray">
+          {converted
+            ? `${compPackage.discount_sessions_used} of ${compPackage.discount_sessions_total} discounted sessions used ($${Number(compPackage.discount_rate).toFixed(2)} each)`
+            : `If they sign on for recurring training: ${compPackage.discount_sessions_total} sessions at $${Number(compPackage.discount_rate).toFixed(2)} each`}
+        </p>
+      ) : null}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {!converted ? (
+          <form
+            action={async () => {
+              "use server";
+              await markCompPackageConverted(compPackage.id, clientId);
+            }}
+          >
+            <Button type="submit" variant="secondary">
+              Mark signed on for recurring training
+            </Button>
+          </form>
+        ) : null}
+        <form
+          action={async () => {
+            "use server";
+            await cancelCompPackage(compPackage.id, clientId);
+          }}
+        >
+          <ConfirmButton
+            variant="ghost"
+            confirmText="Cancel this comp package? This restores their prior session rate."
+          >
+            Cancel package
+          </ConfirmButton>
+        </form>
+      </div>
+    </Card>
   );
 }
 

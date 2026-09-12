@@ -696,6 +696,52 @@ export async function coachBookSession(
   }
 }
 
+// Records one session against an active comp package (a donated block of
+// sessions, optionally followed by a discounted-rate window once the
+// client signs on for recurring training -- see 0105_comp_session_packages).
+// Closes the package out and restores the client's prior session_rate once
+// everything the package promised has been used.
+async function applyCompPackageSessionUse(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  packageId: string,
+  kind: "comp" | "discount"
+) {
+  const { data: pkg } = await supabase
+    .from("comp_session_packages")
+    .select("*")
+    .eq("id", packageId)
+    .maybeSingle();
+  if (!pkg) return;
+
+  const comp_sessions_used =
+    kind === "comp" ? Math.min(pkg.comp_sessions_used + 1, pkg.comp_sessions_total) : pkg.comp_sessions_used;
+  const discount_sessions_used =
+    kind === "discount"
+      ? Math.min(pkg.discount_sessions_used + 1, pkg.discount_sessions_total)
+      : pkg.discount_sessions_used;
+
+  const fullyUsed =
+    comp_sessions_used >= pkg.comp_sessions_total &&
+    (pkg.discount_sessions_total === 0 ||
+      (!!pkg.signed_on_recurring_at && discount_sessions_used >= pkg.discount_sessions_total));
+
+  await supabase
+    .from("comp_session_packages")
+    .update({
+      comp_sessions_used,
+      discount_sessions_used,
+      completed_at: fullyUsed ? new Date().toISOString() : null,
+    })
+    .eq("id", packageId);
+
+  if (fullyUsed) {
+    await supabase
+      .from("clients")
+      .update({ session_rate: pkg.previous_session_rate })
+      .eq("id", pkg.client_id);
+  }
+}
+
 export async function logSession(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
@@ -769,6 +815,17 @@ export async function logSession(clientId: string, formData: FormData) {
     ["paid", "unpaid", "waived"].includes(paymentStatusRaw) ? paymentStatusRaw : null
   ) as "paid" | "unpaid" | "waived" | null;
 
+  // A comp-package session always logs as waived regardless of whatever
+  // the payment dropdown happened to say -- a comp session is free by
+  // definition, so this can't be left to a separate, forgettable field.
+  const compPackageId = String(formData.get("comp_package_id") ?? "").trim();
+  const compPackageUseRaw = String(formData.get("comp_package_use") ?? "");
+  const compPackageUse =
+    compPackageUseRaw === "comp" || compPackageUseRaw === "discount"
+      ? compPackageUseRaw
+      : null;
+  const effectivePaymentStatus = compPackageUse === "comp" ? "waived" : payment_status;
+
   // Defaults to coached (checkbox is checked unless she unchecks it) --
   // she's normally logging a session she actually ran; unchecking it is
   // for the case of recording something a client told her they did on
@@ -785,7 +842,7 @@ export async function logSession(clientId: string, formData: FormData) {
     logged_by: "coach",
     session_type,
     body_map,
-    payment_status,
+    payment_status: effectivePaymentStatus,
     coached,
   });
 
@@ -798,6 +855,10 @@ export async function logSession(clientId: string, formData: FormData) {
     { client_id: clientId, occurrence_date: date, status: "completed" },
     { onConflict: "client_id,occurrence_date" }
   );
+
+  if (compPackageId && compPackageUse) {
+    await applyCompPackageSessionUse(supabase, compPackageId, compPackageUse);
+  }
 
   revalidatePath(`/coach/clients/${clientId}`);
   redirect(`/coach/clients/${clientId}?tab=log`);
@@ -1461,6 +1522,127 @@ export async function markPaymentPaid(paymentId: string, clientId: string) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/finances");
+}
+
+// Starts a comp session package for a client (a silent-auction donation, a
+// giveaway, a referral perk, etc.) -- see 0105_comp_session_packages for the
+// full lifecycle. session_value drives clients.session_rate for as long as
+// the package is active, so a comp session logged "waived" shows its real
+// dollar value, and so "Add payment" pre-fills the right amount once the
+// client is in the discounted-rate window.
+export async function createCompPackage(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const label = String(formData.get("label") ?? "").trim();
+  const session_value = Number(formData.get("session_value") ?? "");
+  const comp_sessions_total = Number(formData.get("comp_sessions_total") ?? "");
+  const discountRateRaw = String(formData.get("discount_rate") ?? "").trim();
+  const discount_rate = discountRateRaw ? Number(discountRateRaw) : null;
+  const discount_sessions_total = discount_rate
+    ? Number(String(formData.get("discount_sessions_total") ?? "0") || "0")
+    : 0;
+
+  if (!label || !session_value || !comp_sessions_total) {
+    throw new Error("Label, session value, and number of comp sessions are required.");
+  }
+
+  const { data: existingActive } = await supabase
+    .from("comp_session_packages")
+    .select("id")
+    .eq("client_id", clientId)
+    .is("completed_at", null)
+    .maybeSingle();
+  if (existingActive) {
+    throw new Error(
+      "This client already has an active comp package. Cancel or complete it first."
+    );
+  }
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("session_rate")
+    .eq("id", clientId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("comp_session_packages").insert({
+    client_id: clientId,
+    label,
+    session_value,
+    comp_sessions_total,
+    discount_rate,
+    discount_sessions_total,
+    previous_session_rate: client?.session_rate ?? null,
+  });
+
+  if (error) throw new Error(error.message);
+
+  await supabase.from("clients").update({ session_rate: session_value }).eq("id", clientId);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  redirect(`/coach/clients/${clientId}?tab=payments`);
+}
+
+// Marks that the client signed on for recurring training before leaving
+// their last comp session -- switches them into the discounted-rate
+// window if the package offers one, otherwise closes the package out
+// immediately and restores their prior rate.
+export async function markCompPackageConverted(packageId: string, clientId: string) {
+  const supabase = await createClient();
+
+  const { data: pkg } = await supabase
+    .from("comp_session_packages")
+    .select("*")
+    .eq("id", packageId)
+    .maybeSingle();
+  if (!pkg) throw new Error("Comp package not found.");
+
+  const hasDiscountPhase = pkg.discount_rate != null && pkg.discount_sessions_total > 0;
+  const now = new Date().toISOString();
+
+  const { error } = await supabase
+    .from("comp_session_packages")
+    .update({
+      signed_on_recurring_at: now,
+      completed_at: hasDiscountPhase ? null : now,
+    })
+    .eq("id", packageId);
+  if (error) throw new Error(error.message);
+
+  await supabase
+    .from("clients")
+    .update({
+      session_rate: hasDiscountPhase ? pkg.discount_rate : pkg.previous_session_rate,
+    })
+    .eq("id", clientId);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Voids a comp package early (the client disappeared mid-way, a mistake
+// when setting it up, etc.) and restores whatever session_rate the client
+// had before it started.
+export async function cancelCompPackage(packageId: string, clientId: string) {
+  const supabase = await createClient();
+
+  const { data: pkg } = await supabase
+    .from("comp_session_packages")
+    .select("previous_session_rate")
+    .eq("id", packageId)
+    .maybeSingle();
+  if (!pkg) throw new Error("Comp package not found.");
+
+  const { error } = await supabase
+    .from("comp_session_packages")
+    .update({ completed_at: new Date().toISOString() })
+    .eq("id", packageId);
+  if (error) throw new Error(error.message);
+
+  await supabase
+    .from("clients")
+    .update({ session_rate: pkg.previous_session_rate })
+    .eq("id", clientId);
+
+  revalidatePath(`/coach/clients/${clientId}`);
 }
 
 export async function updateLegalDocument(

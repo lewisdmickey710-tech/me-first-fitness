@@ -430,6 +430,22 @@ export interface Payment {
   created_at: string;
 }
 
+export interface CompSessionPackage {
+  id: string;
+  client_id: string;
+  label: string;
+  session_value: number;
+  comp_sessions_total: number;
+  comp_sessions_used: number;
+  discount_rate: number | null;
+  discount_sessions_total: number;
+  discount_sessions_used: number;
+  previous_session_rate: number | null;
+  signed_on_recurring_at: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
 export type OccurrenceStatus =
   | "scheduled"
   | "completed"

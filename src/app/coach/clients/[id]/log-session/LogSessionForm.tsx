@@ -8,7 +8,7 @@ import { BodyMapInput } from "@/components/body-map";
 import { WeightInput } from "@/components/weight-input";
 import { PHASES } from "@/lib/constants";
 import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
-import type { BodyMapMarker, SessionEntry, SessionType } from "@/lib/types";
+import type { BodyMapMarker, CompSessionPackage, SessionEntry, SessionType } from "@/lib/types";
 
 export interface ProgramDayOption {
   phase: string;
@@ -86,6 +86,7 @@ export function LogSessionForm({
   defaultPhase,
   lastEntry,
   existingSession,
+  activeCompPackage = null,
 }: {
   clientId: string;
   today: string;
@@ -93,7 +94,20 @@ export function LogSessionForm({
   defaultPhase: string;
   lastEntry: LogEntry | null;
   existingSession?: ExistingSession | null;
+  activeCompPackage?: CompSessionPackage | null;
 }) {
+  const compRemaining = activeCompPackage
+    ? activeCompPackage.comp_sessions_total - activeCompPackage.comp_sessions_used
+    : 0;
+  const discountRemaining =
+    activeCompPackage?.signed_on_recurring_at && activeCompPackage.discount_rate != null
+      ? activeCompPackage.discount_sessions_total - activeCompPackage.discount_sessions_used
+      : 0;
+  // Only offered on a NEW session -- editing an already-logged one doesn't
+  // show this, since undoing/re-applying a comp-package use on edit would
+  // need counter-reversal logic this build doesn't have.
+  const showCompPackagePicker =
+    !existingSession && !!activeCompPackage && (compRemaining > 0 || discountRemaining > 0);
   const availablePhases = useMemo(
     () =>
       PHASES.filter((p) =>
@@ -502,6 +516,34 @@ export function LogSessionForm({
               <option value="waived">Waived (free session)</option>
             </Select>
           </div>
+
+          {showCompPackagePicker && activeCompPackage ? (
+            <div>
+              <input type="hidden" name="comp_package_id" value={activeCompPackage.id} />
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Comp package — {activeCompPackage.label}
+              </label>
+              <Select name="comp_package_use" defaultValue="">
+                <option value="">Not part of the package</option>
+                {compRemaining > 0 ? (
+                  <option value="comp">
+                    Comp session (waived) — {compRemaining} of{" "}
+                    {activeCompPackage.comp_sessions_total} remaining
+                  </option>
+                ) : null}
+                {discountRemaining > 0 ? (
+                  <option value="discount">
+                    Discount session (${Number(activeCompPackage.discount_rate).toFixed(2)}) —{" "}
+                    {discountRemaining} of {activeCompPackage.discount_sessions_total} remaining
+                  </option>
+                ) : null}
+              </Select>
+              <p className="mt-1 text-xs text-gray">
+                Picking a comp session logs it as waived automatically,
+                whatever the Payment field above says.
+              </p>
+            </div>
+          ) : null}
 
           <div>
             <p className="mb-1 text-sm font-medium text-ink">
