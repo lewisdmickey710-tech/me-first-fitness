@@ -269,6 +269,10 @@ const ES: Record<string, string> = {
   "Adjust sets": "Ajustar series",
   "e.g. 4": "ej. 4",
   "Reset to prescribed ({sets})": "Restablecer al prescrito ({sets})",
+  "Adjust reps (currently {reps})": "Ajustar repeticiones (actualmente {reps})",
+  "Adjust reps": "Ajustar repeticiones",
+  "e.g. 12": "ej. 12",
+  "Reset to prescribed ({reps})": "Restablecer al prescrito ({reps})",
   "Delete this logged workout? This can't be undone.":
     "¿Eliminar este entrenamiento registrado? Esto no se puede deshacer.",
   "Did something else active?": "¿Hiciste algo más activo?",

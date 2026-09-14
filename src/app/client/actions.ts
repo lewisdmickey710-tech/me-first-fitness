@@ -1037,12 +1037,12 @@ export async function setProgramExerciseSets(
 
   const trimmed = sets?.trim() || null;
 
-  // A movement swap can coexist on the same override row -- read it first
-  // so clearing the sets override doesn't also deactivate an unrelated
-  // active swap sharing this row.
+  // A movement swap (or a reps override) can coexist on the same override
+  // row -- read them first so clearing the sets override doesn't also
+  // deactivate an unrelated active swap/reps change sharing this row.
   const { data: existing } = await supabase
     .from("client_program_overrides")
-    .select("substitute_exercise_id")
+    .select("substitute_exercise_id, reps_override")
     .eq("client_id", me.id)
     .eq("program_day_exercise_id", programDayExerciseId)
     .maybeSingle();
@@ -1053,7 +1053,48 @@ export async function setProgramExerciseSets(
       program_day_exercise_id: programDayExerciseId,
       sets_override: trimmed,
       edited_by: "client",
-      active: trimmed !== null || !!existing?.substitute_exercise_id,
+      active:
+        trimmed !== null ||
+        !!existing?.substitute_exercise_id ||
+        !!existing?.reps_override,
+    },
+    { onConflict: "client_id,program_day_exercise_id" }
+  );
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/program");
+}
+
+export async function setProgramExerciseReps(
+  programDayExerciseId: string,
+  reps: string | null
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const trimmed = reps?.trim() || null;
+
+  // Same coexistence concern as setProgramExerciseSets, just for reps.
+  const { data: existing } = await supabase
+    .from("client_program_overrides")
+    .select("substitute_exercise_id, sets_override")
+    .eq("client_id", me.id)
+    .eq("program_day_exercise_id", programDayExerciseId)
+    .maybeSingle();
+
+  const { error } = await supabase.from("client_program_overrides").upsert(
+    {
+      client_id: me.id,
+      program_day_exercise_id: programDayExerciseId,
+      reps_override: trimmed,
+      edited_by: "client",
+      active:
+        trimmed !== null ||
+        !!existing?.substitute_exercise_id ||
+        !!existing?.sets_override,
     },
     { onConflict: "client_id,program_day_exercise_id" }
   );

@@ -4,6 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
 import {
   logMyWorkout,
+  setProgramExerciseReps,
   setProgramExerciseSets,
   setProgramExerciseSwap,
 } from "@/app/client/actions";
@@ -431,6 +432,56 @@ export default async function ClientProgramPage({
                                 >
                                   {t("Reset to prescribed ({sets})", {
                                     sets: pde.sets ?? "",
+                                  })}
+                                </button>
+                              </form>
+                            ) : null}
+                          </div>
+                        </Collapsible>
+
+                        <Collapsible
+                          label={
+                            override?.reps_override
+                              ? t("Adjust reps (currently {reps})", {
+                                  reps: override.reps_override,
+                                })
+                              : t("Adjust reps")
+                          }
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <form
+                              action={async (formData: FormData) => {
+                                "use server";
+                                await setProgramExerciseReps(
+                                  pde.id,
+                                  String(formData.get("reps") ?? "")
+                                );
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Input
+                                name="reps"
+                                placeholder={t("e.g. 12")}
+                                defaultValue={override?.reps_override ?? ""}
+                                className="w-24"
+                              />
+                              <Button type="submit" variant="secondary">
+                                {t("Save")}
+                              </Button>
+                            </form>
+                            {override?.reps_override ? (
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await setProgramExerciseReps(pde.id, null);
+                                }}
+                              >
+                                <button
+                                  type="submit"
+                                  className="text-sm text-gray hover:text-ink"
+                                >
+                                  {t("Reset to prescribed ({reps})", {
+                                    reps: pde.reps ?? "",
                                   })}
                                 </button>
                               </form>
