@@ -13,6 +13,11 @@ export const config = {
     // doesn't apply to them. Vercel's cron invocation in particular has no
     // session cookie at all, so without this exclusion it always got
     // redirected to /login before the route's own auth check ever ran.
-    "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // manifest.json and sw.js must also stay excluded -- a signed-out
+    // visitor's browser needs to fetch both (for "Add to Home Screen" and
+    // service worker registration) straight from the login page, and a
+    // redirect response for either breaks the browser's installability
+    // check and the service worker registration outright.
+    "/((?!api|_next/static|_next/image|favicon.ico|manifest.json|sw.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
