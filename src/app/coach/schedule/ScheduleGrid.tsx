@@ -129,6 +129,8 @@ export function ScheduleGrid({
   clients,
   prevWeekHref,
   nextWeekHref,
+  prevMonthHref,
+  nextMonthHref,
   weekLabel,
   todayStr,
   overdueClientIds = [],
@@ -143,6 +145,8 @@ export function ScheduleGrid({
   clients: { id: string; name: string }[];
   prevWeekHref: string;
   nextWeekHref: string;
+  prevMonthHref: string;
+  nextMonthHref: string;
   weekLabel: string;
   todayStr: string;
   overdueClientIds?: string[];
@@ -488,13 +492,31 @@ export function ScheduleGrid({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Link href={prevWeekHref} className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink">
-          ← Prev
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            href={prevMonthHref}
+            className="rounded-lg px-2 py-1 text-xs text-gray hover:text-ink"
+            title="Back one month"
+          >
+            « Month
+          </Link>
+          <Link href={prevWeekHref} className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink">
+            ← Prev
+          </Link>
+        </div>
         <p className="font-medium text-ink">{weekLabel}</p>
-        <Link href={nextWeekHref} className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink">
-          Next →
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link href={nextWeekHref} className="rounded-lg px-2 py-1 text-sm text-gray hover:text-ink">
+            Next →
+          </Link>
+          <Link
+            href={nextMonthHref}
+            className="rounded-lg px-2 py-1 text-xs text-gray hover:text-ink"
+            title="Forward one month"
+          >
+            Month »
+          </Link>
+        </div>
       </div>
 
       <p className="text-xs text-gray">

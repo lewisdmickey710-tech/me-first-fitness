@@ -110,6 +110,22 @@ export default async function CoachSchedulePage({
     new Date(`${weekEndStr}T00:00:00Z`)
   )}`;
 
+  // Jumping by a calendar month (not just 4 weeks) from wherever the grid
+  // is now, re-aligned back to that week's Sunday -- lets her cover a lot
+  // of ground fast (checking availability two months out, say) without
+  // clicking "Next week" a dozen times.
+  function sundayOnOrBefore(d: Date): Date {
+    const result = new Date(d);
+    result.setUTCDate(result.getUTCDate() - result.getUTCDay());
+    return result;
+  }
+  const prevMonthWeekDate = sundayOnOrBefore(
+    new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth() - 1, weekStart.getUTCDate()))
+  );
+  const nextMonthWeekDate = sundayOnOrBefore(
+    new Date(Date.UTC(weekStart.getUTCFullYear(), weekStart.getUTCMonth() + 1, weekStart.getUTCDate()))
+  );
+
   const [
     { data: schedules },
     { data: monthOccurrences },
@@ -381,6 +397,8 @@ export default async function CoachSchedulePage({
             clients={[...(allClients ?? [])].sort((a, b) => a.name.localeCompare(b.name))}
             prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
             nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
+            prevMonthHref={`/coach/schedule?week=${toDateString(prevMonthWeekDate)}`}
+            nextMonthHref={`/coach/schedule?week=${toDateString(nextMonthWeekDate)}`}
             weekLabel={weekLabel}
             todayStr={todayStr}
             overdueClientIds={overdueClientIds}
@@ -429,7 +447,9 @@ export default async function CoachSchedulePage({
             return (
               <Link
                 key={cell.date}
-                href={`/coach/schedule?month=${monthKey}&date=${cell.date}`}
+                href={`/coach/schedule?month=${monthKey}&date=${cell.date}&week=${toDateString(
+                  sundayOnOrBefore(new Date(`${cell.date}T00:00:00Z`))
+                )}`}
                 className={`flex flex-col items-center gap-0.5 rounded-lg py-2 text-sm ${
                   isSelected
                     ? "bg-rose text-white"
