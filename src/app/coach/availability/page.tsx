@@ -268,15 +268,22 @@ export default async function CoachAvailabilityPage({
       </Card>
 
       <Card className="space-y-3">
-        <p className="font-medium text-ink">Block a whole day off</p>
+        <p className="font-medium text-ink">Block days off</p>
         <p className="text-sm text-gray">
           Anyone scheduled that day is auto-cancelled — free reschedule, no
-          fee, and they&apos;ll get an email right away.
+          fee, and they&apos;ll get an email right away. Add an end date to
+          block a whole range at once (e.g. a vacation).
         </p>
         <form action={blockDate} className="flex flex-wrap items-end gap-2">
           <div>
             <label className="mb-1 block text-xs font-medium text-ink">Date</label>
             <Input name="blocked_date" type="date" required min={todayStr} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-ink">
+              Through <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Input name="end_date" type="date" min={todayStr} />
           </div>
           <div className="min-w-[10rem] flex-1">
             <label className="mb-1 block text-xs font-medium text-ink">
@@ -285,7 +292,7 @@ export default async function CoachAvailabilityPage({
             <Textarea name="reason" rows={1} />
           </div>
           <Button type="submit" variant="danger">
-            Block day
+            Block
           </Button>
         </form>
       </Card>
