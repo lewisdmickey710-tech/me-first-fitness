@@ -15,6 +15,7 @@ import {
   sendSessionBookedEmail,
 } from "@/lib/email";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
+import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { safeFileName } from "@/lib/storage";
@@ -2450,6 +2451,18 @@ export async function blockDate(formData: FormData) {
         }
       } catch (emailError) {
         console.error("Failed to send day-blocked email", emailError);
+      }
+
+      if (client.user_id) {
+        try {
+          await sendPushToUser(createAdminClient(), client.user_id, {
+            title: "Session cancelled",
+            body: `Your session on ${whenText} was cancelled${reason ? `: ${reason}` : "."}`,
+            url: "/client/schedule",
+          });
+        } catch (pushError) {
+          console.error("Failed to send day-blocked push", pushError);
+        }
       }
     }
   }

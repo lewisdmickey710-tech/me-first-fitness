@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
 import { Badge, Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
+import { NotificationToggle } from "@/components/notification-toggle";
 import { US_TIMEZONES } from "@/lib/timezone";
 import { LANGUAGES, makeT } from "@/lib/i18n";
 import type {
@@ -286,6 +287,16 @@ export default async function ClientProfilePage() {
           <Link href="/client/history" className="text-sm text-rose hover:underline">
             {t("View →")}
           </Link>
+        </Card>
+      ) : null}
+
+      {!isFirstTime ? (
+        <Card className="space-y-2">
+          <p className="font-medium text-ink">{t("Notifications")}</p>
+          <p className="text-sm text-gray">
+            {t("Get an instant alert on this device for session reminders and other updates — on top of, not instead of, email.")}
+          </p>
+          <NotificationToggle locale={me.language} />
         </Card>
       ) : null}
 

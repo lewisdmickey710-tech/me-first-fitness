@@ -448,6 +448,16 @@ export interface CompSessionPackage {
   completed_at: string | null;
 }
 
+export interface PushSubscriptionRow {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth_key: string;
+  user_agent: string | null;
+  created_at: string;
+}
+
 export type OccurrenceStatus =
   | "scheduled"
   | "completed"

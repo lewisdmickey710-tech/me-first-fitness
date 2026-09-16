@@ -18,7 +18,8 @@ import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { safeFileName } from "@/lib/storage";
 import { formatTimeOfDay } from "@/lib/schedule";
 import { sendNewRequestEmail } from "@/lib/email";
-import { getCoachEmail } from "@/lib/coach";
+import { getCoachEmail, getCoachUserId } from "@/lib/coach";
+import { sendPushToUser } from "@/lib/push";
 import type { PaymentSchedule, SessionEntry } from "@/lib/types";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = {
@@ -459,21 +460,35 @@ export async function submitRequest(formData: FormData) {
     // Schedule page to the right week. A failure here shouldn't undo an
     // otherwise-successful request, so it's logged rather than thrown.
     try {
-      const to = await getCoachEmail(createAdminClient());
+      const admin = createAdminClient();
+      const whenText = businessTime
+        ? `${businessDate} at ${formatTimeOfDay(businessTime)}`
+        : `${businessDate} — no specific time given yet`;
+      const [to, coachUserId] = await Promise.all([
+        getCoachEmail(admin),
+        getCoachUserId(admin),
+      ]);
       if (to) {
         await sendNewRequestEmail(
           to,
           me.name,
           REQUEST_TYPE_LABEL[request_type] ?? "session",
-          businessTime
-            ? `${businessDate} at ${formatTimeOfDay(businessTime)}`
-            : `${businessDate} — no specific time given yet`,
+          whenText,
           note || null,
           reschedule_from_date
         );
       }
+      if (coachUserId) {
+        await sendPushToUser(admin, coachUserId, {
+          title: reschedule_from_date
+            ? `${me.name} wants to reschedule`
+            : `New request from ${me.name}`,
+          body: whenText,
+          url: "/coach/schedule",
+        });
+      }
     } catch (emailError) {
-      console.error("Failed to send new-request email", emailError);
+      console.error("Failed to send new-request notification", emailError);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong.";

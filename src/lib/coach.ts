@@ -15,3 +15,16 @@ export async function getCoachEmail(admin: SupabaseClient): Promise<string | nul
   const { data } = await admin.auth.admin.getUserById(coachProfile.id);
   return data?.user?.email ?? null;
 }
+
+// The coach's own auth user id -- profiles.id IS the auth user id (the
+// standard Supabase profile-per-user shape), so this is just the lookup
+// half of getCoachEmail, exposed separately for callers (push
+// notifications) that need the id rather than the email.
+export async function getCoachUserId(admin: SupabaseClient): Promise<string | null> {
+  const { data: coachProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("role", "coach")
+    .maybeSingle();
+  return coachProfile?.id ?? null;
+}

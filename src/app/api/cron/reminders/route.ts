@@ -9,6 +9,7 @@ import {
   sendSessionReminderEmail,
 } from "@/lib/email";
 import { getCoachEmail } from "@/lib/coach";
+import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
@@ -127,14 +128,20 @@ export async function GET(request: Request) {
     }
 
     try {
+      const whenText = `tomorrow at ${formatTimeOfDayForClient(tomorrowDateStr, schedule.time_of_day, client.timezone)}${
+        schedule.label ? ` (${schedule.label})` : ""
+      }`;
       await sendSessionReminderEmail(
         userResult.user.email,
         client.name,
-        `tomorrow at ${formatTimeOfDayForClient(tomorrowDateStr, schedule.time_of_day, client.timezone)}${
-          schedule.label ? ` (${schedule.label})` : ""
-        }`,
+        whenText,
         client.language
       );
+      await sendPushToUser(supabase, client.user_id, {
+        title: "Session reminder",
+        body: whenText,
+        url: "/client/schedule",
+      });
       await supabase.from("session_reminders_log").insert({
         client_schedule_id: schedule.id,
         occurrence_date: tomorrowDateStr,
@@ -184,6 +191,11 @@ export async function GET(request: Request) {
         `tomorrow${timeText}`,
         client.language
       );
+      await sendPushToUser(supabase, client.user_id, {
+        title: "Session reminder",
+        body: `tomorrow${timeText}`,
+        url: "/client/schedule",
+      });
       await supabase
         .from("session_occurrences")
         .update({ reminder_sent_at: new Date().toISOString() })

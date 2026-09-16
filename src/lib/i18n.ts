@@ -840,4 +840,18 @@ const ES: Record<string, string> = {
   Google: "Google",
   "Update my answers": "Actualizar mis respuestas",
   Submit: "Enviar",
+
+  // Push notifications
+  Notifications: "Notificaciones",
+  "Get an instant alert on this device for session reminders and other updates — on top of, not instead of, email.":
+    "Recibe una alerta al instante en este dispositivo para recordatorios de sesión y otras actualizaciones — además del correo, no en lugar de él.",
+  "🔔 Notifications on": "🔔 Notificaciones activadas",
+  "Turn off": "Desactivar",
+  "Turn on notifications": "Activar notificaciones",
+  "Notifications aren't supported on this browser/device.":
+    "Las notificaciones no son compatibles con este navegador/dispositivo.",
+  "Notifications are blocked for this site -- check your browser or device settings to turn them back on.":
+    "Las notificaciones están bloqueadas para este sitio — revisa la configuración de tu navegador o dispositivo para volver a activarlas.",
+  "Couldn't turn on notifications.": "No se pudieron activar las notificaciones.",
+  "Couldn't turn off notifications.": "No se pudieron desactivar las notificaciones.",
 };

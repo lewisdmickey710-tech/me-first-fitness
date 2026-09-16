@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { updatePaymentMethods } from "@/app/coach/actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
+import { NotificationToggle } from "@/components/notification-toggle";
 import type { BusinessSettings } from "@/lib/types";
 
 export default async function CoachSettingsPage() {
@@ -17,6 +18,15 @@ export default async function CoachSettingsPage() {
         <Heart className="mr-1.5" />
         Settings
       </h1>
+
+      <Card>
+        <p className="mb-3 font-medium text-ink">Notifications</p>
+        <p className="mb-3 text-sm text-gray">
+          Get an instant alert on this device for new requests and other
+          things that need you — on top of, not instead of, email.
+        </p>
+        <NotificationToggle />
+      </Card>
 
       <Card>
         <p className="mb-3 font-medium text-ink">Accepted payment methods</p>
