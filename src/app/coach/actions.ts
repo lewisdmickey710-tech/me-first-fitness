@@ -1645,6 +1645,22 @@ export async function cancelCompPackage(packageId: string, clientId: string) {
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Marks a client's weekly digest as reviewed -- a distinct signal from
+// program_last_updated_at, since looking a client over and deciding
+// nothing needs to change is a real outcome, not the same as having
+// actually edited their program.
+export async function markDigestReviewed(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ digest_reviewed_at: new Date().toISOString() })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/digest");
+}
+
 export async function updateLegalDocument(
   documentId: string,
   currentVersion: number,

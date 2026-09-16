@@ -55,6 +55,7 @@ export interface Client {
   session_rate: number | null;
   self_led: boolean;
   self_led_last_checkin: string | null;
+  digest_reviewed_at: string | null;
 }
 
 export interface SessionEntry {
@@ -120,6 +121,7 @@ export interface BusinessSettings {
   zelle_info: string | null;
   cash_note: string | null;
   google_meet_link: string | null;
+  last_digest_email_sent_on: string | null;
   updated_at: string;
 }
 

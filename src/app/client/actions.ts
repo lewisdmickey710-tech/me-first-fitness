@@ -18,23 +18,8 @@ import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { safeFileName } from "@/lib/storage";
 import { formatTimeOfDay } from "@/lib/schedule";
 import { sendNewRequestEmail } from "@/lib/email";
+import { getCoachEmail } from "@/lib/coach";
 import type { PaymentSchedule, SessionEntry } from "@/lib/types";
-
-// The one place a client action needs to reach the coach's own inbox --
-// there's exactly one coach account, so her email is just whoever holds
-// the "coach" profile role, looked up via the admin client the same way
-// clientLoginEmail resolves a client's address elsewhere in this app.
-async function coachEmail(): Promise<string | null> {
-  const admin = createAdminClient();
-  const { data: coachProfile } = await admin
-    .from("profiles")
-    .select("id")
-    .eq("role", "coach")
-    .maybeSingle();
-  if (!coachProfile) return null;
-  const { data } = await admin.auth.admin.getUserById(coachProfile.id);
-  return data?.user?.email ?? null;
-}
 
 const REQUEST_TYPE_LABEL: Record<string, string> = {
   session: "in-person session",
@@ -474,7 +459,7 @@ export async function submitRequest(formData: FormData) {
     // Schedule page to the right week. A failure here shouldn't undo an
     // otherwise-successful request, so it's logged rather than thrown.
     try {
-      const to = await coachEmail();
+      const to = await getCoachEmail(createAdminClient());
       if (to) {
         await sendNewRequestEmail(
           to,

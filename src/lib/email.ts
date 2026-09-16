@@ -644,6 +644,29 @@ export async function sendNewRequestEmail(
   });
 }
 
+// The weekly nudge pointing the coach at /coach/digest -- sent once a
+// week (the cron route's own dedup guard decides when), only when there's
+// actually something to look at.
+export async function sendDigestReadyEmail(to: string, needsReviewCount: number) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping digest-ready email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `Your weekly digest is ready — ${needsReviewCount} client${
+      needsReviewCount === 1 ? "" : "s"
+    } to look at`,
+    html: wrapper(`
+      <p>${needsReviewCount} virtual client${
+        needsReviewCount === 1 ? "" : "s"
+      } ${needsReviewCount === 1 ? "hasn't" : "haven't"} been reviewed this week.</p>
+      <p>Open your digest to see what everyone's been up to and mark them off as you go.</p>
+    `),
+  });
+}
+
 export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,

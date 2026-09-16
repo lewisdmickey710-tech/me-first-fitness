@@ -1,12 +1,14 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendBlockedDatesReminderEmail,
+  sendDigestReadyEmail,
   sendDocumentsPendingEmail,
   sendInactivityNudgeEmail,
   sendPaymentReminderEmail,
   sendServiceCheckinDueEmail,
   sendSessionReminderEmail,
 } from "@/lib/email";
+import { getCoachEmail } from "@/lib/coach";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
@@ -22,6 +24,9 @@ const INACTIVITY_NUDGE_COOLDOWN_DAYS = INACTIVITY_DAYS_THRESHOLD;
 const DOCUMENT_NUDGE_COOLDOWN_DAYS = 14;
 const SERVICE_CHECKIN_NUDGE_COOLDOWN_DAYS = 14;
 const BLOCKED_DATE_REMINDER_LOOKAHEAD_DAYS = 3;
+const DIGEST_REVIEW_WINDOW_DAYS = 7;
+// Matches the "This week" framing on /coach/digest -- Monday in business tz.
+const DIGEST_NUDGE_DAY_OF_WEEK = 1;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -578,6 +583,55 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Weekly digest nudge: once a week (Monday), point the coach at
+  // /coach/digest if any virtual client hasn't been reviewed in the last
+  // DIGEST_REVIEW_WINDOW_DAYS days. business_settings.last_digest_email_sent_on
+  // is the dedup guard -- this cron runs daily, so without it a Monday
+  // that gets hit more than once (a retry, a manual trigger) could nudge
+  // her twice in the same week. ----
+  let digestNudgeSent = false;
+  if (now.getUTCDay() === DIGEST_NUDGE_DAY_OF_WEEK) {
+    const { data: settings } = await supabase
+      .from("business_settings")
+      .select("last_digest_email_sent_on")
+      .eq("id", true)
+      .maybeSingle();
+
+    if (settings?.last_digest_email_sent_on !== todayDateStr) {
+      try {
+        const digestCutoff = new Date(now);
+        digestCutoff.setUTCDate(digestCutoff.getUTCDate() - DIGEST_REVIEW_WINDOW_DAYS);
+        const digestCutoffStr = toDateString(digestCutoff);
+
+        const { data: virtualClients } = await supabase
+          .from("clients")
+          .select("id, digest_reviewed_at")
+          .eq("session_mode", "virtual")
+          .eq("is_test", false)
+          .is("archived_at", null);
+
+        const needsReviewCount = (virtualClients ?? []).filter(
+          (c) => !c.digest_reviewed_at || c.digest_reviewed_at.slice(0, 10) < digestCutoffStr
+        ).length;
+
+        if (needsReviewCount > 0) {
+          const to = await getCoachEmail(supabase);
+          if (to) {
+            await sendDigestReadyEmail(to, needsReviewCount);
+            digestNudgeSent = true;
+          }
+        }
+
+        await supabase
+          .from("business_settings")
+          .update({ last_digest_email_sent_on: todayDateStr })
+          .eq("id", true);
+      } catch (e) {
+        errors.push(`Digest nudge failed: ${e}`);
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     sessionReminders,
@@ -587,6 +641,7 @@ export async function GET(request: Request) {
     serviceCheckinNudges,
     blockedDateReminders,
     retainerPayments,
+    digestNudgeSent,
     errors,
   });
 }

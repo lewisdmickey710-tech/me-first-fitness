@@ -14,6 +14,7 @@ export default function CoachLayout({
         settingsHref="/coach/settings"
         links={[
           { href: "/coach/roster", label: "Motherboard" },
+          { href: "/coach/digest", label: "Digest" },
           { href: "/coach/schedule", label: "Schedule" },
           { href: "/coach/sign-ons", label: "Sign-ons" },
           { href: "/coach/sliding-scale", label: "Sliding Scale" },
