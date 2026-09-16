@@ -75,6 +75,26 @@ export default async function ClientSchedulePage({
       .is("paid_on", null) as unknown as Promise<{ data: Payment[] | null }>,
   ]);
 
+  if (me.hold_started_at) {
+    return (
+      <div className="space-y-6">
+        <BackLink href="/client/dashboard" />
+        <h1 className="text-xl font-semibold text-ink">
+          <Heart className="mr-1.5" />
+          {t("Your schedule")}
+        </h1>
+        <Card className="space-y-1 border-gold/40 bg-gold/5">
+          <p className="font-medium text-ink">{t("Your spot is on hold")}</p>
+          <p className="text-sm text-gray">
+            {t(
+              "You're not currently scheduled for sessions — the weekly $10 retainer keeps your app access and reserves your spot for whenever you're ready to come back. Reach out to Mickey when you want to resume."
+            )}
+          </p>
+        </Card>
+      </div>
+    );
+  }
+
   const frozen = (unpaidFees ?? []).length > 0;
 
   if (frozen) {

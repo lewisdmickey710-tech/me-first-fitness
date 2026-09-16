@@ -480,6 +480,9 @@ const ES: Record<string, string> = {
   "New date": "Nueva fecha",
   "Preferred date": "Fecha preferida",
   "Preferred time": "Hora preferida",
+  "No specific time — Mickey will confirm": "Sin hora específica — Mickey confirmará",
+  "Mickey isn't available on that day of the week — pick a different date.":
+    "Mickey no está disponible ese día de la semana — elige otra fecha.",
   "Time is in your timezone ({tz}).": "La hora está en tu zona horaria ({tz}).",
   Note: "Nota",
   "Anything your coach should know": "Cualquier cosa que tu entrenadora deba saber",

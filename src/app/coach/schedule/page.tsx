@@ -42,6 +42,7 @@ interface DaySession {
   clientName: string;
   timeOfDay: string | null;
   label: string | null;
+  isHeld: boolean;
 }
 
 export default async function CoachSchedulePage({
@@ -130,8 +131,8 @@ export default async function CoachSchedulePage({
       .lte("occurrence_date", lastDateStr) as unknown as Promise<{
       data: SessionOccurrence[] | null;
     }>,
-    supabase.from("clients").select("id, name") as unknown as Promise<{
-      data: { id: string; name: string }[] | null;
+    supabase.from("clients").select("id, name, hold_started_at") as unknown as Promise<{
+      data: { id: string; name: string; hold_started_at: string | null }[] | null;
     }>,
     supabase.from("coach_availability").select("*") as unknown as Promise<{
       data: CoachAvailability[] | null;
@@ -178,6 +179,12 @@ export default async function CoachSchedulePage({
   const overdueClientIds = [
     ...new Set((overduePayments ?? []).map((p) => p.client_id)),
   ];
+  // A held client isn't training right now -- their recurring slot still
+  // renders (so she knows not to plan on running it), but as an inert
+  // placeholder rather than a real booking.
+  const heldClientIds = new Set(
+    (allClients ?? []).filter((c) => c.hold_started_at).map((c) => c.id)
+  );
 
   const activeSchedules = (schedules ?? []).filter((s) => s.clients);
   const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
@@ -198,6 +205,7 @@ export default async function CoachSchedulePage({
     clientName: string;
     durationMinutes: number;
     clientScheduleId: string | null;
+    isHeld: boolean;
   }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
@@ -219,6 +227,7 @@ export default async function CoachSchedulePage({
         clientName: s.clients!.name,
         durationMinutes: s.duration_minutes,
         clientScheduleId: s.id,
+        isHeld: heldClientIds.has(s.client_id),
       });
     }
   }
@@ -233,6 +242,7 @@ export default async function CoachSchedulePage({
       clientName: clientNameById.get(o.client_id) ?? "Client",
       durationMinutes: o.duration_minutes,
       clientScheduleId: null,
+      isHeld: heldClientIds.has(o.client_id),
     });
   }
 
@@ -258,7 +268,10 @@ export default async function CoachSchedulePage({
   // A date's sessions = whoever has a recurring weekly time matching that
   // weekday, plus anyone with a one-off session_occurrences row for that
   // exact date (e.g. a confirmed time request) who isn't already covered
-  // by a recurring match.
+  // by a recurring match. Includes cancelled/blocked/held ones too (with
+  // isHeld/their true status still visible below) rather than hiding them
+  // outright -- realSessionCount, below, is what actually reflects "how
+  // many sessions really happen that day."
   function sessionsForDate(dateStr: string, dayOfWeek: number): DaySession[] {
     const fromSchedule: DaySession[] = (scheduleByDayOfWeek.get(dayOfWeek) ?? []).map(
       (s) => ({
@@ -266,6 +279,7 @@ export default async function CoachSchedulePage({
         clientName: s.clients?.name ?? clientNameById.get(s.client_id) ?? "Client",
         timeOfDay: s.time_of_day,
         label: s.label,
+        isHeld: heldClientIds.has(s.client_id),
       })
     );
     const covered = new Set(fromSchedule.map((s) => s.clientId));
@@ -276,18 +290,33 @@ export default async function CoachSchedulePage({
         clientName: clientNameById.get(o.client_id) ?? "Client",
         timeOfDay: null,
         label: o.notes,
+        isHeld: heldClientIds.has(o.client_id),
       }));
     return [...fromSchedule, ...fromOccurrenceOnly];
+  }
+
+  // How many of a date's sessions are actually real -- excludes anyone
+  // whose slot was cancelled/late-cancelled/blocked/rescheduled away for
+  // that exact date, and excludes held clients' placeholders, so the
+  // month-view count bubble reflects sessions she can actually plan to
+  // run rather than just "recurring matches, regardless of status."
+  function realSessionCount(dateStr: string, sessions: DaySession[]): number {
+    return sessions.filter((s) => {
+      if (s.isHeld) return false;
+      const status = occurrenceByClientDate.get(`${s.clientId}:${dateStr}`)?.status;
+      return !status || status === "scheduled" || status === "completed";
+    }).length;
   }
 
   const cells: { day: number; date: string; count: number }[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
     const date = new Date(Date.UTC(year, month, day));
     const dateStr = toDateString(date);
+    const daySessions = sessionsForDate(dateStr, date.getUTCDay());
     cells.push({
       day,
       date: dateStr,
-      count: sessionsForDate(dateStr, date.getUTCDay()).length,
+      count: realSessionCount(dateStr, daySessions),
     });
   }
 
@@ -321,7 +350,9 @@ export default async function CoachSchedulePage({
       </div>
       <p className="text-sm text-gray">
         Teal is available time, light pink is booked (with client initials),
-        dark pink is blocked, and purple is a time request waiting on you.
+        dark pink is blocked, purple is a time request waiting on you, and
+        faded gray is a held client&apos;s usual time — a placeholder, not a
+        real session.
       </p>
 
       {/* Breaks out of the page's centered max-w-3xl column -- that width
@@ -442,9 +473,12 @@ export default async function CoachSchedulePage({
             );
             const status = occurrence?.status ?? "scheduled";
             const isPast = selectedCell.date < todayStr;
-            const cancellable = status === "scheduled";
+            const cancellable = status === "scheduled" && !s.isHeld;
             return (
-              <Card key={s.clientId} className="space-y-2">
+              <Card
+                key={s.clientId}
+                className={`space-y-2 ${s.isHeld ? "opacity-50" : ""}`}
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <Link
@@ -458,16 +492,26 @@ export default async function CoachSchedulePage({
                       {s.timeOfDay && s.label ? ` · ${s.label}` : ""}
                     </p>
                   </div>
-                  <Badge tone={status === "completed" ? "green" : status === "scheduled" ? "teal" : "pink"}>
-                    {STATUS_LABEL[status] ?? "Scheduled"}
-                    {(status === "cancelled" || status === "late_cancelled") &&
-                    occurrence?.cancelled_by
-                      ? occurrence.cancelled_by === "coach"
-                        ? " (by you)"
-                        : " (by client)"
-                      : ""}
-                  </Badge>
+                  {s.isHeld ? (
+                    <Badge tone="gray">On hold — not a real session</Badge>
+                  ) : (
+                    <Badge tone={status === "completed" ? "green" : status === "scheduled" ? "teal" : "pink"}>
+                      {STATUS_LABEL[status] ?? "Scheduled"}
+                      {(status === "cancelled" || status === "late_cancelled") &&
+                      occurrence?.cancelled_by
+                        ? occurrence.cancelled_by === "coach"
+                          ? " (by you)"
+                          : " (by client)"
+                        : ""}
+                    </Badge>
+                  )}
                 </div>
+                {s.isHeld ? (
+                  <p className="text-xs text-gray">
+                    {s.clientName} is on hold — this is just a placeholder for
+                    where their usual time would fall. Nothing to do here.
+                  </p>
+                ) : null}
                 {cancellable && !isPast ? (
                   <div className="flex flex-wrap gap-2">
                     <form

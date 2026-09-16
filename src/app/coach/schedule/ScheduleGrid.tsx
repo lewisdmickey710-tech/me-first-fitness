@@ -47,6 +47,7 @@ interface DayBooking {
   clientName: string;
   durationMinutes: number;
   clientScheduleId: string | null;
+  isHeld: boolean;
 }
 
 interface PendingReschedule {
@@ -682,6 +683,18 @@ export function ScheduleGrid({
               {bookingsForDay(day.date).map((b) => {
                 const geometry = bookingGeometry(b);
                 if (!geometry) return null;
+                if (b.isHeld) {
+                  return (
+                    <div
+                      key={`${b.clientId}-${b.timeOfDay}`}
+                      title={`${b.clientName} — on hold. This is a placeholder for their usual time, not a real session.`}
+                      className="absolute inset-x-0 z-10 flex items-center justify-center rounded-md border border-grayLt bg-grayLt/50 text-[10px] font-medium leading-none text-gray opacity-60"
+                      style={{ top: geometry.top, height: geometry.height }}
+                    >
+                      {initials(b.clientName)}
+                    </div>
+                  );
+                }
                 const movable = day.date >= todayStr;
                 const isPickedUp =
                   pickedUpBooking?.clientId === b.clientId && pickedUpBooking?.date === b.date;
@@ -751,6 +764,9 @@ export function ScheduleGrid({
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-gold/40" /> Pending (balance owed)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded bg-grayLt opacity-60" /> On hold (placeholder)
         </span>
       </div>
 

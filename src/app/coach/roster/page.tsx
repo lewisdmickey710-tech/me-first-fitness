@@ -418,11 +418,17 @@ export default async function RosterPage({
   const nowBizTimeStr = nowBiz.toISOString().slice(11, 16);
 
   const clientNameById = new Map((clients ?? []).map((c) => [c.id, c.name]));
+  // A held client isn't actually training right now -- their recurring day
+  // shouldn't surface as the featured "come prepare for this" widget below.
+  const heldClientIds = new Set(
+    (clients ?? []).filter((c) => c.hold_started_at).map((c) => c.id)
+  );
   const scheduleByDayOfWeek = new Map<
     number,
     { client_id: string; time_of_day: string; duration_minutes: number }[]
   >();
   for (const s of activeSchedules ?? []) {
+    if (heldClientIds.has(s.client_id)) continue;
     const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
     list.push(s);
     scheduleByDayOfWeek.set(s.day_of_week, list);
@@ -456,6 +462,7 @@ export default async function RosterPage({
     }
     for (const o of occurrenceRows ?? []) {
       if (o.occurrence_date !== dateStr || o.status !== "scheduled") continue;
+      if (heldClientIds.has(o.client_id)) continue;
       const match = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
       if (!match) continue;
       candidates.push({

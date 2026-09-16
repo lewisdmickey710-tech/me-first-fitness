@@ -16,7 +16,31 @@ import { BUSINESS_TIMEZONE, convertWallTime, toDateString, nowInBusinessTz } fro
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { safeFileName } from "@/lib/storage";
+import { formatTimeOfDay } from "@/lib/schedule";
+import { sendNewRequestEmail } from "@/lib/email";
 import type { PaymentSchedule, SessionEntry } from "@/lib/types";
+
+// The one place a client action needs to reach the coach's own inbox --
+// there's exactly one coach account, so her email is just whoever holds
+// the "coach" profile role, looked up via the admin client the same way
+// clientLoginEmail resolves a client's address elsewhere in this app.
+async function coachEmail(): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data: coachProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("role", "coach")
+    .maybeSingle();
+  if (!coachProfile) return null;
+  const { data } = await admin.auth.admin.getUserById(coachProfile.id);
+  return data?.user?.email ?? null;
+}
+
+const REQUEST_TYPE_LABEL: Record<string, string> = {
+  session: "in-person session",
+  checkin_call: "check-in call",
+  video_session: "video session",
+};
 
 export async function logCheckin(formData: FormData) {
   const me = await getMyClient();
@@ -443,6 +467,28 @@ export async function submitRequest(formData: FormData) {
         request_id: newRequest.id,
       });
       if (paymentError) throw new Error(paymentError.message);
+    }
+
+    // Nothing else notified the coach that this even happened -- without
+    // this, a request just sits quietly until she happens to open the
+    // Schedule page to the right week. A failure here shouldn't undo an
+    // otherwise-successful request, so it's logged rather than thrown.
+    try {
+      const to = await coachEmail();
+      if (to) {
+        await sendNewRequestEmail(
+          to,
+          me.name,
+          REQUEST_TYPE_LABEL[request_type] ?? "session",
+          businessTime
+            ? `${businessDate} at ${formatTimeOfDay(businessTime)}`
+            : `${businessDate} — no specific time given yet`,
+          note || null,
+          reschedule_from_date
+        );
+      }
+    } catch (emailError) {
+      console.error("Failed to send new-request email", emailError);
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Something went wrong.";

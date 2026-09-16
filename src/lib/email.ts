@@ -609,6 +609,41 @@ export async function sendRequestCounteredEmail(
   });
 }
 
+// The one email addressed TO the coach rather than a client -- nothing
+// else notified her when a client submitted a time request (including a
+// reschedule), so a request could sit unnoticed until she happened to open
+// the Schedule page to the right week. Deliberately plain/un-localized,
+// like every other coach-facing surface in the app.
+export async function sendNewRequestEmail(
+  to: string,
+  clientName: string,
+  requestTypeLabel: string,
+  whenText: string,
+  note: string | null,
+  rescheduleFromText: string | null
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping new-request email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: rescheduleFromText
+      ? `${clientName} wants to reschedule`
+      : `New request from ${clientName}`,
+    html: wrapper(`
+      <p>${clientName} just requested ${rescheduleFromText ? "to reschedule their" : "a"} <strong>${requestTypeLabel}</strong>:</p>
+      <p style="background: #F3EEF0; border-radius: 12px; padding: 12px 16px;">
+        <strong>${whenText}</strong>
+        ${rescheduleFromText ? `<br /><span style="font-size: 13px; color: #8A8078;">Moving from ${rescheduleFromText}</span>` : ""}
+      </p>
+      ${note ? `<p style="font-size: 14px; color: #4A4038;"><em>"${note}"</em></p>` : ""}
+      <p>Open your Schedule or their Requests tab to accept, decline, or propose a different time.</p>
+    `),
+  });
+}
+
 export async function sendMilestoneAchievedEmail(
   to: string,
   clientName: string,

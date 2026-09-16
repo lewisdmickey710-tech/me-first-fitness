@@ -163,7 +163,12 @@ export default async function ClientDashboard() {
         : Promise.resolve({ data: null }),
     ]);
 
-  const nextSession = nextSessionForClient(schedules ?? [], occurrences ?? []);
+  // On hold means nothing's really scheduled -- the "Your spot is on hold"
+  // card above says so; showing an actionable "Next session" card too would
+  // contradict it.
+  const nextSession = me.hold_started_at
+    ? null
+    : nextSessionForClient(schedules ?? [], occurrences ?? []);
   const nextSessionHours =
     nextSession?.timeOfDay
       ? hoursUntilOccurrence(nextSession.date, nextSession.timeOfDay)

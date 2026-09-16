@@ -2,12 +2,13 @@ import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { submitRequest } from "@/app/client/actions";
 import { getMyClient } from "@/lib/current-client";
-import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
+import { Button, Card, EmptyState, Heart, Textarea } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
+import { AvailabilityTimeFields } from "@/components/availability-time-fields";
 import { BUSINESS_TIMEZONE, timezoneLabel, toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { makeT } from "@/lib/i18n";
-import type { BusinessSettings } from "@/lib/types";
+import type { BusinessSettings, CoachAvailability } from "@/lib/types";
 
 export default async function RequestTimePage({
   searchParams,
@@ -24,6 +25,11 @@ export default async function RequestTimePage({
   const overdue = me
     ? await clientHasOverdueBalance(supabase, me.id, toDateString(nowInBusinessTz()))
     : false;
+  const { data: availability } = (await supabase
+    .from("coach_availability")
+    .select("day_of_week, start_time, end_time")) as {
+    data: Pick<CoachAvailability, "day_of_week" | "start_time" | "end_time">[] | null;
+  };
 
   if (overdue) {
     const { data: businessSettings } = (await supabase
@@ -71,21 +77,16 @@ export default async function RequestTimePage({
           {rescheduleFrom ? (
             <input type="hidden" name="reschedule_from_date" value={rescheduleFrom} />
           ) : null}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {rescheduleFrom ? t("New date") : t("Preferred date")}
-              </label>
-              <Input name="preferred_date" type="date" required />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Preferred time")}{" "}
-                <span className="font-normal text-gray">{t("(optional)")}</span>
-              </label>
-              <Input name="preferred_time" type="time" />
-            </div>
-          </div>
+          <AvailabilityTimeFields
+            availability={(availability ?? []).map((a) => ({
+              dayOfWeek: a.day_of_week,
+              startTime: a.start_time,
+              endTime: a.end_time,
+            }))}
+            clientTz={clientTz}
+            locale={me?.language}
+            rescheduleLabel={rescheduleFrom ? t("New date") : t("Preferred date")}
+          />
           {!isOwnTimezone ? (
             <p className="-mt-2 text-xs text-gray">
               {t("Time is in your timezone ({tz}).", { tz: timezoneLabel(clientTz) })}
