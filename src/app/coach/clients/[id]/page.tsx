@@ -650,6 +650,8 @@ function Overview({
   });
 
   const boundAddNote = addClientNote.bind(null, client.id);
+  const priorityNotes = notes.filter((n) => n.priority);
+  const otherNotes = notes.filter((n) => !n.priority);
 
   return (
     <div className="space-y-4">
@@ -660,21 +662,54 @@ function Overview({
             (running log — separate from per-session notes)
           </span>
         </p>
-        <form action={boundAddNote} className="flex gap-2">
+        <form action={boundAddNote} className="space-y-2">
           <Textarea
             name="note"
             rows={2}
             placeholder="Anything worth remembering — injuries, preferences, progress..."
-            className="flex-1"
           />
-          <Button type="submit" variant="secondary" className="self-end">
-            Add
-          </Button>
+          <div className="flex items-center justify-between">
+            <Checkbox name="priority" label="Flag as high-priority" />
+            <Button type="submit" variant="secondary">
+              Add
+            </Button>
+          </div>
         </form>
-        {notes.length > 0 ? (
-          <Collapsible label={`${notes.length} note${notes.length > 1 ? "s" : ""}`}>
+        {priorityNotes.length > 0 ? (
+          <div className="space-y-2">
+            {priorityNotes.map((n) => (
+              <div
+                key={n.id}
+                className="flex items-start justify-between gap-2 rounded-lg border border-pink/40 bg-pink/5 px-3 py-2"
+              >
+                <div>
+                  <Badge tone="pink">Priority</Badge>
+                  <p className="mt-1 text-sm text-ink">{n.note}</p>
+                  <p className="mt-0.5 text-xs text-gray">
+                    {new Date(n.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <form
+                  action={async () => {
+                    "use server";
+                    await deleteClientNote(client.id, n.id);
+                  }}
+                >
+                  <button
+                    type="submit"
+                    className="shrink-0 text-xs text-gray hover:text-pink"
+                  >
+                    Delete
+                  </button>
+                </form>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {otherNotes.length > 0 ? (
+          <Collapsible label={`${otherNotes.length} note${otherNotes.length > 1 ? "s" : ""}`}>
             <div className="space-y-2">
-              {notes.map((n) => (
+              {otherNotes.map((n) => (
                 <div
                   key={n.id}
                   className="flex items-start justify-between gap-2 rounded-lg bg-cream px-3 py-2"

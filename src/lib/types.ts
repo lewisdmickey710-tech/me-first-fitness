@@ -112,6 +112,7 @@ export interface ClientNote {
   id: string;
   client_id: string;
   note: string;
+  priority: boolean;
   created_at: string;
 }
 

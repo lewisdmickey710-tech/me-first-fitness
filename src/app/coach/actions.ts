@@ -861,6 +861,48 @@ export async function logSession(clientId: string, formData: FormData) {
     await applyCompPackageSessionUse(supabase, compPackageId, compPackageUse);
   }
 
+  // Quick wellness pulse-check and priority note, both optional -- offered
+  // right on the Log Session form so she isn't sent to a separate page to
+  // capture how the client's doing before diving into the workout. These
+  // are secondary to the session itself, so a failure here doesn't block
+  // the save that already went through.
+  const checkin_sleep = String(formData.get("checkin_sleep") ?? "").trim();
+  const checkin_water = String(formData.get("checkin_water") ?? "").trim();
+  const checkin_food = String(formData.get("checkin_food") ?? "").trim();
+  const checkin_energy = String(formData.get("checkin_energy") ?? "").trim();
+  const checkin_mood = String(formData.get("checkin_mood") ?? "").trim();
+  const checkin_notes = String(formData.get("checkin_notes") ?? "").trim();
+  if (checkin_sleep || checkin_water || checkin_food || checkin_energy || checkin_mood || checkin_notes) {
+    try {
+      const { error: checkinError } = await supabase.from("checkins").insert({
+        client_id: clientId,
+        date,
+        sleep: checkin_sleep || null,
+        water: checkin_water || null,
+        food: checkin_food || null,
+        energy: checkin_energy || null,
+        mood: checkin_mood || null,
+        notes: checkin_notes || null,
+        logged_by: "coach",
+      });
+      if (checkinError) throw checkinError;
+    } catch (checkinError) {
+      console.error("Failed to save session check-in", checkinError);
+    }
+  }
+
+  const priorityNote = String(formData.get("priority_note") ?? "").trim();
+  if (priorityNote) {
+    try {
+      const { error: noteError } = await supabase
+        .from("client_notes")
+        .insert({ client_id: clientId, note: priorityNote, priority: true });
+      if (noteError) throw noteError;
+    } catch (noteError) {
+      console.error("Failed to save priority note", noteError);
+    }
+  }
+
   revalidatePath(`/coach/clients/${clientId}`);
   redirect(`/coach/clients/${clientId}?tab=log`);
 }
@@ -2076,10 +2118,11 @@ export async function addClientNote(clientId: string, formData: FormData) {
   const supabase = await createClient();
   const note = String(formData.get("note") ?? "").trim();
   if (!note) return;
+  const priority = formData.get("priority") === "on";
 
   const { error } = await supabase
     .from("client_notes")
-    .insert({ client_id: clientId, note });
+    .insert({ client_id: clientId, note, priority });
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);

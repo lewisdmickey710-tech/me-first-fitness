@@ -394,6 +394,65 @@ export function LogSessionForm({
             </div>
           </div>
 
+          {existingSession ? null : (
+            <div className="space-y-3 rounded-xl border border-grayLt bg-cream/50 p-3">
+              <p className="text-sm font-medium text-ink">
+                Quick check-in{" "}
+                <span className="font-normal text-gray">
+                  (optional — how are they doing today?)
+                </span>
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink">Sleep</label>
+                  <Input name="checkin_sleep" placeholder="e.g. 7 hrs" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink">Energy</label>
+                  <Input name="checkin_energy" placeholder="e.g. Good" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink">Mood</label>
+                  <Input name="checkin_mood" placeholder="e.g. Steady" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink">Water</label>
+                  <Input name="checkin_water" placeholder="e.g. 64 oz" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-ink">Food</label>
+                  <Input name="checkin_food" placeholder="On track / off track" />
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink">
+                  Check-in notes
+                </label>
+                <Textarea name="checkin_notes" rows={2} />
+              </div>
+              <p className="text-xs text-gray">
+                Fill in whatever&apos;s worth logging — this is saved as
+                their check-in for today, same as one they&apos;d log
+                themselves.
+              </p>
+
+              <div className="border-t border-grayLt pt-3">
+                <label className="mb-1 block text-xs font-medium text-ink">
+                  Anything high-priority to flag?{" "}
+                  <span className="font-normal text-gray">(optional)</span>
+                </label>
+                <Textarea
+                  name="priority_note"
+                  rows={2}
+                  placeholder="An injury, something going on in their life, anything you want to see again before next time..."
+                />
+                <p className="mt-1 text-xs text-gray">
+                  Saved to their notes, flagged so it stands out.
+                </p>
+              </div>
+            </div>
+          )}
+
           {showExerciseGrid ? (
             <div>
               <label className="mb-2 block text-sm font-medium text-ink">
