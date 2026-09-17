@@ -1,5 +1,6 @@
 import type { createClient } from "@/lib/supabase/server";
 import type { Client, SessionEntry } from "@/lib/types";
+import { BRAND } from "@/lib/brand";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -126,7 +127,7 @@ export async function buildClientExportText(
   ]);
 
   const lines: string[] = [];
-  lines.push(`MeFirstFitness — Data Export for ${client.name}`);
+  lines.push(`${BRAND.name} — Data Export for ${client.name}`);
   lines.push(`Generated ${new Date().toISOString().slice(0, 10)}`);
   lines.push(
     "\nThis is a full export of everything tracked in the app for this client, for their own records."

@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "MeFirstFitness",
-  description: "Mind & Muscle Mechanics — coaching, made personal.",
+  title: BRAND.name,
+  description: `${BRAND.tagline} — coaching, made personal.`,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "MeFirstFitness",
+    title: BRAND.name,
   },
 };
 

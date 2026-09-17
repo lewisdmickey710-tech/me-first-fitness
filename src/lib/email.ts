@@ -1,12 +1,13 @@
 import { Resend } from "resend";
 import { LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import type { Locale } from "@/lib/i18n";
+import { BRAND, FROM_EMAIL } from "@/lib/brand";
 
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-const FROM = process.env.EMAIL_FROM ?? "MeFirstFitness <onboarding@resend.dev>";
+const FROM = FROM_EMAIL;
 
 const BLOCKED_DATE_FMT_EN = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
@@ -34,12 +35,12 @@ const KIND_LABEL_ES: Record<string, string> = {
 function wrapper(bodyHtml: string): string {
   return `
     <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #2B2320;">
-      <p style="font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: #E75480; font-weight: 600; margin-bottom: 4px;">
-        &hearts; MeFirstFitness
+      <p style="font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: ${BRAND.accentColor}; font-weight: 600; margin-bottom: 4px;">
+        &hearts; ${BRAND.name}
       </p>
       ${bodyHtml}
       <p style="margin-top: 32px; font-size: 12px; color: #8A8078;">
-        Mind &amp; Muscle Mechanics
+        ${BRAND.tagline}
       </p>
     </div>
   `;
@@ -63,11 +64,11 @@ export async function sendLeadInviteEmail(
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Set up your MeFirstFitness login",
+    subject: `Set up your ${BRAND.name} login`,
     html: wrapper(`
       <p>Hi ${name},</p>
       <p>Thanks for requesting a free assessment! Tap the link below to set up your login — you'll be able to fill out a bit more before we meet.</p>
-      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Set up your login →</a></p>
+      <p><a href="${actionLink}" style="color: ${BRAND.accentColor}; font-weight: 600;">Set up your login →</a></p>
       <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new assessment and I'll send a fresh one.</p>
     `),
   });
@@ -92,7 +93,7 @@ export async function sendPreviewAccessEmail(
     html: wrapper(`
       <p>Hi ${name},</p>
       <p>While you think it over, I put together your own "Test the Waters" profile so you can see exactly what you'd get as a client — your first workout day, laid out in full, plus a look at everything else the app tracks for you.</p>
-      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Take a look →</a></p>
+      <p><a href="${actionLink}" style="color: ${BRAND.accentColor}; font-weight: 600;">Take a look →</a></p>
       <p style="font-size: 13px; color: #8A8078;">No pressure, no obligation — just a chance to see the value before you decide. Ready when you are? There's an "Unlock Our Partnership" button waiting for you in there. This link works once and expires after a while; if it's stopped working, just reach out and I'll send a fresh one.</p>
     `),
   });
@@ -109,10 +110,10 @@ export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
   await resend.emails.send({
     from: FROM,
     to,
-    subject: "Your MeFirstFitness login link",
+    subject: `Your ${BRAND.name} login link`,
     html: wrapper(`
       <p>Here&apos;s your one-time login link:</p>
-      <p><a href="${actionLink}" style="color: #E75480; font-weight: 600;">Log in →</a></p>
+      <p><a href="${actionLink}" style="color: ${BRAND.accentColor}; font-weight: 600;">Log in →</a></p>
       <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new one.</p>
     `),
   });
@@ -434,7 +435,7 @@ export async function sendPacketEmail(
     .sort((a, b) => a.phase.localeCompare(b.phase))
     .map(
       (l) =>
-        `<li><a href="${l.url}" style="color: #E75480; font-weight: 600;">Phase ${l.phase} →</a></li>`
+        `<li><a href="${l.url}" style="color: ${BRAND.accentColor}; font-weight: 600;">Phase ${l.phase} →</a></li>`
     )
     .join("");
   await resend.emails.send({
@@ -692,14 +693,14 @@ export async function sendMilestoneAchievedEmail(
       <p><strong>${milestoneTitle}</strong> — hecho. Estoy genuinamente orgullosa de ti, y quería que lo escucharas directamente de mí, no solo ver una marca en la aplicación.</p>
       ${achievedNote ? `<p>${achievedNote}</p>` : ""}
       <p>Inicia sesión para verlo marcado en tus logros — y sigamos adelante.</p>
-      <p>— Mickey</p>
+      <p>— ${BRAND.coachName}</p>
     `
         : `
       <p>Hi ${clientName},</p>
       <p><strong>${milestoneTitle}</strong> — done. I'm genuinely proud of you, and I wanted you to hear it directly from me, not just see a checkmark in the app.</p>
       ${achievedNote ? `<p>${achievedNote}</p>` : ""}
       <p>Log in to see it marked on your milestones — and let's keep going.</p>
-      <p>— Mickey</p>
+      <p>— ${BRAND.coachName}</p>
     `
     ),
   });

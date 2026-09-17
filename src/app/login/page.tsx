@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sendClientLoginLink } from "@/app/login/actions";
 import { Button, Card, Collapsible, Heart, Input } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 
 type Tab = "client" | "coach";
 
@@ -22,9 +23,9 @@ export default function LoginPage() {
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold text-ink">
           <Heart className="mr-2" />
-          MeFirstFitness
+          {BRAND.name}
         </h1>
-        <p className="mt-1 text-sm text-gray">Mind &amp; Muscle Mechanics</p>
+        <p className="mt-1 text-sm text-gray">{BRAND.tagline}</p>
         <p className="mt-2 text-base font-medium text-rose">
           Feel Strong. Feel Free. Feel You.
         </p>
@@ -216,7 +217,7 @@ function ClientLogin() {
       </Button>
       <p className="text-center text-xs text-gray">
         No password needed — we&apos;ll email you a one-time link. Look for
-        an email from <strong>MeFirstFitness</strong> (check spam if you
+        an email from <strong>{BRAND.name}</strong> (check spam if you
         don&apos;t see it in a couple minutes).
       </p>
     </form>

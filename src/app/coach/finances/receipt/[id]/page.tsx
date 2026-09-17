@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PrintButton } from "./PrintButton";
 import type { Payment } from "@/lib/types";
+import { BRAND } from "@/lib/brand";
 
 const KIND_LABEL: Record<string, string> = {
   session: "Training session",
@@ -35,7 +36,7 @@ export default async function ReceiptPage({
       <div className="space-y-4 rounded-2xl border border-grayLt p-6">
         <div>
           <p className="text-lg font-semibold text-ink">
-            MeFirstFitness — Mind &amp; Muscle Mechanics
+            {BRAND.name} — {BRAND.tagline}
           </p>
           <p className="text-sm text-gray">Payment receipt</p>
         </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button, Card, Heart, Input } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 
 type Status = "checking" | "ready" | "invalid";
 
@@ -70,7 +71,7 @@ export default function ResetPasswordPage() {
       <div className="mb-8 text-center">
         <h1 className="text-2xl font-semibold text-ink">
           <Heart className="mr-2" />
-          MeFirstFitness
+          {BRAND.name}
         </h1>
         <p className="mt-1 text-sm text-gray">Set a new password</p>
       </div>

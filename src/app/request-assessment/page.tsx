@@ -1,5 +1,6 @@
 import { submitAssessmentRequest } from "./actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
+import { BRAND } from "@/lib/brand";
 
 export default async function RequestAssessmentPage({
   searchParams,
@@ -23,9 +24,9 @@ export default async function RequestAssessmentPage({
       <div className="mb-8 max-w-md text-center">
         <h1 className="text-2xl font-semibold text-ink">
           <Heart className="mr-2" />
-          MeFirstFitness
+          {BRAND.name}
         </h1>
-        <p className="mt-1 text-sm text-gray">Mind &amp; Muscle Mechanics</p>
+        <p className="mt-1 text-sm text-gray">{BRAND.tagline}</p>
         <p className="mt-3 text-lg font-medium text-rose">
           Feel Strong. Feel Free. Feel You.
         </p>
