@@ -74,6 +74,12 @@ export async function saveProgramDay(
   // would silently hand that slot's id -- and any client_program_overrides
   // pointed at it -- to whatever different exercise ended up in that slot
   // after the shift, instead of actually deleting/moving anything.
+  // Dropping exact repeats here (same exercise picked twice in one day)
+  // rather than rejecting the save -- nothing stopped this before, and a
+  // hard error on submit would be a worse experience than just not saving
+  // a second copy of a row that adds nothing a higher set/rep count on
+  // the first one wouldn't.
+  const seenExerciseIds = new Set<string>();
   const filledRows = exerciseIds
     .map((exercise_id, i) => ({
       pde_id: pdeIds[i] || null,
@@ -84,7 +90,12 @@ export async function saveProgramDay(
       tempo: tempoList[i]?.trim() || null,
       superset_group: supersetList[i]?.trim() || null,
     }))
-    .filter((r) => r.exercise_id);
+    .filter((r) => r.exercise_id)
+    .filter((r) => {
+      if (seenExerciseIds.has(r.exercise_id)) return false;
+      seenExerciseIds.add(r.exercise_id);
+      return true;
+    });
 
   const keptIds = new Set(
     filledRows.filter((r) => r.pde_id).map((r) => r.pde_id!)

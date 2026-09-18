@@ -561,6 +561,8 @@ export interface ClientDocumentAcknowledgment {
   document_version: number;
   signed_name: string | null;
   acknowledged_at: string;
+  signed_via: "app" | "external";
+  external_file_path: string | null;
 }
 
 export interface Measurement {

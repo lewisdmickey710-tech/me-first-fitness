@@ -1766,6 +1766,58 @@ export async function setClientDocumentAssignment(
   revalidatePath("/client/documents");
 }
 
+// Records a document as signed on paper (or through some other means)
+// before this feature -- or the app itself -- existed, so the client isn't
+// made to redo it digitally. Writes the same acknowledgment row the
+// client's own digital signature would, just with signed_via/
+// external_file_path set instead -- the client's Documents page only
+// renders its sign form when no ack row exists yet, so this alone is
+// enough to suppress it for that client/document.
+export async function recordExternalDocumentSignature(
+  clientId: string,
+  documentId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const signed_name = String(formData.get("signed_name") ?? "").trim();
+  if (!signed_name) throw new Error("Whose name is on the signed form?");
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Attach a scan or photo of the signed document.");
+  }
+
+  const { data: doc, error: docError } = await supabase
+    .from("legal_documents")
+    .select("version")
+    .eq("id", documentId)
+    .single();
+  if (docError || !doc) throw new Error("Document not found.");
+
+  const path = `${clientId}/documents/${documentId}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
+  const { error: uploadError } = await supabase.storage
+    .from("form-checks")
+    .upload(path, file, { contentType: file.type });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error } = await supabase.from("client_document_acknowledgments").upsert(
+    {
+      client_id: clientId,
+      document_id: documentId,
+      document_version: doc.version,
+      signed_name,
+      signed_via: "external",
+      external_file_path: path,
+      acknowledged_at: new Date().toISOString(),
+    },
+    { onConflict: "client_id,document_id,document_version" }
+  );
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 export async function addClientForAccount(userId: string, formData: FormData) {
   const supabase = await createClient();
 

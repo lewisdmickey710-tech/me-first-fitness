@@ -423,12 +423,18 @@ export default async function RosterPage({
   const heldClientIds = new Set(
     (clients ?? []).filter((c) => c.hold_started_at).map((c) => c.id)
   );
+  // Virtual clients are async-programming by design -- no standing weekly
+  // slot -- so a stray client_schedules row left over from before that was
+  // enforced shouldn't surface here as a "come prepare for this" session.
+  const virtualClientIds = new Set(
+    (clients ?? []).filter((c) => c.session_mode === "virtual").map((c) => c.id)
+  );
   const scheduleByDayOfWeek = new Map<
     number,
     { client_id: string; time_of_day: string; duration_minutes: number }[]
   >();
   for (const s of activeSchedules ?? []) {
-    if (heldClientIds.has(s.client_id)) continue;
+    if (heldClientIds.has(s.client_id) || virtualClientIds.has(s.client_id)) continue;
     const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
     list.push(s);
     scheduleByDayOfWeek.set(s.day_of_week, list);

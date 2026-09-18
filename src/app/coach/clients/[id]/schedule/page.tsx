@@ -80,52 +80,67 @@ export default async function ClientSchedulePage({
         </div>
       )}
 
-      <Card>
-        <form action={boundAdd} className="space-y-4">
-          <p className="font-medium text-ink">Add a recurring time</p>
-          <div className="grid grid-cols-2 gap-3">
+      {client.session_mode === "virtual" ? (
+        <Card className="border-teal/30 bg-teal/5">
+          <p className="text-sm font-medium text-ink">
+            This client is virtual — async programming, not a standing slot
+          </p>
+          <p className="mt-1 text-sm text-gray">
+            Virtual clients don&apos;t get a recurring weekly time — their
+            program updates on your own cadence instead. If they book a
+            video call, that&apos;s handled as a one-off request, not a
+            recurring booking. Remove any leftover recurring times above if
+            this client used to be in-person.
+          </p>
+        </Card>
+      ) : (
+        <Card>
+          <form action={boundAdd} className="space-y-4">
+            <p className="font-medium text-ink">Add a recurring time</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink">
+                  Day
+                </label>
+                <Select name="day_of_week" defaultValue="2">
+                  {DAY_NAMES.map((name, i) => (
+                    <option key={name} value={i}>
+                      {name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-ink">
+                  Time
+                </label>
+                <Input name="time_of_day" type="time" required defaultValue="17:00" />
+              </div>
+            </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Day
+                Length
               </label>
-              <Select name="day_of_week" defaultValue="2">
-                {DAY_NAMES.map((name, i) => (
-                  <option key={name} value={i}>
-                    {name}
-                  </option>
-                ))}
+              <Select name="duration_minutes" defaultValue="60">
+                <option value="60">60 minutes (standard)</option>
+                <option value="30">30 minutes (negotiated only)</option>
               </Select>
+              <p className="mt-1 text-xs text-gray">
+                30 minutes is a backup option for a specific arrangement, not
+                something offered by default — only pick it if you&apos;ve
+                actually agreed to it with this client.
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
-                Time
+                Label <span className="font-normal text-gray">(optional)</span>
               </label>
-              <Input name="time_of_day" type="time" required defaultValue="17:00" />
+              <Input name="label" placeholder="e.g. In-person, Virtual" />
             </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              Length
-            </label>
-            <Select name="duration_minutes" defaultValue="60">
-              <option value="60">60 minutes (standard)</option>
-              <option value="30">30 minutes (negotiated only)</option>
-            </Select>
-            <p className="mt-1 text-xs text-gray">
-              30 minutes is a backup option for a specific arrangement, not
-              something offered by default — only pick it if you&apos;ve
-              actually agreed to it with this client.
-            </p>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              Label <span className="font-normal text-gray">(optional)</span>
-            </label>
-            <Input name="label" placeholder="e.g. In-person, Virtual" />
-          </div>
-          <Button type="submit">Add time</Button>
-        </form>
-      </Card>
+            <Button type="submit">Add time</Button>
+          </form>
+        </Card>
+      )}
     </div>
   );
 }

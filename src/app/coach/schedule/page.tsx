@@ -35,7 +35,9 @@ const MONTH_LABEL_FMT = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 
-type ScheduleRow = ClientSchedule & { clients: { id: string; name: string } | null };
+type ScheduleRow = ClientSchedule & {
+  clients: { id: string; name: string; session_mode: string | null } | null;
+};
 
 interface DaySession {
   clientId: string;
@@ -138,7 +140,7 @@ export default async function CoachSchedulePage({
   ] = await Promise.all([
     supabase
       .from("client_schedules")
-      .select("*, clients(id, name)")
+      .select("*, clients(id, name, session_mode)")
       .eq("active", true) as unknown as Promise<{ data: ScheduleRow[] | null }>,
     supabase
       .from("session_occurrences")
@@ -202,7 +204,12 @@ export default async function CoachSchedulePage({
     (allClients ?? []).filter((c) => c.hold_started_at).map((c) => c.id)
   );
 
-  const activeSchedules = (schedules ?? []).filter((s) => s.clients);
+  // Virtual clients are async-programming by design -- no standing weekly
+  // slot -- so a stray client_schedules row left over from before that was
+  // enforced shouldn't render as a recurring booking bubble here.
+  const activeSchedules = (schedules ?? []).filter(
+    (s) => s.clients && s.clients.session_mode !== "virtual"
+  );
   const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
   for (const s of activeSchedules) {
     const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];

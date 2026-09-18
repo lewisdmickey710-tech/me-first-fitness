@@ -24,6 +24,7 @@ import {
   markCompPackageConverted,
   markMilestoneAchieved,
   markPaymentPaid,
+  recordExternalDocumentSignature,
   setClientDocumentAssignment,
   setClientPartner,
   setClientPhase,
@@ -352,6 +353,25 @@ export default async function ClientDetailPage({
 
   const optionalDocuments = (allDocuments ?? []).filter((d) => !d.assigned_to_all);
 
+  const externalDocUrlByPath = new Map<string, string>();
+  const externalDocPaths = [
+    ...new Set(
+      (documentAcks ?? [])
+        .map((a) => a.external_file_path)
+        .filter((p): p is string => !!p)
+    ),
+  ];
+  if (externalDocPaths.length > 0) {
+    await Promise.all(
+      externalDocPaths.map(async (path) => {
+        const { data } = await supabase.storage
+          .from("form-checks")
+          .createSignedUrl(path, 3600);
+        if (data?.signedUrl) externalDocUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
+
   const { data: careProfiles } = (await supabase
     .from("care_profiles")
     .select("*")
@@ -508,6 +528,7 @@ export default async function ClientDetailPage({
           assignments={assignments ?? []}
           acks={documentAcks ?? []}
           minorConsent={minorConsent}
+          externalDocUrlByPath={externalDocUrlByPath}
         />
       )}
       {tab === "program" && (
@@ -1613,6 +1634,7 @@ function DocumentsTab({
   assignments,
   acks,
   minorConsent,
+  externalDocUrlByPath,
 }: {
   clientId: string;
   allDocuments: LegalDocument[];
@@ -1620,6 +1642,7 @@ function DocumentsTab({
   assignments: ClientDocumentAssignment[];
   acks: ClientDocumentAcknowledgment[];
   minorConsent: ClientMinorConsent | null;
+  externalDocUrlByPath: Map<string, string>;
 }) {
   const assignedDocIds = new Set(assignments.map((a) => a.document_id));
   const ackByDocumentAndVersion = new Map<string, ClientDocumentAcknowledgment>();
@@ -1664,15 +1687,25 @@ function DocumentsTab({
       ) : (
         visibleDocuments.map((doc) => {
           const ack = ackByDocumentAndVersion.get(`${doc.id}:${doc.version}`);
+          const externalUrl = ack?.external_file_path
+            ? externalDocUrlByPath.get(ack.external_file_path)
+            : null;
+          const boundRecordExternal = recordExternalDocumentSignature.bind(
+            null,
+            clientId,
+            doc.id
+          );
           return (
             <Card key={doc.id} className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="font-medium text-ink">{doc.title}</p>
                 {ack ? (
                   <Badge tone="green">
-                    {ack.signed_name
-                      ? `signed ${ack.acknowledged_at.slice(0, 10)}`
-                      : `read ${ack.acknowledged_at.slice(0, 10)}`}
+                    {ack.signed_via === "external"
+                      ? `signed outside the app ${ack.acknowledged_at.slice(0, 10)}`
+                      : ack.signed_name
+                        ? `signed ${ack.acknowledged_at.slice(0, 10)}`
+                        : `read ${ack.acknowledged_at.slice(0, 10)}`}
                   </Badge>
                 ) : (
                   <Badge tone="gold">not reviewed yet</Badge>
@@ -1682,7 +1715,53 @@ function DocumentsTab({
               {ack?.signed_name ? (
                 <p className="text-xs text-gray">
                   Signed by {ack.signed_name} on {ack.acknowledged_at.slice(0, 10)}
+                  {externalUrl ? (
+                    <>
+                      {" — "}
+                      <a
+                        href={externalUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-medium text-rose hover:underline"
+                      >
+                        view uploaded copy
+                      </a>
+                    </>
+                  ) : null}
                 </p>
+              ) : null}
+              {!ack || ack.signed_via === "external" ? (
+                <Collapsible
+                  label={
+                    ack
+                      ? "Replace the uploaded copy"
+                      : "Already signed outside the app?"
+                  }
+                >
+                  <form action={boundRecordExternal} className="space-y-2">
+                    <p className="text-xs text-gray">
+                      For a client who filled this out on paper (or before
+                      this feature existed) — upload the signed copy instead
+                      of making them redo it in the app.
+                    </p>
+                    <Input
+                      name="signed_name"
+                      placeholder="Name as signed on the form"
+                      required
+                      defaultValue={ack?.signed_name ?? ""}
+                    />
+                    <input
+                      type="file"
+                      name="file"
+                      accept="image/*,.pdf"
+                      required
+                      className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+                    />
+                    <Button type="submit" variant="secondary">
+                      Save signed copy
+                    </Button>
+                  </form>
+                </Collapsible>
               ) : null}
             </Card>
           );
