@@ -59,7 +59,7 @@ export async function updateSession(request: NextRequest) {
     const role = profile?.role ?? "client";
     const homeFor = (r: string) =>
       r === "coach"
-        ? "/coach/roster"
+        ? "/coach/dashboard"
         : r === "lead"
           ? "/lead/dashboard"
           : "/client/dashboard";

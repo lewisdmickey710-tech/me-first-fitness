@@ -377,6 +377,7 @@ export async function convertLeadToClient(leadId: string, formData: FormData) {
   revalidatePath("/coach/leads");
   revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   redirect(`/coach/clients/${client.id}`);
 }
 

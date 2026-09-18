@@ -13,7 +13,8 @@ export default function CoachLayout({
         faqHref="/coach/faq"
         settingsHref="/coach/settings"
         links={[
-          { href: "/coach/roster", label: "Motherboard" },
+          { href: "/coach/dashboard", label: "Motherboard" },
+          { href: "/coach/roster", label: "All Clients" },
           { href: "/coach/digest", label: "Digest" },
           { href: "/coach/schedule", label: "Schedule" },
           { href: "/coach/sign-ons", label: "Sign-ons" },

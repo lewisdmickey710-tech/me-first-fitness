@@ -67,6 +67,7 @@ export async function addClient(formData: FormData) {
   if (phaseError) throw new Error(phaseError.message);
 
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   redirect(`/coach/clients/${data.id}`);
 }
 
@@ -104,6 +105,7 @@ export async function advancePhase(clientId: string) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function setClientPhase(clientId: string, phase: Phase) {
@@ -137,6 +139,7 @@ export async function setClientPhase(clientId: string, phase: Phase) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function setRequestStatus(
@@ -202,6 +205,7 @@ export async function setRequestStatus(
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   revalidatePath("/coach/schedule");
   revalidatePath("/client/schedule");
   revalidatePath("/client/dashboard");
@@ -1865,6 +1869,7 @@ export async function addClientForAccount(userId: string, formData: FormData) {
   revalidatePath("/coach/signups");
   revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   redirect(`/coach/clients/${data.id}`);
 }
 
@@ -1884,6 +1889,7 @@ export async function linkExistingClientToAccount(
   revalidatePath("/coach/signups");
   revalidatePath("/coach/sign-ons");
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
@@ -1965,6 +1971,7 @@ export async function setClientPartner(clientId: string, partnerClientId: string
   if (partnerClientId) revalidatePath(`/coach/clients/${partnerClientId}`);
   if (previousPartnerId) revalidatePath(`/coach/clients/${previousPartnerId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function updateClientProfile(clientId: string, formData: FormData) {
@@ -2066,6 +2073,7 @@ export async function startClientHold(clientId: string) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function endClientHold(clientId: string) {
@@ -2079,6 +2087,7 @@ export async function endClientHold(clientId: string) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 const OVERRIDABLE_FLAGS = ["inactive", "high_risk", "session_not_logged"] as const;
@@ -2110,6 +2119,7 @@ export async function addFlagOverride(clientId: string, formData: FormData) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function clearFlagOverride(clientId: string, overrideId: string) {
@@ -2123,6 +2133,7 @@ export async function clearFlagOverride(clientId: string, overrideId: string) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 // Marks "today" as when a virtual-async client's program was last updated,
@@ -2152,6 +2163,7 @@ export async function archiveClient(clientId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   redirect("/coach/roster");
 }
 
@@ -2164,6 +2176,7 @@ export async function unarchiveClient(clientId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function addClientNote(clientId: string, formData: FormData) {
@@ -2203,6 +2216,7 @@ export async function logSelfLedCheckin(clientId: string, formData: FormData) {
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
 }
 
 export async function deleteClientNote(clientId: string, noteId: string) {
@@ -2330,6 +2344,7 @@ export async function touchClientViewed(clientId: string) {
       .update({ last_viewed_at: new Date().toISOString() })
       .eq("id", clientId);
     revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
   } catch (err) {
     console.error("Failed to record client view", err);
   }

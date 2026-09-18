@@ -35,12 +35,13 @@ function sundayOf(dateStr: string): string {
 export default async function RosterPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string; sort?: string }>;
+  searchParams: Promise<{ archived?: string; sort?: string; q?: string }>;
 }) {
-  const { archived: archivedParam, sort: sortParam } = await searchParams;
+  const { archived: archivedParam, sort: sortParam, q: qParam } = await searchParams;
   const showArchived = archivedParam === "1";
   const sort: "name" | "risk_asc" | "risk_desc" =
     sortParam === "risk_asc" || sortParam === "risk_desc" ? sortParam : "name";
+  const query = (qParam ?? "").trim();
 
   const supabase = await createClient();
 
@@ -51,9 +52,14 @@ export default async function RosterPage({
   clientsQuery = showArchived
     ? clientsQuery.not("archived_at", "is", null)
     : clientsQuery.is("archived_at", null);
-  const { data: clients } = (await clientsQuery) as unknown as {
+  const { data: allClientRows } = (await clientsQuery) as unknown as {
     data: ClientRow[] | null;
   };
+  const clients = query
+    ? (allClientRows ?? []).filter((c) =>
+        c.name.toLowerCase().includes(query.toLowerCase())
+      )
+    : allClientRows;
 
   const clientIds = (clients ?? []).map((c) => c.id);
 
@@ -805,7 +811,7 @@ export default async function RosterPage({
         <div>
           <h1 className="text-xl font-semibold text-ink">
             <Heart className="mr-1.5" />
-            {showArchived ? "Archived clients" : "The Motherboard"}
+            {showArchived ? "Archived clients" : "All Clients"}
           </h1>
           {!showArchived ? (
             <p className="mt-0.5 text-sm text-gray">
@@ -818,7 +824,7 @@ export default async function RosterPage({
             href="/coach/roster"
             className="text-sm text-gray hover:text-ink"
           >
-            ← Back to Motherboard
+            ← Back to all clients
           </Link>
         ) : (
           <Link
@@ -829,6 +835,26 @@ export default async function RosterPage({
           </Link>
         )}
       </div>
+
+      <form action="/coach/roster" method="get" className="flex gap-2">
+        {showArchived ? <input type="hidden" name="archived" value="1" /> : null}
+        {sort !== "name" ? <input type="hidden" name="sort" value={sort} /> : null}
+        <input
+          type="text"
+          name="q"
+          defaultValue={query}
+          placeholder="Search clients by name…"
+          className="w-full rounded-xl border border-grayLt bg-white px-3 py-2 text-sm text-ink placeholder:text-gray focus:border-rose focus:outline-none"
+        />
+        {query ? (
+          <Link
+            href={showArchived ? "/coach/roster?archived=1" : "/coach/roster"}
+            className="shrink-0 self-center text-sm text-gray hover:text-ink"
+          >
+            Clear
+          </Link>
+        ) : null}
+      </form>
 
       {!showArchived ? (
         <Link
