@@ -660,6 +660,16 @@ function Overview({
       )
     : null;
 
+  const daysSinceProgramUpdate = client.program_last_updated_at
+    ? Math.floor(
+        (new Date(today).getTime() -
+          new Date(client.program_last_updated_at).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+  // Same 14-day staleness threshold as the weekly digest (/coach/digest).
+  const programStale = daysSinceProgramUpdate === null || daysSinceProgramUpdate >= 14;
+
   const risk = computeCancellationRisk({
     recentOccurrenceStatuses: occurrences
       .filter((o) => o.status !== "scheduled")
@@ -871,34 +881,80 @@ function Overview({
         </Card>
       ) : null}
 
-      <Card>
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray">Next session</p>
-            {nextSession ? (
-              <p className="mt-1 text-lg font-semibold text-ink">
-                {nextSession.timeOfDay
-                  ? formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)
-                  : `${DAY_NAMES[nextSession.dayOfWeek]}, ${nextSession.date}`}
-                {nextSession.label ? ` · ${nextSession.label}` : ""}{" "}
-                <Badge tone={nextSession.isOneOff ? "teal" : "gray"}>
-                  {nextSession.isOneOff ? "One-off" : "Recurring"}
-                </Badge>
+      {client.session_mode === "virtual" ? (
+        <Card>
+          <p className="text-sm font-medium text-gray">Online coaching</p>
+          <div className="mt-2 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray">Program last updated</p>
+              <p
+                className={`text-base font-semibold ${
+                  programStale ? "text-pink" : "text-ink"
+                }`}
+              >
+                {client.program_last_updated_at
+                  ? `${daysSinceProgramUpdate} day${daysSinceProgramUpdate === 1 ? "" : "s"} ago`
+                  : "Never"}
               </p>
-            ) : (
-              <p className="mt-1 text-sm text-gray">
-                No recurring schedule set.
-              </p>
-            )}
+            </div>
+            <form
+              action={async () => {
+                "use server";
+                await touchProgramUpdated(client.id);
+              }}
+            >
+              <Button type="submit" variant="secondary">
+                Mark updated today
+              </Button>
+            </form>
+          </div>
+          <div className="mt-3 border-t border-grayLt pt-3">
+            <p className="text-xs text-gray">Last check-in or activity</p>
+            <p className="text-base font-semibold text-ink">
+              {daysSinceLastCheckinOrActivity === null
+                ? "Never"
+                : daysSinceLastCheckinOrActivity === 0
+                  ? "Today"
+                  : `${daysSinceLastCheckinOrActivity} day${daysSinceLastCheckinOrActivity === 1 ? "" : "s"} ago`}
+            </p>
           </div>
           <Link
-            href={`/coach/clients/${client.id}/schedule`}
-            className="shrink-0 text-sm text-gray hover:text-ink"
+            href="/coach/digest"
+            className="mt-3 inline-block text-sm text-rose hover:underline"
           >
-            Manage
+            Open weekly digest →
           </Link>
-        </div>
-      </Card>
+        </Card>
+      ) : (
+        <Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray">Next session</p>
+              {nextSession ? (
+                <p className="mt-1 text-lg font-semibold text-ink">
+                  {nextSession.timeOfDay
+                    ? formatSchedule(nextSession.dayOfWeek, nextSession.timeOfDay)
+                    : `${DAY_NAMES[nextSession.dayOfWeek]}, ${nextSession.date}`}
+                  {nextSession.label ? ` · ${nextSession.label}` : ""}{" "}
+                  <Badge tone={nextSession.isOneOff ? "teal" : "gray"}>
+                    {nextSession.isOneOff ? "One-off" : "Recurring"}
+                  </Badge>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-gray">
+                  No recurring schedule set.
+                </p>
+              )}
+            </div>
+            <Link
+              href={`/coach/clients/${client.id}/schedule`}
+              className="shrink-0 text-sm text-gray hover:text-ink"
+            >
+              Manage
+            </Link>
+          </div>
+        </Card>
+      )}
 
       {nextDue ? (
         <Card className={nextDue.due_date < today ? "border-pink/40 bg-pink/5" : ""}>
