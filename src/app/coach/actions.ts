@@ -1210,19 +1210,46 @@ export async function logSessionOccurrence(
     throw new Error("Invalid status.");
   }
 
-  const { error } = await supabase.from("session_occurrences").upsert(
-    {
-      client_id: clientId,
-      client_schedule_id,
-      occurrence_date,
-      status,
-      rescheduled_to_date,
-      notes,
-    },
-    { onConflict: "client_id,occurrence_date" }
-  );
+  const { data: occurrence, error } = await supabase
+    .from("session_occurrences")
+    .upsert(
+      {
+        client_id: clientId,
+        client_schedule_id,
+        occurrence_date,
+        status,
+        rescheduled_to_date,
+        notes,
+      },
+      { onConflict: "client_id,occurrence_date" }
+    )
+    .select("id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // Retroactively recording that a late-cancellation fee was already
+  // collected outside the app (cash, Venmo, at the time) -- a plain
+  // "already paid" payment row, not the pending-due one the client's own
+  // in-app cancellation would create. Deliberately doesn't touch
+  // late_cancel_free_remaining: a manual entry like this is the coach
+  // directly saying a fee applies, not the automatic free-allotment check.
+  const feeCharged = formData.get("fee_charged") === "on";
+  if (feeCharged) {
+    const feeAmountRaw = String(formData.get("fee_amount") ?? "").trim();
+    const feePaidOn = String(formData.get("fee_paid_on") ?? "").trim() || occurrence_date;
+    if (!feeAmountRaw) throw new Error("Fee amount is required.");
+    const { error: feeError } = await supabase.from("payments").insert({
+      client_id: clientId,
+      description: "Late cancellation fee",
+      amount: Number(feeAmountRaw),
+      due_date: occurrence_date,
+      paid_on: feePaidOn,
+      kind: "late_cancellation_fee",
+      session_occurrence_id: occurrence.id,
+    });
+    if (feeError) throw new Error(feeError.message);
+  }
 
   revalidatePath(`/coach/clients/${clientId}`);
 }

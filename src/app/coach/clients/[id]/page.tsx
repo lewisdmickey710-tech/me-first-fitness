@@ -70,7 +70,7 @@ import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
-import { lateCancellationFreeAllotment } from "@/lib/cancellation";
+import { lateCancellationFreeAllotment, lateCancellationFeeAmount } from "@/lib/cancellation";
 import { CALL_DURATION_MINUTES } from "@/lib/video-session";
 import {
   LOG_ENTRY_KIND_LABEL,
@@ -561,6 +561,8 @@ export default async function ClientDetailPage({
           clientId={id}
           schedules={schedules ?? []}
           occurrences={occurrences ?? []}
+          sessions={sessions ?? []}
+          paymentSchedule={client.payment_schedule}
         />
       )}
       {tab === "checkins" && (
@@ -2529,17 +2531,159 @@ async function LogTab({
   );
 }
 
+const ATTENDANCE_PAST_LOOKBACK_DAYS = 14;
+const ATTENDANCE_APP_LAUNCH_DATE = "2026-08-24";
+
 function AttendanceTab({
   clientId,
   schedules,
   occurrences,
+  sessions,
+  paymentSchedule,
 }: {
   clientId: string;
   schedules: ClientSchedule[];
   occurrences: SessionOccurrence[];
+  sessions: { date: string }[];
+  paymentSchedule: Client["payment_schedule"];
 }) {
   const resolvedDates = new Set(occurrences.map((o) => o.occurrence_date));
   const upcoming = upcomingOccurrences(schedules, resolvedDates, 14);
+
+  // Recurring slots in the recent past with no occurrence recorded at all
+  // and no logged session -- e.g. a client late-cancelled by text and paid
+  // the fee in person, but it never got marked here at the time. Same
+  // lookback window the Motherboard's "Payments not logged" uses.
+  const todayStr = toDateString(nowInBusinessTz());
+  const loggedDateSet = new Set(sessions.map((s) => s.date));
+  const pastUnresolved: typeof upcoming = [];
+  for (const s of schedules) {
+    if (!s.active) continue;
+    for (let i = 1; i <= ATTENDANCE_PAST_LOOKBACK_DAYS; i++) {
+      const d = new Date(`${todayStr}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - i);
+      const dateStr = toDateString(d);
+      if (dateStr < ATTENDANCE_APP_LAUNCH_DATE) break;
+      if (d.getUTCDay() !== s.day_of_week) continue;
+      if (resolvedDates.has(dateStr) || loggedDateSet.has(dateStr)) continue;
+      pastUnresolved.push({
+        date: dateStr,
+        dayOfWeek: s.day_of_week,
+        timeOfDay: s.time_of_day,
+        label: s.label,
+        scheduleId: s.id,
+      });
+    }
+  }
+  pastUnresolved.sort((a, b) => b.date.localeCompare(a.date));
+  const feeAmount = lateCancellationFeeAmount(paymentSchedule);
+
+  function OutcomeCard(occ: (typeof upcoming)[number]) {
+    return (
+      <Card key={`${occ.scheduleId}-${occ.date}`}>
+        <p className="font-medium text-ink">
+          {occ.date} · {formatSchedule(occ.dayOfWeek, occ.timeOfDay)}
+          {occ.label ? ` · ${occ.label}` : ""}
+        </p>
+        <form
+          action={async (formData: FormData) => {
+            "use server";
+            formData.set("occurrence_date", occ.date);
+            formData.set("client_schedule_id", occ.scheduleId);
+            await logSessionOccurrence(clientId, formData);
+          }}
+          className="mt-2 space-y-2"
+        >
+          <div className="flex flex-wrap items-end gap-2">
+            <Select name="status" defaultValue="" className="w-40" required>
+              <option value="" disabled>
+                Mark as…
+              </option>
+              <option value="cancelled">Cancelled</option>
+              <option value="late_cancelled">Late cancel (&lt;12h)</option>
+              <option value="rescheduled">Rescheduled</option>
+              <option value="completed">Completed</option>
+            </Select>
+            <Button type="submit" variant="secondary">
+              Save
+            </Button>
+          </div>
+          <Textarea
+            name="notes"
+            rows={1}
+            placeholder="Reason, or reschedule details (optional)"
+          />
+          <div className="rounded-xl border border-grayLt bg-cream/50 p-2.5">
+            <Checkbox
+              name="fee_charged"
+              label="A late cancellation fee was already collected for this"
+            />
+            <div className="mt-2 flex items-end gap-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink">
+                  Amount
+                </label>
+                <Input
+                  name="fee_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={feeAmount}
+                  className="w-24"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-ink">
+                  Paid on
+                </label>
+                <Input name="fee_paid_on" type="date" defaultValue={occ.date} />
+              </div>
+            </div>
+          </div>
+        </form>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <form
+            action={async () => {
+              "use server";
+              await coachCancelSession(
+                clientId,
+                occ.date,
+                occ.scheduleId,
+                false,
+                occ.timeOfDay
+              );
+            }}
+          >
+            <ConfirmButton
+              variant="danger"
+              confirmText={`Cancel this session on ${occ.date} and email them?`}
+            >
+              I&apos;m unavailable — cancel &amp; email them
+            </ConfirmButton>
+          </form>
+          <form
+            action={async () => {
+              "use server";
+              await coachCancelSession(
+                clientId,
+                occ.date,
+                occ.scheduleId,
+                true,
+                occ.timeOfDay
+              );
+            }}
+          >
+            <ConfirmButton
+              variant="secondary"
+              confirmText={`Mark this session on ${occ.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+            >
+              Client emergency
+            </ConfirmButton>
+          </form>
+        </div>
+      </Card>
+    );
+  }
 
   const counts = occurrences.reduce(
     (acc, o) => {
@@ -2574,86 +2718,23 @@ function AttendanceTab({
         )}
       </Card>
 
+      {pastUnresolved.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-gray">
+            Past — mark outcome
+          </p>
+          <p className="text-xs text-gray">
+            Recurring times in the last two weeks with nothing recorded —
+            e.g. a late cancellation you found out about after the fact.
+          </p>
+          {pastUnresolved.map((occ) => OutcomeCard(occ))}
+        </div>
+      ) : null}
+
       {upcoming.length > 0 ? (
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray">Upcoming — mark outcome</p>
-          {upcoming.map((occ) => (
-            <Card key={`${occ.scheduleId}-${occ.date}`}>
-              <p className="font-medium text-ink">
-                {occ.date} · {formatSchedule(occ.dayOfWeek, occ.timeOfDay)}
-                {occ.label ? ` · ${occ.label}` : ""}
-              </p>
-              <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  formData.set("occurrence_date", occ.date);
-                  formData.set("client_schedule_id", occ.scheduleId);
-                  await logSessionOccurrence(clientId, formData);
-                }}
-                className="mt-2 space-y-2"
-              >
-                <div className="flex flex-wrap items-end gap-2">
-                  <Select name="status" defaultValue="" className="w-40" required>
-                    <option value="" disabled>
-                      Mark as…
-                    </option>
-                    <option value="cancelled">Cancelled</option>
-                    <option value="late_cancelled">Late cancel (&lt;12h)</option>
-                    <option value="rescheduled">Rescheduled</option>
-                    <option value="completed">Completed</option>
-                  </Select>
-                  <Button type="submit" variant="secondary">
-                    Save
-                  </Button>
-                </div>
-                <Textarea
-                  name="notes"
-                  rows={1}
-                  placeholder="Reason, or reschedule details (optional)"
-                />
-              </form>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <form
-                  action={async () => {
-                    "use server";
-                    await coachCancelSession(
-                      clientId,
-                      occ.date,
-                      occ.scheduleId,
-                      false,
-                      occ.timeOfDay
-                    );
-                  }}
-                >
-                  <ConfirmButton
-                    variant="danger"
-                    confirmText={`Cancel this session on ${occ.date} and email them?`}
-                  >
-                    I&apos;m unavailable — cancel &amp; email them
-                  </ConfirmButton>
-                </form>
-                <form
-                  action={async () => {
-                    "use server";
-                    await coachCancelSession(
-                      clientId,
-                      occ.date,
-                      occ.scheduleId,
-                      true,
-                      occ.timeOfDay
-                    );
-                  }}
-                >
-                  <ConfirmButton
-                    variant="secondary"
-                    confirmText={`Mark this session on ${occ.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
-                  >
-                    Client emergency
-                  </ConfirmButton>
-                </form>
-              </div>
-            </Card>
-          ))}
+          {upcoming.map((occ) => OutcomeCard(occ))}
         </div>
       ) : null}
 
