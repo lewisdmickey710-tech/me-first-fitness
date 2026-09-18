@@ -50,7 +50,7 @@ export default async function DashboardPage() {
     supabase
       .from("clients")
       .select(
-        "id, name, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at"
+        "id, name, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono"
       )
       .is("archived_at", null) as unknown as Promise<{ data: Client[] | null }>,
     supabase
@@ -167,9 +167,21 @@ export default async function DashboardPage() {
   todaysSessions.sort((a, b) => (a.timeOfDay ?? "99:99").localeCompare(b.timeOfDay ?? "99:99"));
 
   // ---------------- Sessions not logged (payments not logged) ----------------
+  // Pro bono clients are always waived -- there's no payment to have missed
+  // recording, so they never belong on this list even if the session
+  // itself hasn't been logged yet.
+  const proBonoClientIds = new Set(
+    (clients ?? []).filter((c) => c.pro_bono).map((c) => c.id)
+  );
   const scheduleByDayOfWeek = new Map<number, ScheduleRow[]>();
   for (const s of schedules ?? []) {
-    if (virtualClientIds.has(s.client_id) || heldClientIds.has(s.client_id)) continue;
+    if (
+      virtualClientIds.has(s.client_id) ||
+      heldClientIds.has(s.client_id) ||
+      proBonoClientIds.has(s.client_id)
+    ) {
+      continue;
+    }
     const list = scheduleByDayOfWeek.get(s.day_of_week) ?? [];
     list.push(s);
     scheduleByDayOfWeek.set(s.day_of_week, list);
@@ -309,7 +321,7 @@ export default async function DashboardPage() {
                     </p>
                   </div>
                   <Link
-                    href={`/coach/clients/${clientId}/log-session?date=${dates[dates.length - 1]}`}
+                    href={`/coach/clients/${clientId}/log-session?date=${dates[0]}`}
                     className="text-sm font-medium text-rose hover:underline"
                   >
                     Log it →
