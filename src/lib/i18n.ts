@@ -168,6 +168,7 @@ const ES: Record<string, string> = {
   More: "Más",
   "Log a daily check-in": "Registrar un check-in diario",
   "Symptom log": "Registro de síntomas",
+  "Track how you're feeling": "Registra cómo te sientes",
   Milestones: "Logros",
   "Wellness guide": "Guía de bienestar",
   Documents: "Documentos",

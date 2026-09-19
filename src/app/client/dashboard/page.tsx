@@ -571,6 +571,13 @@ export default async function ClientDashboard() {
           }
         />
         <ActionTile href="/client/habits" label={t("Habits")} description={t("Track your daily habits")} />
+        {me.symptom_tracker_enabled ? (
+          <ActionTile
+            href="/client/symptoms"
+            label={t("Symptom log")}
+            description={t("Track how you're feeling")}
+          />
+        ) : null}
         <ActionTile
           href="/client/progress"
           label={t("My progress")}
@@ -586,9 +593,6 @@ export default async function ClientDashboard() {
       <Collapsible label={t("More")} labelClassName="text-sm font-medium text-gray">
         <div className="rounded-xl border border-grayLt bg-white px-4">
           <MoreLink href="/client/checkin" label={t("Log a daily check-in")} />
-          {me.symptom_tracker_enabled ? (
-            <MoreLink href="/client/symptoms" label={t("Symptom log")} />
-          ) : null}
           <MoreLink href="/client/milestones" label={t("Milestones")} />
           <MoreLink href="/client/guide" label={t("Wellness guide")} />
           <MoreLink
