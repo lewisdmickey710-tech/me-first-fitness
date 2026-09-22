@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { safeFileName } from "@/lib/storage";
 
 export async function addCommunityPost(formData: FormData) {
   const me = await getMyClient();
@@ -11,19 +10,12 @@ export async function addCommunityPost(formData: FormData) {
 
   const kind = String(formData.get("kind") ?? "general");
   const body = String(formData.get("body") ?? "").trim();
-  const photo = formData.get("photo");
 
   const supabase = await createClient();
 
-  let photoPath: string | null = null;
-  if (photo instanceof File && photo.size > 0) {
-    const path = `${me.id}/community-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("form-checks")
-      .upload(path, photo, { contentType: photo.type });
-    if (uploadError) throw new Error(uploadError.message);
-    photoPath = path;
-  }
+  // Uploaded client-side straight to Storage before this action runs --
+  // see addNutritionLog in client/actions.ts for why.
+  const photoPath = String(formData.get("photo_path") ?? "").trim() || null;
 
   if (!body && !photoPath) {
     throw new Error("Add a photo or a few words before posting.");

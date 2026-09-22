@@ -15,7 +15,6 @@ import {
 import { BUSINESS_TIMEZONE, convertWallTime, toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { clientHasOverdueBalance } from "@/lib/payment-status";
-import { safeFileName } from "@/lib/storage";
 import { formatTimeOfDay } from "@/lib/schedule";
 import { sendNewRequestEmail } from "@/lib/email";
 import { getCoachEmail, getCoachUserId } from "@/lib/coach";
@@ -75,16 +74,9 @@ export async function logActivity(formData: FormData) {
 
   if (!date || !type) throw new Error("Date and type are required.");
 
-  let photoPath: string | null = null;
-  const photo = formData.get("photo");
-  if (photo instanceof File && photo.size > 0) {
-    const path = `${me.id}/activity-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("form-checks")
-      .upload(path, photo, { contentType: photo.type });
-    if (uploadError) throw new Error(uploadError.message);
-    photoPath = path;
-  }
+  // Uploaded client-side straight to Storage before this action runs (see
+  // LogActivityForm) -- see addNutritionLog above for why.
+  const photoPath = String(formData.get("photo_path") ?? "").trim() || null;
 
   const { error } = await supabase.from("activities").insert({
     client_id: me.id,
@@ -100,7 +92,6 @@ export async function logActivity(formData: FormData) {
 
   revalidatePath("/client/activity");
   revalidatePath("/client/dashboard");
-  redirect("/client/activity");
 }
 
 // A workout the client did entirely on her own -- no prescribed program day
@@ -198,24 +189,18 @@ export async function addProgressPhoto(formData: FormData) {
   const notes = String(formData.get("notes") ?? "").trim();
   if (!date) throw new Error("Date is required.");
 
-  const photo = formData.get("photo");
-  if (!(photo instanceof File) || photo.size === 0) {
-    throw new Error("A photo is required.");
-  }
+  // Uploaded client-side straight to Storage before this action runs (see
+  // ProgressPhotoForm) -- see addNutritionLog above for why.
+  const photoPath = String(formData.get("photo_path") ?? "").trim();
+  if (!photoPath) throw new Error("A photo is required.");
 
   const supabase = await createClient();
-
-  const path = `${me.id}/progress-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
-  const { error: uploadError } = await supabase.storage
-    .from("form-checks")
-    .upload(path, photo, { contentType: photo.type });
-  if (uploadError) throw new Error(uploadError.message);
 
   const { error } = await supabase.from("client_progress_photos").insert({
     client_id: me.id,
     date,
     angle,
-    photo_path: path,
+    photo_path: photoPath,
     notes: notes || null,
   });
   if (error) throw new Error(error.message);
@@ -1220,16 +1205,10 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
       const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
       const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
 
-      let mediaPath: string | null = null;
-      const file = formData.get(`file_${pde.id}`);
-      if (file instanceof File && file.size > 0) {
-        const path = `${me.id}/${crypto.randomUUID()}-${safeFileName(file.name)}`;
-        const { error: uploadError } = await supabase.storage
-          .from("form-checks")
-          .upload(path, file, { contentType: file.type });
-        if (uploadError) throw new Error(uploadError.message);
-        mediaPath = path;
-      }
+      // Uploaded client-side straight to Storage before this action runs
+      // (see WorkoutLogForm) -- see addNutritionLog above for why.
+      const mediaPath =
+        String(formData.get(`media_path_${pde.id}`) ?? "").trim() || null;
 
       return {
         exercise: effectiveName,
@@ -1316,11 +1295,14 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
   revalidatePath("/client/dashboard");
   // Nothing on the page visibly changed before this -- the same log form
   // just sat there looking submittable, which made it easy to hit "Log
-  // this workout" a second time and end up with a duplicate. Redirecting
-  // (instead of just revalidating in place) forces a fresh page load with
-  // a clear confirmation banner and collapses the just-logged day's form
-  // behind a deliberate "log it again" disclosure.
-  redirect(`/client/program?logged=${encodeURIComponent(day.day_number)}`);
+  // this workout" a second time and end up with a duplicate. The caller
+  // (WorkoutLogForm) navigates to /client/program?logged=<n> with this,
+  // forcing a fresh page load with a clear confirmation banner and
+  // collapsing the just-logged day's form behind a deliberate "log it
+  // again" disclosure -- same effect as the redirect() this used to call
+  // directly, moved client-side since redirect()'s internal throw can't
+  // be used safely from inside a try/catch around a client-invoked action.
+  return day.day_number;
 }
 
 // Lets a client remove a workout she logged herself -- most often an
@@ -1532,16 +1514,11 @@ export async function addNutritionLog(formData: FormData) {
 
   const supabase = await createClient();
 
-  let photoPath: string | null = null;
-  const photo = formData.get("photo");
-  if (photo instanceof File && photo.size > 0) {
-    const path = `${me.id}/nutrition-${crypto.randomUUID()}-${safeFileName(photo.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("form-checks")
-      .upload(path, photo, { contentType: photo.type });
-    if (uploadError) throw new Error(uploadError.message);
-    photoPath = path;
-  }
+  // The photo, if any, is uploaded client-side straight to Storage before
+  // this action is called (see NutritionLogForm) -- Vercel caps a server
+  // action's own request body at 4.5MB, well under a real phone photo, so
+  // the bytes can't travel through here. Only the resulting path does.
+  const photoPath = textOrNull("photo_path");
 
   const { error } = await supabase.from("client_nutrition_logs").insert({
     client_id: me.id,

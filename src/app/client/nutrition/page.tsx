@@ -1,11 +1,12 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { addNutritionLog, deleteNutritionLog } from "@/app/client/actions";
-import { Button, Card, EmptyState, Heart, Input, Textarea } from "@/components/ui";
+import { deleteNutritionLog } from "@/app/client/actions";
+import { Card, EmptyState, Heart } from "@/components/ui";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
 import type { ClientNutritionLog } from "@/lib/types";
+import { NutritionLogForm } from "@/app/client/nutrition/NutritionLogForm";
 
 export default async function ClientNutritionPage() {
   const me = await getMyClient();
@@ -68,98 +69,7 @@ export default async function ClientNutritionPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <form action={addNutritionLog} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Date")}
-              </label>
-              <Input name="log_date" type="date" required defaultValue={todayStr} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Meal")}
-              </label>
-              <Input name="meal_label" placeholder={t("e.g. Lunch")} />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Photo")}{" "}
-              <span className="font-normal text-gray">
-                {t("(easiest option — just snap it, no description needed)")}
-              </span>
-            </label>
-            <input
-              type="file"
-              name="photo"
-              accept="image/*"
-              capture="environment"
-              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("What did you eat?")}
-            </label>
-            <Textarea name="description" rows={2} placeholder={t("Optional")} />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Hunger before (1–10)")}
-              </label>
-              <Input name="hunger_before" type="number" min={1} max={10} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Fullness after (1–10)")}
-              </label>
-              <Input name="fullness_after" type="number" min={1} max={10} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Satisfaction (1–5)")}
-              </label>
-              <Input name="satisfaction" type="number" min={1} max={5} />
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Calories")}
-              </label>
-              <Input name="calories" type="number" min={0} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Protein (g)")}
-              </label>
-              <Input name="protein_g" type="number" min={0} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Carbs (g)")}
-              </label>
-              <Input name="carbs_g" type="number" min={0} />
-            </div>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Fat (g)")}
-            </label>
-            <Input name="fat_g" type="number" min={0} className="max-w-[8rem]" />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Notes")}
-            </label>
-            <Textarea name="notes" rows={2} placeholder={t("Optional")} />
-          </div>
-          <Button type="submit">{t("Save entry")}</Button>
-        </form>
-      </Card>
+      <NutritionLogForm clientId={me.id} todayStr={todayStr} t={t} />
 
       {(nutritionLogs ?? []).length > 0 ? (
         <div className="space-y-2">

@@ -1,21 +1,20 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { logActivity, logFreestyleWorkout } from "@/app/client/actions";
+import { logFreestyleWorkout } from "@/app/client/actions";
 import {
   Button,
   Card,
   EmptyState,
   Heart,
   Input,
-  Select,
   Textarea,
 } from "@/components/ui";
 import { WeightInput } from "@/components/weight-input";
-import { ACTIVITY_TYPES } from "@/lib/constants";
 import { toDateString } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
 import type { Activity } from "@/lib/types";
+import { LogActivityForm } from "@/app/client/activity/LogActivityForm";
 
 const FREESTYLE_ROWS = 8;
 
@@ -76,61 +75,7 @@ export default async function ClientActivityPage() {
         {t("instead, so it counts toward that.")}
       </p>
 
-      <Card>
-        <form action={logActivity} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Date")}
-            </label>
-            <Input name="date" type="date" required defaultValue={today} />
-            <p className="mt-1 text-xs text-gray">
-              {t("Forgot to log it the same day? Change the date to when it actually happened — logging it late is totally fine.")}
-            </p>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Type")}
-            </label>
-            <Select name="type" required defaultValue="">
-              <option value="" disabled>
-                {t("Choose one")}
-              </option>
-              {ACTIVITY_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {t(type)}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Duration")}{" "}
-              <span className="font-normal text-gray">{t("(optional)")}</span>
-            </label>
-            <Input name="duration" placeholder={t("e.g. 30 min")} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Notes")}
-            </label>
-            <Textarea name="notes" rows={3} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Photo")}{" "}
-              <span className="font-normal text-gray">{t("(optional)")}</span>
-            </label>
-            <input
-              type="file"
-              name="photo"
-              accept="image/*"
-              capture="environment"
-              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-            />
-          </div>
-          <Button type="submit">{t("Save activity")}</Button>
-        </form>
-      </Card>
+      <LogActivityForm clientId={me.id} today={today} t={t} />
 
       <div>
         <h2 className="text-lg font-semibold text-ink">

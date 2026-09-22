@@ -3,13 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { getCurrentPhase } from "@/lib/phase";
 import {
-  logMyWorkout,
   setProgramExerciseReps,
   setProgramExerciseSets,
   setProgramExerciseSwap,
 } from "@/app/client/actions";
 import { WeightInput } from "@/components/weight-input";
 import { ConfirmButton } from "@/components/confirm-button";
+import { WorkoutLogForm } from "@/app/client/program/WorkoutLogForm";
 import {
   Button,
   Card,
@@ -521,13 +521,11 @@ export default async function ClientProgramPage({
                   })}
                 </div>
 
-                <form
+                <WorkoutLogForm
                   id={logFormId}
-                  action={async (formData: FormData) => {
-                    "use server";
-                    await logMyWorkout(day.id, formData);
-                  }}
-                  className="mt-4 space-y-4 border-t border-grayLt pt-4"
+                  dayId={day.id}
+                  clientId={me.id}
+                  pdeIds={sortedExercises.map((pde) => pde.id)}
                 >
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">
@@ -555,7 +553,7 @@ export default async function ClientProgramPage({
                       {t("Log this workout")}
                     </Button>
                   )}
-                </form>
+                </WorkoutLogForm>
                 </Collapsible>
               </Card>
             );

@@ -1,20 +1,17 @@
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
-import { addProgressPhoto, deleteProgressPhoto } from "@/app/client/actions";
+import { deleteProgressPhoto } from "@/app/client/actions";
 import {
-  Button,
   Card,
   DeltaField,
   EmptyState,
   Heart,
-  Input,
-  Select,
   Sparkline,
-  Textarea,
 } from "@/components/ui";
 import { makeT } from "@/lib/i18n";
 import type { ClientProgressPhoto, Measurement, TrainingSession } from "@/lib/types";
+import { ProgressPhotoForm } from "@/app/client/progress/ProgressPhotoForm";
 
 function parseWeight(raw: string): number | null {
   const match = raw.match(/-?\d+(\.\d+)?/);
@@ -158,51 +155,7 @@ export default async function ClientProgressPage() {
 
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray">{t("Progress photos")}</p>
-        <Card>
-          <form action={addProgressPhoto} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">
-                  {t("Date")}
-                </label>
-                <Input name="date" type="date" required defaultValue={today} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-ink">
-                  {t("Angle")}
-                </label>
-                <Select name="angle" defaultValue="">
-                  <option value="">{t("Not specified")}</option>
-                  <option value="front">{t("Front")}</option>
-                  <option value="side">{t("Side")}</option>
-                  <option value="back">{t("Back (angle)")}</option>
-                  <option value="other">{t("Other")}</option>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Photo")}
-              </label>
-              <input
-                type="file"
-                name="photo"
-                accept="image/*"
-                capture="environment"
-                required
-                className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-ink">
-                {t("Notes")}{" "}
-                <span className="font-normal text-gray">{t("(optional)")}</span>
-              </label>
-              <Textarea name="notes" rows={2} />
-            </div>
-            <Button type="submit">{t("Add photo")}</Button>
-          </form>
-        </Card>
+        <ProgressPhotoForm clientId={me.id} today={today} t={t} />
 
         {(progressPhotos ?? []).length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

@@ -3,12 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import {
   addCommunityComment,
-  addCommunityPost,
   deleteCommunityComment,
   deleteCommunityPost,
   toggleCommunityReaction,
 } from "@/app/client/community/actions";
 import { acknowledgeDocument } from "@/app/client/actions";
+import { PostForm } from "@/app/client/community/PostForm";
 import {
   Badge,
   Button,
@@ -187,41 +187,7 @@ export default async function ClientCommunityPage() {
         </p>
       </div>
 
-      <Card>
-        <form action={addCommunityPost} className="space-y-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("What kind of post is this?")}
-            </label>
-            <Select name="kind" defaultValue="general">
-              <option value="win">{t(KIND_LABEL.win)}</option>
-              <option value="question">{t(KIND_LABEL.question)}</option>
-              <option value="progress">{t(KIND_LABEL.progress)}</option>
-              <option value="general">{t(KIND_LABEL.general)}</option>
-            </Select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Share something")}
-            </label>
-            <Textarea name="body" rows={3} placeholder={t("Optional if you're just posting a photo")} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-ink">
-              {t("Photo")}{" "}
-              <span className="font-normal text-gray">{t("(optional)")}</span>
-            </label>
-            <input
-              type="file"
-              name="photo"
-              accept="image/*"
-              capture="environment"
-              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-            />
-          </div>
-          <Button type="submit">{t("Post")}</Button>
-        </form>
-      </Card>
+      <PostForm clientId={me.id} t={t} />
 
       {(posts ?? []).length === 0 ? (
         <EmptyState
