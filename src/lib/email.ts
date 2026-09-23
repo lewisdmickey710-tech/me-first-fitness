@@ -385,6 +385,56 @@ export async function sendEmergencyCancelledSessionEmail(
   });
 }
 
+// For a session the coach cancelled on the client's behalf after the
+// client let them know outside the app (a text, usually) that they
+// couldn't make it -- as opposed to sendCoachCancelledSessionEmail
+// (the coach's own unavailability) or sendEmergencyCancelledSessionEmail
+// (always free). feeAmount is null when no late cancellation fee applies
+// (plenty of notice, or the coach waived it).
+export async function sendClientCancelledSessionEmail(
+  to: string,
+  clientName: string,
+  whenText: string,
+  feeAmount: number | null,
+  locale: Locale = "en"
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping client-cancelled session email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject:
+      locale === "es"
+        ? "Tu sesión está cancelada"
+        : "Your session is cancelled",
+    html: wrapper(
+      locale === "es"
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>He cancelado tu sesión el <strong>${whenText}</strong> como me indicaste.</p>
+      ${
+        feeAmount
+          ? `<p>Como fue dentro de la ventana de cancelación de 12 horas, se aplica el cargo por cancelación tardía de $${feeAmount} — lo verás en tu historial de pagos.</p>`
+          : `<p>Sin cargo por esta.</p>`
+      }
+      <p>Cuando estés lista/o, busquemos un nuevo horario.</p>
+    `
+        : `
+      <p>Hi ${clientName},</p>
+      <p>I've cancelled your session on <strong>${whenText}</strong> as you let me know.</p>
+      ${
+        feeAmount
+          ? `<p>Since this was inside the 12-hour cancellation window, the $${feeAmount} late cancellation fee applies — you'll see it in your payment history.</p>`
+          : `<p>No charge for this one.</p>`
+      }
+      <p>Whenever you're ready, let's find a new time.</p>
+    `
+    ),
+  });
+}
+
 export async function sendDayBlockedEmail(
   to: string,
   clientName: string,

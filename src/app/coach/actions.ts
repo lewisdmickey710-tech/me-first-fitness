@@ -9,11 +9,13 @@ import {
   sendMilestoneAchievedEmail,
   sendCoachCancelledSessionEmail,
   sendEmergencyCancelledSessionEmail,
+  sendClientCancelledSessionEmail,
   sendDayBlockedEmail,
   sendRequestCounteredEmail,
   sendSessionRescheduledEmail,
   sendSessionBookedEmail,
 } from "@/lib/email";
+import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -2734,6 +2736,143 @@ export async function coachCancelSession(
       occurrenceDate,
       match.clientScheduleId,
       isEmergency,
+      silent
+    );
+  } catch (err) {
+    console.error("Failed to mirror cancellation to booking partner", err);
+  }
+}
+
+// For a client who let the coach know outside the app (a text, usually)
+// that they can't make an upcoming session, instead of cancelling it
+// themselves in the app. Mirrors cancelMySession's late-window
+// classification (client/actions.ts), but the fee decision is the
+// coach's own call rather than the automatic free-allotment check --
+// same reasoning as logSessionOccurrence's retroactive "already
+// collected" entry: a manual entry like this is the coach directly
+// saying a fee applies (or doesn't), not the automated policy running.
+// Deliberately doesn't touch late_cancel_free_remaining for the same
+// reason.
+async function coachCancelSessionAsClientCore(
+  clientId: string,
+  occurrenceDate: string,
+  clientScheduleId: string | null,
+  timeOfDay: string | null,
+  waiveLateFee: boolean,
+  silent: boolean
+) {
+  const supabase = await createClient();
+
+  const late = timeOfDay ? isLateCancellation(occurrenceDate, timeOfDay) : false;
+  const status = late ? "late_cancelled" : "cancelled";
+
+  const { data: occurrence, error } = await supabase
+    .from("session_occurrences")
+    .upsert(
+      {
+        client_id: clientId,
+        ...(clientScheduleId ? { client_schedule_id: clientScheduleId } : {}),
+        occurrence_date: occurrenceDate,
+        status,
+        cancelled_by: "client",
+        ...(late && waiveLateFee ? { notes: "Late cancellation — fee waived." } : {}),
+      },
+      { onConflict: "client_id,occurrence_date" }
+    )
+    .select("id")
+    .single();
+  if (error) throw new Error(error.message);
+
+  let feeAmount: number | null = null;
+  if (late && !waiveLateFee) {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("payment_schedule")
+      .eq("id", clientId)
+      .single();
+    feeAmount = lateCancellationFeeAmount(client?.payment_schedule ?? null);
+    const { error: feeError } = await supabase.from("payments").insert({
+      client_id: clientId,
+      description: "Late cancellation fee",
+      amount: feeAmount,
+      due_date: occurrenceDate,
+      kind: "late_cancellation_fee",
+      session_occurrence_id: occurrence.id,
+    });
+    if (feeError) throw new Error(feeError.message);
+  }
+
+  if (!silent) {
+    try {
+      const { data: client } = await supabase
+        .from("clients")
+        .select("name, user_id, language")
+        .eq("id", clientId)
+        .single();
+      if (client) {
+        const email = await clientLoginEmail(client.user_id);
+        if (email) {
+          await sendClientCancelledSessionEmail(
+            email,
+            client.name,
+            occurrenceDate,
+            feeAmount,
+            client.language
+          );
+        }
+      }
+    } catch (emailError) {
+      console.error("Failed to send client-cancelled session email", emailError);
+    }
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/schedule");
+  revalidatePath("/coach/dashboard");
+  revalidatePath("/client/schedule");
+  revalidatePath("/client/dashboard");
+}
+
+// timeOfDay is optional only for backward compatibility -- without it, a
+// booking partner's matching slot can't be found, so the cancellation
+// just applies to this one client.
+export async function coachCancelSessionAsClient(
+  clientId: string,
+  occurrenceDate: string,
+  clientScheduleId: string | null,
+  timeOfDay: string | null,
+  waiveLateFee: boolean,
+  silent: boolean = false
+) {
+  await coachCancelSessionAsClientCore(
+    clientId,
+    occurrenceDate,
+    clientScheduleId,
+    timeOfDay,
+    waiveLateFee,
+    silent
+  );
+
+  if (!timeOfDay) return;
+
+  const supabase = await createClient();
+  const { data: client } = await supabase
+    .from("clients")
+    .select("partner_client_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.partner_client_id) return;
+
+  const match = await findPartnerScheduleMatch(supabase, client.partner_client_id, occurrenceDate, timeOfDay);
+  if (!match) return;
+
+  try {
+    await coachCancelSessionAsClientCore(
+      client.partner_client_id,
+      occurrenceDate,
+      match.clientScheduleId,
+      timeOfDay,
+      waiveLateFee,
       silent
     );
   } catch (err) {

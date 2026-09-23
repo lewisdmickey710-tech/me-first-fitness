@@ -13,6 +13,7 @@ import {
   cancelCompPackage,
   clearFlagOverride,
   coachCancelSession,
+  coachCancelSessionAsClient,
   confirmVideoSessionRequest,
   deleteClientNote,
   deleteLoggedSession,
@@ -70,7 +71,11 @@ import { nowInBusinessTz, toDateString, US_TIMEZONES } from "@/lib/timezone";
 import { computeCancellationRisk } from "@/lib/risk";
 import { payAsYouGoStatus } from "@/lib/payment-status";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
-import { lateCancellationFreeAllotment, lateCancellationFeeAmount } from "@/lib/cancellation";
+import {
+  isLateCancellation,
+  lateCancellationFreeAllotment,
+  lateCancellationFeeAmount,
+} from "@/lib/cancellation";
 import { CALL_DURATION_MINUTES } from "@/lib/video-session";
 import {
   LOG_ENTRY_KIND_LABEL,
@@ -2579,6 +2584,7 @@ function AttendanceTab({
   const feeAmount = lateCancellationFeeAmount(paymentSchedule);
 
   function OutcomeCard(occ: (typeof upcoming)[number]) {
+    const late = isLateCancellation(occ.date, occ.timeOfDay);
     return (
       <Card key={`${occ.scheduleId}-${occ.date}`}>
         <p className="font-medium text-ink">
@@ -2661,25 +2667,68 @@ function AttendanceTab({
               I&apos;m unavailable — cancel &amp; email them
             </ConfirmButton>
           </form>
-          <form
-            action={async () => {
-              "use server";
-              await coachCancelSession(
-                clientId,
-                occ.date,
-                occ.scheduleId,
-                true,
-                occ.timeOfDay
-              );
-            }}
-          >
-            <ConfirmButton
-              variant="secondary"
-              confirmText={`Mark this session on ${occ.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+          {late ? (
+            <>
+              <form
+                action={async () => {
+                  "use server";
+                  await coachCancelSessionAsClient(
+                    clientId,
+                    occ.date,
+                    occ.scheduleId,
+                    occ.timeOfDay,
+                    false
+                  );
+                }}
+              >
+                <ConfirmButton
+                  variant="secondary"
+                  confirmText={`This is inside the 12-hour window — charge the $${feeAmount} late cancellation fee for ${occ.date}?`}
+                >
+                  Client unavailable — charge ${feeAmount}
+                </ConfirmButton>
+              </form>
+              <form
+                action={async () => {
+                  "use server";
+                  await coachCancelSessionAsClient(
+                    clientId,
+                    occ.date,
+                    occ.scheduleId,
+                    occ.timeOfDay,
+                    true
+                  );
+                }}
+              >
+                <ConfirmButton
+                  variant="secondary"
+                  confirmText={`This is inside the 12-hour window — waive the late cancellation fee for ${occ.date}?`}
+                >
+                  Client unavailable — waive fee
+                </ConfirmButton>
+              </form>
+            </>
+          ) : (
+            <form
+              action={async () => {
+                "use server";
+                await coachCancelSessionAsClient(
+                  clientId,
+                  occ.date,
+                  occ.scheduleId,
+                  occ.timeOfDay,
+                  true
+                );
+              }}
             >
-              Client emergency
-            </ConfirmButton>
-          </form>
+              <ConfirmButton
+                variant="secondary"
+                confirmText={`Cancel this session on ${occ.date} — client unavailable, no charge?`}
+              >
+                Client unavailable
+              </ConfirmButton>
+            </form>
+          )}
         </div>
       </Card>
     );

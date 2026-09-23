@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { unarchiveClient, coachCancelSession } from "@/app/coach/actions";
+import { unarchiveClient, coachCancelSession, coachCancelSessionAsClient } from "@/app/coach/actions";
+import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
@@ -804,6 +805,12 @@ export default async function RosterPage({
     ? (clients ?? []).find((c) => c.id === nextSession!.clientId)
     : null;
   const nextSessionFlags = nextSessionClient ? computeFlags(nextSessionClient) : [];
+  const nextSessionLate = nextSession
+    ? isLateCancellation(nextSession.date, nextSession.timeOfDay)
+    : false;
+  const nextSessionFeeAmount = lateCancellationFeeAmount(
+    nextSessionClient?.payment_schedule ?? null
+  );
 
   return (
     <div className="space-y-6">
@@ -925,28 +932,71 @@ export default async function RosterPage({
                   variant="danger"
                   confirmText={`Cancel ${nextSession.clientName}'s session on ${nextSession.date}?`}
                 >
-                  Cancel
+                  I&apos;m unavailable
                 </ConfirmButton>
               </form>
-              <form
-                action={async () => {
-                  "use server";
-                  await coachCancelSession(
-                    nextSession!.clientId,
-                    nextSession!.date,
-                    null,
-                    true,
-                    nextSession!.timeOfDay
-                  );
-                }}
-              >
-                <ConfirmButton
-                  variant="secondary"
-                  confirmText={`Mark ${nextSession.clientName}'s session on ${nextSession.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+              {nextSessionLate ? (
+                <>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await coachCancelSessionAsClient(
+                        nextSession!.clientId,
+                        nextSession!.date,
+                        null,
+                        nextSession!.timeOfDay,
+                        false
+                      );
+                    }}
+                  >
+                    <ConfirmButton
+                      variant="secondary"
+                      confirmText={`This is inside the 12-hour window — charge ${nextSession.clientName} the $${nextSessionFeeAmount} late cancellation fee?`}
+                    >
+                      Client unavailable — charge ${nextSessionFeeAmount}
+                    </ConfirmButton>
+                  </form>
+                  <form
+                    action={async () => {
+                      "use server";
+                      await coachCancelSessionAsClient(
+                        nextSession!.clientId,
+                        nextSession!.date,
+                        null,
+                        nextSession!.timeOfDay,
+                        true
+                      );
+                    }}
+                  >
+                    <ConfirmButton
+                      variant="secondary"
+                      confirmText={`This is inside the 12-hour window — waive the late cancellation fee for ${nextSession.clientName}?`}
+                    >
+                      Client unavailable — waive fee
+                    </ConfirmButton>
+                  </form>
+                </>
+              ) : (
+                <form
+                  action={async () => {
+                    "use server";
+                    await coachCancelSessionAsClient(
+                      nextSession!.clientId,
+                      nextSession!.date,
+                      null,
+                      nextSession!.timeOfDay,
+                      true
+                    );
+                  }}
                 >
-                  Client emergency
-                </ConfirmButton>
-              </form>
+                  <ConfirmButton
+                    variant="secondary"
+                    confirmText={`Cancel ${nextSession.clientName}'s session on ${nextSession.date} — client unavailable, no charge?`}
+                  >
+                    Client unavailable
+                  </ConfirmButton>
+                </form>
+              )}
             </div>
           </Card>
         ) : (

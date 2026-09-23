@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { coachCancelSession } from "@/app/coach/actions";
+import { coachCancelSession, coachCancelSessionAsClient } from "@/app/coach/actions";
 import { ScheduleGrid, type RequestChip } from "./ScheduleGrid";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
 import type {
   ClientSchedule,
   CoachAvailability,
   CoachBlockedDate,
+  PaymentSchedule,
   SessionOccurrence,
   SessionRequest,
 } from "@/lib/types";
@@ -45,6 +47,7 @@ interface DaySession {
   timeOfDay: string | null;
   label: string | null;
   isHeld: boolean;
+  paymentSchedule: PaymentSchedule | null;
 }
 
 export default async function CoachSchedulePage({
@@ -149,8 +152,15 @@ export default async function CoachSchedulePage({
       .lte("occurrence_date", lastDateStr) as unknown as Promise<{
       data: SessionOccurrence[] | null;
     }>,
-    supabase.from("clients").select("id, name, hold_started_at") as unknown as Promise<{
-      data: { id: string; name: string; hold_started_at: string | null }[] | null;
+    supabase.from("clients").select("id, name, hold_started_at, payment_schedule") as unknown as Promise<{
+      data:
+        | {
+            id: string;
+            name: string;
+            hold_started_at: string | null;
+            payment_schedule: PaymentSchedule | null;
+          }[]
+        | null;
     }>,
     supabase.from("coach_availability").select("*") as unknown as Promise<{
       data: CoachAvailability[] | null;
@@ -194,6 +204,9 @@ export default async function CoachSchedulePage({
   ]);
 
   const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
+  const clientPaymentScheduleById = new Map(
+    (allClients ?? []).map((c) => [c.id, c.payment_schedule])
+  );
   const overdueClientIds = [
     ...new Set((overduePayments ?? []).map((p) => p.client_id)),
   ];
@@ -303,6 +316,7 @@ export default async function CoachSchedulePage({
         timeOfDay: s.time_of_day,
         label: s.label,
         isHeld: heldClientIds.has(s.client_id),
+        paymentSchedule: clientPaymentScheduleById.get(s.client_id) ?? null,
       })
     );
     const covered = new Set(fromSchedule.map((s) => s.clientId));
@@ -314,6 +328,7 @@ export default async function CoachSchedulePage({
         timeOfDay: null,
         label: o.notes,
         isHeld: heldClientIds.has(o.client_id),
+        paymentSchedule: clientPaymentScheduleById.get(o.client_id) ?? null,
       }));
     return [...fromSchedule, ...fromOccurrenceOnly];
   }
@@ -401,7 +416,9 @@ export default async function CoachSchedulePage({
             }))}
             bookings={weekBookings}
             requests={requestChips}
-            clients={[...(allClients ?? [])].sort((a, b) => a.name.localeCompare(b.name))}
+            clients={[...(allClients ?? [])]
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((c) => ({ id: c.id, name: c.name, paymentSchedule: c.payment_schedule }))}
             prevWeekHref={`/coach/schedule?week=${toDateString(prevWeekDate)}`}
             nextWeekHref={`/coach/schedule?week=${toDateString(nextWeekDate)}`}
             prevMonthHref={`/coach/schedule?week=${toDateString(prevMonthWeekDate)}`}
@@ -501,6 +518,10 @@ export default async function CoachSchedulePage({
             const status = occurrence?.status ?? "scheduled";
             const isPast = selectedCell.date < todayStr;
             const cancellable = status === "scheduled" && !s.isHeld;
+            const late = s.timeOfDay
+              ? isLateCancellation(selectedCell.date, s.timeOfDay)
+              : false;
+            const feeAmount = lateCancellationFeeAmount(s.paymentSchedule);
             return (
               <Card
                 key={s.clientId}
@@ -560,25 +581,68 @@ export default async function CoachSchedulePage({
                         I&apos;m unavailable — cancel &amp; email them
                       </ConfirmButton>
                     </form>
-                    <form
-                      action={async () => {
-                        "use server";
-                        await coachCancelSession(
-                          s.clientId,
-                          selectedCell.date,
-                          null,
-                          true,
-                          s.timeOfDay
-                        );
-                      }}
-                    >
-                      <ConfirmButton
-                        variant="secondary"
-                        confirmText={`Mark ${s.clientName}'s session on ${selectedCell.date} as a client emergency — cancelled, no charge, no fee. Continue?`}
+                    {late ? (
+                      <>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await coachCancelSessionAsClient(
+                              s.clientId,
+                              selectedCell.date,
+                              null,
+                              s.timeOfDay,
+                              false
+                            );
+                          }}
+                        >
+                          <ConfirmButton
+                            variant="secondary"
+                            confirmText={`This is inside the 12-hour window — charge ${s.clientName} the $${feeAmount} late cancellation fee?`}
+                          >
+                            Client unavailable — charge ${feeAmount}
+                          </ConfirmButton>
+                        </form>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await coachCancelSessionAsClient(
+                              s.clientId,
+                              selectedCell.date,
+                              null,
+                              s.timeOfDay,
+                              true
+                            );
+                          }}
+                        >
+                          <ConfirmButton
+                            variant="secondary"
+                            confirmText={`This is inside the 12-hour window — waive the late cancellation fee for ${s.clientName}?`}
+                          >
+                            Client unavailable — waive fee
+                          </ConfirmButton>
+                        </form>
+                      </>
+                    ) : (
+                      <form
+                        action={async () => {
+                          "use server";
+                          await coachCancelSessionAsClient(
+                            s.clientId,
+                            selectedCell.date,
+                            null,
+                            s.timeOfDay,
+                            true
+                          );
+                        }}
                       >
-                        Client emergency
-                      </ConfirmButton>
-                    </form>
+                        <ConfirmButton
+                          variant="secondary"
+                          confirmText={`Cancel ${s.clientName}'s session on ${selectedCell.date} — client unavailable, no charge?`}
+                        >
+                          Client unavailable
+                        </ConfirmButton>
+                      </form>
+                    )}
                   </div>
                 ) : null}
                 {cancellable && isPast ? (
@@ -608,26 +672,71 @@ export default async function CoachSchedulePage({
                           Retro-mark cancelled
                         </ConfirmButton>
                       </form>
-                      <form
-                        action={async () => {
-                          "use server";
-                          await coachCancelSession(
-                            s.clientId,
-                            selectedCell.date,
-                            null,
-                            true,
-                            s.timeOfDay,
-                            true
-                          );
-                        }}
-                      >
-                        <ConfirmButton
-                          variant="secondary"
-                          confirmText={`Retroactively mark ${s.clientName}'s session on ${selectedCell.date} as a client emergency? No email will be sent.`}
+                      {late ? (
+                        <>
+                          <form
+                            action={async () => {
+                              "use server";
+                              await coachCancelSessionAsClient(
+                                s.clientId,
+                                selectedCell.date,
+                                null,
+                                s.timeOfDay,
+                                false,
+                                true
+                              );
+                            }}
+                          >
+                            <ConfirmButton
+                              variant="secondary"
+                              confirmText={`Retroactively mark this as a late cancellation and charge ${s.clientName} the $${feeAmount} fee? No email will be sent.`}
+                            >
+                              Retro-mark client unavailable — charge ${feeAmount}
+                            </ConfirmButton>
+                          </form>
+                          <form
+                            action={async () => {
+                              "use server";
+                              await coachCancelSessionAsClient(
+                                s.clientId,
+                                selectedCell.date,
+                                null,
+                                s.timeOfDay,
+                                true,
+                                true
+                              );
+                            }}
+                          >
+                            <ConfirmButton
+                              variant="secondary"
+                              confirmText={`Retroactively mark this as a late cancellation for ${s.clientName}, fee waived? No email will be sent.`}
+                            >
+                              Retro-mark client unavailable — waive fee
+                            </ConfirmButton>
+                          </form>
+                        </>
+                      ) : (
+                        <form
+                          action={async () => {
+                            "use server";
+                            await coachCancelSessionAsClient(
+                              s.clientId,
+                              selectedCell.date,
+                              null,
+                              s.timeOfDay,
+                              true,
+                              true
+                            );
+                          }}
                         >
-                          Retro-mark client emergency
-                        </ConfirmButton>
-                      </form>
+                          <ConfirmButton
+                            variant="secondary"
+                            confirmText={`Retroactively mark ${s.clientName}'s session on ${selectedCell.date} as client unavailable, no charge? No email will be sent.`}
+                          >
+                            Retro-mark client unavailable
+                          </ConfirmButton>
+                        </form>
+                      )}
                     </div>
                   </div>
                 ) : null}

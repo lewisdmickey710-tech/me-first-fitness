@@ -9,10 +9,13 @@ import {
   coachRescheduleSession,
   coachBookSession,
   coachCancelSession,
+  coachCancelSessionAsClient,
   removeClientSchedule,
 } from "@/app/coach/actions";
 import { Button, Select } from "@/components/ui";
 import { formatTimeOfDay } from "@/lib/schedule";
+import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
+import type { PaymentSchedule } from "@/lib/types";
 
 const BOOKING_TYPES = [
   { id: "session", label: "In-person session" },
@@ -142,7 +145,7 @@ export function ScheduleGrid({
   blocks: BlockRow[];
   bookings: DayBooking[];
   requests: RequestChip[];
-  clients: { id: string; name: string }[];
+  clients: { id: string; name: string; paymentSchedule: PaymentSchedule | null }[];
   prevWeekHref: string;
   nextWeekHref: string;
   prevMonthHref: string;
@@ -174,6 +177,12 @@ export function ScheduleGrid({
   const [error, setError] = useState<string | null>(null);
   const [balanceActionBooking, setBalanceActionBooking] = useState<DayBooking | null>(
     null
+  );
+  const balanceActionLate = balanceActionBooking
+    ? isLateCancellation(balanceActionBooking.date, balanceActionBooking.timeOfDay)
+    : false;
+  const balanceActionFeeAmount = lateCancellationFeeAmount(
+    clients.find((c) => c.id === balanceActionBooking?.clientId)?.paymentSchedule ?? null
   );
 
   // Coming here from the "Next booked session" widget's Reschedule button
@@ -437,6 +446,22 @@ export function ScheduleGrid({
     startTransition(async () => {
       try {
         await coachCancelSession(b.clientId, b.date, b.clientScheduleId, isEmergency, b.timeOfDay);
+        setBalanceActionBooking(null);
+        router.refresh();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't cancel that session.");
+      }
+    });
+  }
+
+  // For a client who texted to cancel instead of doing it in the app --
+  // as opposed to cancelSingleOccurrence's isEmergency, which is about the
+  // coach's own reason. Charges/waives the late cancellation fee as a
+  // direct manual call, not the automatic free-allotment check.
+  function cancelAsClient(b: DayBooking, waiveLateFee: boolean) {
+    startTransition(async () => {
+      try {
+        await coachCancelSessionAsClient(b.clientId, b.date, b.clientScheduleId, b.timeOfDay, waiveLateFee);
         setBalanceActionBooking(null);
         router.refresh();
       } catch (err) {
@@ -987,16 +1012,37 @@ export function ScheduleGrid({
                 disabled={isPending}
                 onClick={() => cancelSingleOccurrence(balanceActionBooking)}
               >
-                Cancel this session
+                I&apos;m unavailable
               </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={isPending}
-                onClick={() => cancelSingleOccurrence(balanceActionBooking, true)}
-              >
-                Client emergency (no charge)
-              </Button>
+              {balanceActionLate ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={isPending}
+                    onClick={() => cancelAsClient(balanceActionBooking, false)}
+                  >
+                    Client unavailable — charge ${balanceActionFeeAmount}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={isPending}
+                    onClick={() => cancelAsClient(balanceActionBooking, true)}
+                  >
+                    Client unavailable — waive fee
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={isPending}
+                  onClick={() => cancelAsClient(balanceActionBooking, true)}
+                >
+                  Client unavailable
+                </Button>
+              )}
               {balanceActionBooking.clientScheduleId ? (
                 <Button
                   type="button"
