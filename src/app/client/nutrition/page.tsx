@@ -69,7 +69,7 @@ export default async function ClientNutritionPage() {
         </Card>
       ) : null}
 
-      <NutritionLogForm clientId={me.id} todayStr={todayStr} t={t} />
+      <NutritionLogForm clientId={me.id} todayStr={todayStr} locale={me.language} />
 
       {(nutritionLogs ?? []).length > 0 ? (
         <div className="space-y-2">

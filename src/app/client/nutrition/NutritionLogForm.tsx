@@ -4,17 +4,18 @@ import { useRef, useState, useTransition } from "react";
 import { addNutritionLog } from "@/app/client/actions";
 import { uploadFormCheckFile } from "@/lib/upload-client";
 import { Button, Card, Input, Textarea } from "@/components/ui";
-import type { makeT } from "@/lib/i18n";
+import { makeT, type Locale } from "@/lib/i18n";
 
 export function NutritionLogForm({
   clientId,
   todayStr,
-  t,
+  locale,
 }: {
   clientId: string;
   todayStr: string;
-  t: ReturnType<typeof makeT>;
+  locale: Locale;
 }) {
+  const t = makeT(locale);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

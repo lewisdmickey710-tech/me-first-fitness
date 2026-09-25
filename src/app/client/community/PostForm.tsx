@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { addCommunityPost } from "@/app/client/community/actions";
 import { uploadFormCheckFile } from "@/lib/upload-client";
 import { Button, Card, Select, Textarea } from "@/components/ui";
-import type { makeT } from "@/lib/i18n";
+import { makeT, type Locale } from "@/lib/i18n";
 
 const KIND_LABEL: Record<string, string> = {
   win: "Win",
@@ -15,11 +15,12 @@ const KIND_LABEL: Record<string, string> = {
 
 export function PostForm({
   clientId,
-  t,
+  locale,
 }: {
   clientId: string;
-  t: ReturnType<typeof makeT>;
+  locale: Locale;
 }) {
+  const t = makeT(locale);
   const formRef = useRef<HTMLFormElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();

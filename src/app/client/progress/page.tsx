@@ -155,7 +155,7 @@ export default async function ClientProgressPage() {
 
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray">{t("Progress photos")}</p>
-        <ProgressPhotoForm clientId={me.id} today={today} t={t} />
+        <ProgressPhotoForm clientId={me.id} today={today} locale={me.language} />
 
         {(progressPhotos ?? []).length > 0 ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

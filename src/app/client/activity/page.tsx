@@ -75,7 +75,7 @@ export default async function ClientActivityPage() {
         {t("instead, so it counts toward that.")}
       </p>
 
-      <LogActivityForm clientId={me.id} today={today} t={t} />
+      <LogActivityForm clientId={me.id} today={today} locale={me.language} />
 
       <div>
         <h2 className="text-lg font-semibold text-ink">

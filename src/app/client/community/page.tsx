@@ -187,7 +187,7 @@ export default async function ClientCommunityPage() {
         </p>
       </div>
 
-      <PostForm clientId={me.id} t={t} />
+      <PostForm clientId={me.id} locale={me.language} />
 
       {(posts ?? []).length === 0 ? (
         <EmptyState
