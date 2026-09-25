@@ -749,6 +749,59 @@ async function applyCompPackageSessionUse(
   }
 }
 
+// Keeps a logged session's linked payment (sessions.payment_id) in sync
+// with its payment_status -- sessions.payment_status is a lightweight
+// per-session flag for pay-as-you-go clients (see payment-status.ts),
+// which on its own never touched the payments table Finances' income
+// totals are built from. Creates a payments row when a session is marked
+// paid, updates its amount/date if the session is edited, and removes it
+// if payment_status is changed away from paid -- otherwise a session
+// flipped back to unpaid would leave a phantom income record behind.
+async function syncSessionPayment(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clientId: string,
+  date: string,
+  paymentStatus: "paid" | "unpaid" | "waived" | null,
+  existingPaymentId: string | null,
+  formData: FormData
+): Promise<string | null> {
+  if (paymentStatus === "paid") {
+    const amountRaw = String(formData.get("payment_amount") ?? "").trim();
+    if (!amountRaw) throw new Error("Enter the amount paid for this session.");
+    const amount = Number(amountRaw);
+
+    if (existingPaymentId) {
+      const { error } = await supabase
+        .from("payments")
+        .update({ amount, due_date: date, paid_on: date })
+        .eq("id", existingPaymentId);
+      if (error) throw new Error(error.message);
+      return existingPaymentId;
+    }
+
+    const { data, error } = await supabase
+      .from("payments")
+      .insert({
+        client_id: clientId,
+        description: `Session — ${date}`,
+        amount,
+        due_date: date,
+        paid_on: date,
+        kind: "session",
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+    return data.id;
+  }
+
+  if (existingPaymentId) {
+    const { error } = await supabase.from("payments").delete().eq("id", existingPaymentId);
+    if (error) throw new Error(error.message);
+  }
+  return null;
+}
+
 export async function logSession(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
@@ -839,6 +892,15 @@ export async function logSession(clientId: string, formData: FormData) {
   // their own.
   const coached = formData.get("coached") === "on";
 
+  const paymentId = await syncSessionPayment(
+    supabase,
+    clientId,
+    date,
+    effectivePaymentStatus,
+    null,
+    formData
+  );
+
   const { error } = await supabase.from("sessions").insert({
     client_id: clientId,
     day_label,
@@ -850,6 +912,7 @@ export async function logSession(clientId: string, formData: FormData) {
     session_type,
     body_map,
     payment_status: effectivePaymentStatus,
+    payment_id: paymentId,
     coached,
   });
 
@@ -910,6 +973,7 @@ export async function logSession(clientId: string, formData: FormData) {
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/finances");
   redirect(`/coach/clients/${clientId}?tab=log`);
 }
 
@@ -999,6 +1063,22 @@ export async function updateSession(
 
   const coached = formData.get("coached") === "on";
 
+  const { data: existingSessionRow } = await supabase
+    .from("sessions")
+    .select("payment_id")
+    .eq("id", sessionId)
+    .eq("client_id", clientId)
+    .single();
+
+  const paymentId = await syncSessionPayment(
+    supabase,
+    clientId,
+    date,
+    payment_status,
+    existingSessionRow?.payment_id ?? null,
+    formData
+  );
+
   const { error } = await supabase
     .from("sessions")
     .update({
@@ -1010,6 +1090,7 @@ export async function updateSession(
       session_type,
       body_map,
       payment_status,
+      payment_id: paymentId,
       coached,
     })
     .eq("id", sessionId)
@@ -1024,6 +1105,7 @@ export async function updateSession(
   );
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/finances");
   redirect(`/coach/clients/${clientId}?tab=log`);
 }
 
@@ -1033,6 +1115,21 @@ export async function updateSession(
 // page load, not a real cross-client risk (this is coach-only already).
 export async function deleteLoggedSession(clientId: string, sessionId: string) {
   const supabase = await createClient();
+
+  // Deleting a session that was marked paid shouldn't leave its income
+  // record behind with nothing visible pointing to it -- clean up the
+  // linked payment (if any) first, same as switching payment_status away
+  // from "paid" does in syncSessionPayment.
+  const { data: existing } = await supabase
+    .from("sessions")
+    .select("payment_id")
+    .eq("id", sessionId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+  if (existing?.payment_id) {
+    await supabase.from("payments").delete().eq("id", existing.payment_id);
+  }
+
   const { error } = await supabase
     .from("sessions")
     .delete()
@@ -1041,6 +1138,7 @@ export async function deleteLoggedSession(clientId: string, sessionId: string) {
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/finances");
 }
 
 export async function deleteMeasurement(clientId: string, measurementId: string) {

@@ -50,6 +50,14 @@ export default async function EditSessionPage({
   // against someone hitting the URL directly.
   if (!session || session.logged_by !== "coach") notFound();
 
+  const { data: linkedPayment } = session.payment_id
+    ? ((await supabase
+        .from("payments")
+        .select("amount")
+        .eq("id", session.payment_id)
+        .maybeSingle()) as { data: { amount: number } | null })
+    : { data: null };
+
   const [{ data: days }, currentPhase] = await Promise.all([
     client.care_profile_id
       ? (supabase
@@ -135,6 +143,7 @@ export default async function EditSessionPage({
     rating: session.rating,
     day_notes: session.day_notes,
     payment_status: session.payment_status,
+    payment_amount: linkedPayment?.amount ?? null,
     body_map: session.body_map,
     coached: session.coached,
   };
@@ -162,6 +171,7 @@ export default async function EditSessionPage({
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={null}
         existingSession={existingSession}
+        sessionRate={client.session_rate}
       />
     </div>
   );

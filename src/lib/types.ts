@@ -103,6 +103,7 @@ export interface TrainingSession {
   session_type: SessionType;
   body_map: BodyMapMarker[] | null;
   payment_status: "paid" | "unpaid" | "waived" | null;
+  payment_id: string | null;
   coached: boolean;
   coach_notes: string | null;
   created_at: string;

@@ -26,6 +26,7 @@ export interface ExistingSession {
   rating: number | null;
   day_notes: string | null;
   payment_status: "paid" | "unpaid" | "waived" | null;
+  payment_amount: number | null;
   body_map: BodyMapMarker[] | null;
   coached: boolean;
 }
@@ -87,6 +88,7 @@ export function LogSessionForm({
   lastEntry,
   existingSession,
   activeCompPackage = null,
+  sessionRate = null,
 }: {
   clientId: string;
   today: string;
@@ -95,6 +97,7 @@ export function LogSessionForm({
   lastEntry: LogEntry | null;
   existingSession?: ExistingSession | null;
   activeCompPackage?: CompSessionPackage | null;
+  sessionRate?: number | null;
 }) {
   const compRemaining = activeCompPackage
     ? activeCompPackage.comp_sessions_total - activeCompPackage.comp_sessions_used
@@ -132,6 +135,9 @@ export function LogSessionForm({
     existingSession?.session_type === "recovery"
       ? existingSession.entries[0]?.exercise ?? ""
       : ""
+  );
+  const [paymentStatus, setPaymentStatus] = useState<"" | "paid" | "unpaid" | "waived">(
+    existingSession?.payment_status ?? ""
   );
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
   const [habitName, setHabitName] = useState("");
@@ -568,12 +574,38 @@ export function LogSessionForm({
               Payment{" "}
               <span className="font-normal text-gray">(optional)</span>
             </label>
-            <Select name="payment_status" defaultValue={existingSession?.payment_status ?? ""}>
+            <Select
+              name="payment_status"
+              value={paymentStatus}
+              onChange={(e) =>
+                setPaymentStatus(e.target.value as "" | "paid" | "unpaid" | "waived")
+              }
+            >
               <option value="">— Not recorded —</option>
               <option value="paid">Paid this session</option>
               <option value="unpaid">Not paid this session</option>
               <option value="waived">Waived (free session)</option>
             </Select>
+            {paymentStatus === "paid" ? (
+              <div className="mt-2 max-w-[10rem]">
+                <label className="mb-1 block text-xs font-medium text-ink">
+                  Amount paid
+                </label>
+                <Input
+                  name="payment_amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  defaultValue={
+                    existingSession?.payment_amount ?? sessionRate ?? ""
+                  }
+                />
+                <p className="mt-1 text-xs text-gray">
+                  Counts toward Finances income for this date.
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {showCompPackagePicker && activeCompPackage ? (

@@ -183,6 +183,7 @@ export default async function LogSessionPage({
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={lastEntry}
         activeCompPackage={activeCompPackage}
+        sessionRate={client.session_rate}
       />
     </div>
   );
