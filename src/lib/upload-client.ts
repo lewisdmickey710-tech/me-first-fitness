@@ -14,9 +14,17 @@ export async function uploadFormCheckFile(
 ): Promise<string> {
   const supabase = createClient();
   const path = `${clientId}/${prefix}-${crypto.randomUUID()}-${safeFileName(file.name)}`;
+  // Some mobile browsers (iOS Safari especially, with an iCloud-synced
+  // photo not yet fully local) can hand supabase-js a File whose stream
+  // reads as empty by the time the upload request is built, which the
+  // storage API rejects with "No content provided" even though the file
+  // picker showed a normal thumbnail. Reading it into an ArrayBuffer here,
+  // where the browser has already fully materialized the bytes, avoids
+  // relying on the File's own (sometimes flaky) stream at upload time.
+  const bytes = await file.arrayBuffer();
   const { error } = await supabase.storage
     .from("form-checks")
-    .upload(path, file, { contentType: file.type });
+    .upload(path, bytes, { contentType: file.type });
   if (error) throw new Error(error.message);
   return path;
 }
