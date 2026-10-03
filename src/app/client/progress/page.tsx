@@ -4,6 +4,7 @@ import { getMyClient } from "@/lib/current-client";
 import { deleteProgressPhoto } from "@/app/client/actions";
 import {
   Card,
+  Collapsible,
   DeltaField,
   EmptyState,
   Heart,
@@ -231,6 +232,38 @@ export default async function ClientProgressPage() {
                 ))}
               </dl>
             </Card>
+
+            {allMeasurements.length > 1 ? (
+              <Collapsible label={t("Measurement history")}>
+                <div className="space-y-2">
+                  {allMeasurements.slice(1).map((m, i) => {
+                    const previous = allMeasurements[i + 2] ?? null;
+                    return (
+                      <Card key={m.id}>
+                        <p className="text-sm font-medium text-gray">{m.date}</p>
+                        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+                          <DeltaField
+                            label={t("Weight")}
+                            value={m.weight}
+                            previous={previous?.weight ?? null}
+                            unit="lb"
+                          />
+                          {CIRCUMFERENCE_FIELDS.map((f) => (
+                            <DeltaField
+                              key={f.key}
+                              label={t(f.label)}
+                              value={m[f.key] as number | null}
+                              previous={(previous?.[f.key] as number | null) ?? null}
+                              unit="in"
+                            />
+                          ))}
+                        </dl>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </Collapsible>
+            ) : null}
           </>
         )}
       </div>

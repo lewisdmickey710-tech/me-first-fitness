@@ -571,6 +571,7 @@ const ES: Record<string, string> = {
     "Tu entrenadora registra esto durante tu evaluación mensual — aparecerán aquí una vez que se registre la primera.",
   "Weight trend": "Tendencia de peso",
   Latest: "Más reciente",
+  "Measurement history": "Historial de medidas",
   Weight: "Peso",
   Neck: "Cuello",
   Chest: "Pecho",
