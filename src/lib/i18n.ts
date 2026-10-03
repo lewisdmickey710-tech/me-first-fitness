@@ -314,6 +314,13 @@ const ES: Record<string, string> = {
   "shared with coach": "compartido con la entrenadora",
   "Optional — when it happens, what helps, etc.": "Opcional — cuándo sucede, qué ayuda, etc.",
   "Share this entry with my coach": "Compartir esta entrada con mi entrenadora",
+  "Has a note — tap to also set a level": "Tiene una nota — toca para también poner un nivel",
+  "Describe a day": "Describe un día",
+  "Write about a symptom in words, with or without tapping a level above.":
+    "Escribe sobre un síntoma con palabras, hayas tocado un nivel arriba o no.",
+  "What happened, what helped, anything you'd want to remember":
+    "Qué pasó, qué ayudó, cualquier cosa que quieras recordar",
+  "Save note": "Guardar nota",
 
   // Nutrition
   "Nutrition log": "Registro de nutrición",

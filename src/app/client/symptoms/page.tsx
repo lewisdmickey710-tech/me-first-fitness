@@ -7,7 +7,7 @@ import {
   addSymptomTracker,
   cycleSymptomLog,
   deleteSymptomTracker,
-  updateSymptomLogDetails,
+  upsertSymptomNote,
 } from "@/app/client/actions";
 import {
   Badge,
@@ -18,6 +18,7 @@ import {
   EmptyState,
   Heart,
   Input,
+  Select,
   Textarea,
 } from "@/components/ui";
 import { nowInBusinessTz, toDateString, weekDates } from "@/lib/timezone";
@@ -187,15 +188,25 @@ export default async function ClientSymptomsPage({
                     >
                       <button
                         type="submit"
-                        className={`h-6 w-6 rounded-full border transition ${
-                          log ? LEVEL_CLASS[log.level] : "border-grayLt bg-white hover:border-rose/40"
+                        className={`relative h-6 w-6 rounded-full border transition ${
+                          log?.level
+                            ? LEVEL_CLASS[log.level]
+                            : "border-grayLt bg-white hover:border-rose/40"
                         }`}
                         aria-label={
-                          log
+                          log?.level
                             ? t("Level {n} — tap to change", { n: log.level })
-                            : t("Tap to log")
+                            : log
+                              ? t("Has a note — tap to also set a level")
+                              : t("Tap to log")
                         }
-                      />
+                      >
+                        {log && !log.level ? (
+                          <span className="absolute inset-0 flex items-center justify-center text-[10px] text-gray">
+                            ✎
+                          </span>
+                        ) : null}
+                      </button>
                     </form>
                   );
                 })}
@@ -220,6 +231,38 @@ export default async function ClientSymptomsPage({
         </form>
       </Card>
 
+      {(symptoms ?? []).length > 0 ? (
+        <Card>
+          <p className="mb-2 text-sm font-medium text-ink">
+            {t("Describe a day")}
+          </p>
+          <p className="mb-3 text-xs text-gray">
+            {t("Write about a symptom in words, with or without tapping a level above.")}
+          </p>
+          <form action={upsertSymptomNote} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <Select name="symptom_id" defaultValue={symptoms![0].id} required>
+                {symptoms!.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </Select>
+              <Input name="log_date" type="date" defaultValue={todayStr} required />
+            </div>
+            <Textarea
+              name="note"
+              rows={2}
+              placeholder={t("What happened, what helped, anything you'd want to remember")}
+            />
+            <Checkbox name="shared_with_coach" label={t("Share this entry with my coach")} />
+            <Button type="submit" variant="secondary">
+              {t("Save note")}
+            </Button>
+          </form>
+        </Card>
+      ) : null}
+
       {loggedDays.length > 0 ? (
         <div>
           <h2 className="mb-2 text-sm font-medium text-ink">
@@ -235,7 +278,9 @@ export default async function ClientSymptomsPage({
                     label={
                       <span className="inline-flex items-center gap-2">
                         <span
-                          className={`inline-block h-3 w-3 rounded-full border ${LEVEL_CLASS[log.level]}`}
+                          className={`inline-block h-3 w-3 rounded-full border ${
+                            log.level ? LEVEL_CLASS[log.level] : "border-grayLt bg-white"
+                          }`}
                         />
                         {log.log_date} — {symptom.name}
                         {log.shared_with_coach ? (
@@ -245,7 +290,7 @@ export default async function ClientSymptomsPage({
                     }
                     labelClassName="text-sm text-ink"
                   >
-                    <form action={updateSymptomLogDetails} className="space-y-3">
+                    <form action={upsertSymptomNote} className="space-y-3">
                       <input type="hidden" name="symptom_id" value={symptom.id} />
                       <input type="hidden" name="log_date" value={log.log_date} />
                       <div>

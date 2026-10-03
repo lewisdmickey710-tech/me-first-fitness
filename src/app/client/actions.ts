@@ -1428,7 +1428,11 @@ export async function deleteSymptomTracker(symptomId: string) {
 }
 
 // Same tap-to-cycle pattern as cycleHabitLog above -- empty -> level 1
-// (teal) -> level 2 (gold) -> level 3 (pink) -> empty.
+// (teal) -> level 2 (gold) -> level 3 (pink) -> empty. A day can also carry
+// just a note with no level at all (see upsertSymptomNote) -- tapping the
+// circle on one of those starts it at level 1 without disturbing the note,
+// and cycling back past level 3 clears the level but keeps the row (and
+// its note) rather than deleting it, unless there's no note to keep.
 export async function cycleSymptomLog(symptomId: string, logDate: string) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
@@ -1436,7 +1440,7 @@ export async function cycleSymptomLog(symptomId: string, logDate: string) {
   const supabase = await createClient();
   const { data: existing } = await supabase
     .from("client_symptom_day_logs")
-    .select("id, level")
+    .select("id, level, note")
     .eq("symptom_id", symptomId)
     .eq("log_date", logDate)
     .maybeSingle();
@@ -1446,12 +1450,26 @@ export async function cycleSymptomLog(symptomId: string, logDate: string) {
       .from("client_symptom_day_logs")
       .insert({ symptom_id: symptomId, client_id: me.id, log_date: logDate, level: 1 });
     if (error) throw new Error(error.message);
-  } else if (existing.level >= 3) {
+  } else if (existing.level == null) {
     const { error } = await supabase
       .from("client_symptom_day_logs")
-      .delete()
+      .update({ level: 1 })
       .eq("id", existing.id);
     if (error) throw new Error(error.message);
+  } else if (existing.level >= 3) {
+    if (existing.note) {
+      const { error } = await supabase
+        .from("client_symptom_day_logs")
+        .update({ level: null })
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await supabase
+        .from("client_symptom_day_logs")
+        .delete()
+        .eq("id", existing.id);
+      if (error) throw new Error(error.message);
+    }
   } else {
     const { error } = await supabase
       .from("client_symptom_day_logs")
@@ -1463,7 +1481,12 @@ export async function cycleSymptomLog(symptomId: string, logDate: string) {
   revalidatePath("/client/symptoms");
 }
 
-export async function updateSymptomLogDetails(formData: FormData) {
+// Adds or edits a day's note in words -- independent of the color level,
+// so a client can describe what happened on a day without being forced to
+// also rate its severity. Upserts: creates the day's row (no level) if it
+// doesn't exist yet, or just updates the note/sharing on one that does
+// (preserving whatever level, if any, is already set).
+export async function upsertSymptomNote(formData: FormData) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
 
@@ -1474,13 +1497,32 @@ export async function updateSymptomLogDetails(formData: FormData) {
   if (!symptomId || !logDate) throw new Error("Missing symptom or date.");
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: existing } = await supabase
     .from("client_symptom_day_logs")
-    .update({ note: note || null, shared_with_coach: sharedWithCoach })
+    .select("id")
     .eq("symptom_id", symptomId)
     .eq("log_date", logDate)
-    .eq("client_id", me.id);
-  if (error) throw new Error(error.message);
+    .eq("client_id", me.id)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from("client_symptom_day_logs")
+      .update({ note: note || null, shared_with_coach: sharedWithCoach })
+      .eq("id", existing.id);
+    if (error) throw new Error(error.message);
+  } else {
+    if (!note) throw new Error("Write something before saving.");
+    const { error } = await supabase.from("client_symptom_day_logs").insert({
+      symptom_id: symptomId,
+      client_id: me.id,
+      log_date: logDate,
+      level: null,
+      note,
+      shared_with_coach: sharedWithCoach,
+    });
+    if (error) throw new Error(error.message);
+  }
 
   revalidatePath("/client/symptoms");
 }

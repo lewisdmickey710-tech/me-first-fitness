@@ -2996,7 +2996,9 @@ function SymptomsTab({ symptomLogs }: { symptomLogs: SharedSymptomDayLog[] }) {
                     <div key={`${sid}-${d}`} className="flex justify-center">
                       <span
                         className={`inline-block h-4 w-4 rounded-full border ${
-                          log ? WELLNESS_LEVEL_CLASS[log.level] : "border-grayLt bg-white"
+                          log?.level
+                            ? WELLNESS_LEVEL_CLASS[log.level]
+                            : "border-grayLt bg-white"
                         }`}
                       />
                     </div>

@@ -379,7 +379,7 @@ export interface ClientSymptomDayLog {
   symptom_id: string;
   client_id: string;
   log_date: string;
-  level: number;
+  level: number | null;
   note: string | null;
   shared_with_coach: boolean;
   created_at: string;
