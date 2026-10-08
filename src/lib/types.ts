@@ -83,7 +83,8 @@ export type SessionType =
   | "freestyle"
   | "conversation"
   | "recovery"
-  | "assessment";
+  | "assessment"
+  | "nutritionist";
 
 export interface BodyMapMarker {
   regionId: number;

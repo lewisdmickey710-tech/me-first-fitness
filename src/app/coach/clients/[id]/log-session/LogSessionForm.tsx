@@ -60,6 +60,7 @@ const SESSION_TYPES: { id: SessionType; label: string }[] = [
   { id: "conversation", label: "Conversation" },
   { id: "recovery", label: "Recovery" },
   { id: "assessment", label: "Measurements / screening" },
+  { id: "nutritionist", label: "Nutritionist session" },
 ];
 
 const NOTES_LABEL: Record<SessionType, string> = {
@@ -68,6 +69,7 @@ const NOTES_LABEL: Record<SessionType, string> = {
   conversation: "What did you talk about? What's the plan for their week?",
   recovery: "Notes",
   assessment: "Movement screening / measurement findings",
+  nutritionist: "What was discussed? What's the nutrition plan going forward?",
 };
 
 function blankRows(count: number): Row[] {
@@ -205,6 +207,8 @@ export function LogSessionForm({
         return "Recovery";
       case "assessment":
         return "Measurements / screening";
+      case "nutritionist":
+        return "Nutritionist session";
       default:
         return "";
     }
@@ -546,7 +550,7 @@ export function LogSessionForm({
             </div>
           ) : null}
 
-          {sessionType !== "conversation" ? (
+          {sessionType !== "conversation" && sessionType !== "nutritionist" ? (
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
                 Rating (1–5){" "}

@@ -811,7 +811,7 @@ export async function logSession(clientId: string, formData: FormData) {
   const day_notes = String(formData.get("day_notes") ?? "").trim();
   const sessionTypeRaw = String(formData.get("session_type") ?? "freestyle");
   const session_type = (
-    ["program", "freestyle", "conversation", "recovery", "assessment"].includes(
+    ["program", "freestyle", "conversation", "recovery", "assessment", "nutritionist"].includes(
       sessionTypeRaw
     )
       ? sessionTypeRaw
@@ -996,7 +996,7 @@ export async function updateSession(
   const day_notes = String(formData.get("day_notes") ?? "").trim();
   const sessionTypeRaw = String(formData.get("session_type") ?? "freestyle");
   const session_type = (
-    ["program", "freestyle", "conversation", "recovery", "assessment"].includes(
+    ["program", "freestyle", "conversation", "recovery", "assessment", "nutritionist"].includes(
       sessionTypeRaw
     )
       ? sessionTypeRaw

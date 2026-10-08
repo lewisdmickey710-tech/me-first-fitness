@@ -137,6 +137,7 @@ const SESSION_TYPE_LABEL: Record<SessionType, string> = {
   conversation: "Conversation",
   recovery: "Recovery",
   assessment: "Assessment",
+  nutritionist: "Nutritionist session",
 };
 
 const OCCURRENCE_STATUS_LABEL: Record<OccurrenceStatus, string> = {
