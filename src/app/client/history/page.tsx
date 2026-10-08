@@ -11,6 +11,7 @@ import {
   mergeLogEntries,
 } from "@/lib/log-entries";
 import { makeT } from "@/lib/i18n";
+import { NUTRITION_SESSION_FIELDS } from "@/lib/nutrition-session";
 import type { Activity, TrainingSession } from "@/lib/types";
 
 export default async function ClientHistoryPage() {
@@ -33,7 +34,7 @@ export default async function ClientHistoryPage() {
       .from("sessions")
       // coach_notes is deliberately excluded -- coach's-eyes-only.
       .select(
-        "id, client_id, day_label, date, entries, rating, day_notes, logged_by, session_type, body_map, payment_status, coached, created_at"
+        "id, client_id, day_label, date, entries, rating, day_notes, logged_by, session_type, body_map, payment_status, nutrition_details, coached, created_at"
       )
       .eq("client_id", me.id)
       .order("date", { ascending: false }) as unknown as Promise<{
@@ -153,6 +154,20 @@ export default async function ClientHistoryPage() {
                 ) : null}
                 {s?.day_notes ? (
                   <p className="text-sm text-ink">{s.day_notes}</p>
+                ) : null}
+                {s?.nutrition_details ? (
+                  <dl className="space-y-1.5 rounded-lg bg-cream/50 p-2.5 text-sm">
+                    {NUTRITION_SESSION_FIELDS.filter(
+                      (f) => s.nutrition_details![f.key]
+                    ).map((f) => (
+                      <div key={f.key}>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-gray/70">
+                          {t(f.label)}
+                        </dt>
+                        <dd className="text-ink">{s.nutrition_details![f.key]}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 ) : null}
                 {a?.duration ? <p className="text-sm text-gray">{a.duration}</p> : null}
                 {a?.photo_path && photoUrlByPath.has(a.photo_path) ? (

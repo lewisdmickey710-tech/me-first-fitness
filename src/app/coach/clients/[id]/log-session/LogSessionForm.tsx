@@ -8,7 +8,14 @@ import { BodyMapInput } from "@/components/body-map";
 import { WeightInput } from "@/components/weight-input";
 import { PHASES } from "@/lib/constants";
 import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
-import type { BodyMapMarker, CompSessionPackage, SessionEntry, SessionType } from "@/lib/types";
+import { NUTRITION_SESSION_FIELDS } from "@/lib/nutrition-session";
+import type {
+  BodyMapMarker,
+  CompSessionPackage,
+  NutritionSessionDetails,
+  SessionEntry,
+  SessionType,
+} from "@/lib/types";
 
 export interface ProgramDayOption {
   phase: string;
@@ -28,6 +35,7 @@ export interface ExistingSession {
   payment_status: "paid" | "unpaid" | "waived" | null;
   payment_amount: number | null;
   body_map: BodyMapMarker[] | null;
+  nutrition_details: NutritionSessionDetails | null;
   coached: boolean;
 }
 
@@ -156,6 +164,7 @@ export function LogSessionForm({
   const showExerciseGrid = sessionType === "program" || sessionType === "freestyle";
   const showRecoveryField = sessionType === "recovery";
   const showProgramPicker = sessionType === "program" && availablePhases.length > 0;
+  const showNutritionFields = sessionType === "nutritionist";
 
   function applyDay(day: ProgramDayOption) {
     setActiveDayKey(`${day.phase}-${day.dayNumber}`);
@@ -550,6 +559,24 @@ export function LogSessionForm({
             </div>
           ) : null}
 
+          {showNutritionFields ? (
+            <div className="space-y-3 rounded-xl border border-grayLt bg-cream/50 p-3">
+              {NUTRITION_SESSION_FIELDS.map((f) => (
+                <div key={f.key}>
+                  <label className="mb-1 block text-sm font-medium text-ink">
+                    {f.label}
+                  </label>
+                  <Textarea
+                    name={`nutrition_${f.key}`}
+                    rows={2}
+                    placeholder={f.placeholder}
+                    defaultValue={existingSession?.nutrition_details?.[f.key] ?? ""}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {sessionType !== "conversation" && sessionType !== "nutritionist" ? (
             <div>
               <label className="mb-1 block text-sm font-medium text-ink">
@@ -568,7 +595,14 @@ export function LogSessionForm({
 
           <div>
             <label className="mb-1 block text-sm font-medium text-ink">
-              {NOTES_LABEL[sessionType]}
+              {showNutritionFields ? (
+                <>
+                  Additional notes{" "}
+                  <span className="font-normal text-gray">(optional)</span>
+                </>
+              ) : (
+                NOTES_LABEL[sessionType]
+              )}
             </label>
             <Textarea name="day_notes" rows={3} defaultValue={existingSession?.day_notes ?? ""} />
           </div>

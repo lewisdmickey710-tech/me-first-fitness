@@ -145,6 +145,7 @@ export default async function EditSessionPage({
     payment_status: session.payment_status,
     payment_amount: linkedPayment?.amount ?? null,
     body_map: session.body_map,
+    nutrition_details: session.nutrition_details,
     coached: session.coached,
   };
 

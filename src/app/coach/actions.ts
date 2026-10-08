@@ -16,6 +16,7 @@ import {
   sendSessionBookedEmail,
 } from "@/lib/email";
 import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
+import { parseNutritionDetails } from "@/lib/nutrition-session";
 import { DAY_NAMES, formatTimeOfDay } from "@/lib/schedule";
 import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
@@ -913,6 +914,7 @@ export async function logSession(clientId: string, formData: FormData) {
     body_map,
     payment_status: effectivePaymentStatus,
     payment_id: paymentId,
+    nutrition_details: parseNutritionDetails(formData, session_type),
     coached,
   });
 
@@ -1091,6 +1093,7 @@ export async function updateSession(
       body_map,
       payment_status,
       payment_id: paymentId,
+      nutrition_details: parseNutritionDetails(formData, session_type),
       coached,
     })
     .eq("id", sessionId)

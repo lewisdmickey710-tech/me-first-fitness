@@ -511,6 +511,11 @@ const ES: Record<string, string> = {
   "💛 Covered through Give Back To Community": "💛 Cubierto a través de Give Back To Community",
   "(swapped from {name})": "(cambiado de {name})",
   "prescribed movement": "movimiento prescrito",
+  "Current eating patterns / habits": "Patrones / hábitos alimenticios actuales",
+  "Goals discussed": "Metas discutidas",
+  "Meal plan / recommendations given": "Plan de comidas / recomendaciones dadas",
+  "Challenges or barriers": "Retos o barreras",
+  "Follow-up action items": "Acciones de seguimiento",
 
   // Activity log
   "Activity log": "Registro de actividad",

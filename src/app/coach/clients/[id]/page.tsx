@@ -77,6 +77,7 @@ import {
   lateCancellationFeeAmount,
 } from "@/lib/cancellation";
 import { CALL_DURATION_MINUTES } from "@/lib/video-session";
+import { NUTRITION_SESSION_FIELDS } from "@/lib/nutrition-session";
 import {
   LOG_ENTRY_KIND_LABEL,
   LOG_ENTRY_KIND_TONE,
@@ -2424,6 +2425,20 @@ async function LogTab({
                 ) : null}
                 {s?.day_notes ? (
                   <p className="mt-1 text-sm text-ink">{s.day_notes}</p>
+                ) : null}
+                {s?.nutrition_details ? (
+                  <dl className="mt-2 space-y-1.5 rounded-lg bg-cream/50 p-2.5 text-sm">
+                    {NUTRITION_SESSION_FIELDS.filter(
+                      (f) => s.nutrition_details![f.key]
+                    ).map((f) => (
+                      <div key={f.key}>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-gray/70">
+                          {f.label}
+                        </dt>
+                        <dd className="text-ink">{s.nutrition_details![f.key]}</dd>
+                      </div>
+                    ))}
+                  </dl>
                 ) : null}
                 {s?.body_map && s.body_map.length > 0 ? (
                   <Collapsible label="View body map" className="mt-2">

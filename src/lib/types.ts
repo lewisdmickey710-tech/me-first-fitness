@@ -92,6 +92,14 @@ export interface BodyMapMarker {
   label: string;
 }
 
+export interface NutritionSessionDetails {
+  eating_patterns: string | null;
+  goals: string | null;
+  recommendations: string | null;
+  challenges: string | null;
+  follow_ups: string | null;
+}
+
 export interface TrainingSession {
   id: string;
   client_id: string;
@@ -105,6 +113,7 @@ export interface TrainingSession {
   body_map: BodyMapMarker[] | null;
   payment_status: "paid" | "unpaid" | "waived" | null;
   payment_id: string | null;
+  nutrition_details: NutritionSessionDetails | null;
   coached: boolean;
   coach_notes: string | null;
   created_at: string;
