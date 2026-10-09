@@ -10,7 +10,12 @@ export default async function ClientAreaLayout({
 
   return (
     <div className="min-h-screen">
-      <TopNav title="MeFirstFitness" faqHref="/client/faq" locale={me?.language} />
+      <TopNav
+        title="MeFirstFitness"
+        faqHref="/client/faq"
+        settingsHref="/client/profile"
+        locale={me?.language}
+      />
       <main className="mx-auto max-w-xl px-4 py-6">{children}</main>
     </div>
   );
