@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { updatePaymentMethods } from "@/app/coach/actions";
+import { updatePaymentMethods, updateWeatherZip } from "@/app/coach/actions";
 import { Button, Card, Heart, Input, Textarea } from "@/components/ui";
 import { NotificationToggle } from "@/components/notification-toggle";
 import type { BusinessSettings } from "@/lib/types";
@@ -88,6 +88,28 @@ export default async function CoachSettingsPage() {
               Your persistent room link — shown to a client once their
               video session is confirmed, so they can click straight in.
             </p>
+          </div>
+          <Button type="submit">Save</Button>
+        </form>
+      </Card>
+
+      <Card>
+        <p className="mb-3 font-medium text-ink">Weather in your morning digest</p>
+        <p className="mb-4 text-sm text-gray">
+          Your zip code, so the daily morning push can mention weather worth
+          knowing about -- rain/snow likely, or extreme heat/cold. Skipped
+          entirely on an unremarkable day, and left blank this stays off.
+          Uses the free National Weather Service API, no account needed.
+        </p>
+        <form action={updateWeatherZip} className="flex items-end gap-2">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-ink">Zip code</label>
+            <Input
+              name="weather_zip"
+              defaultValue={settings?.weather_zip ?? ""}
+              placeholder="e.g. 73034"
+              maxLength={5}
+            />
           </div>
           <Button type="submit">Save</Button>
         </form>

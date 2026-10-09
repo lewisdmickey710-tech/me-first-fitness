@@ -150,6 +150,8 @@ export interface BusinessSettings {
   cash_note: string | null;
   google_meet_link: string | null;
   last_digest_email_sent_on: string | null;
+  last_morning_digest_sent_on: string | null;
+  weather_zip: string | null;
   updated_at: string;
 }
 

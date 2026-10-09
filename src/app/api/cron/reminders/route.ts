@@ -14,9 +14,11 @@ import { getCoachEmail, getCoachUserId } from "@/lib/coach";
 import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDay, formatTimeOfDayForClient } from "@/lib/schedule";
-import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
+import { computeCancellationRisk, INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { computeStreak, nextStreakCelebration } from "@/lib/streaks";
+import { getTodaysNotableWeather } from "@/lib/weather";
+import type { OccurrenceStatus } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -801,13 +803,15 @@ export async function GET(request: Request) {
   {
     const { data: morningSettings } = await supabase
       .from("business_settings")
-      .select("last_morning_digest_sent_on")
+      .select("last_morning_digest_sent_on, weather_zip")
       .eq("id", true)
       .maybeSingle();
 
     if (morningSettings?.last_morning_digest_sent_on !== todayDateStr) {
       try {
         const todayDayOfWeek = now.getUTCDay();
+        const yesterdayDayOfWeek = yesterday.getUTCDay();
+        const riskLookback = toDateString(new Date(now.getTime() - 90 * 86400000));
 
         const [
           { data: todaySchedules },
@@ -817,15 +821,25 @@ export async function GET(request: Request) {
           { data: overduePayments },
           { data: pendingSlidingScale },
           { data: readyLeads },
+          { data: activeClients },
+          { data: recentOccurrences },
+          { data: recentCheckins },
+          { data: recentActivities },
+          { data: recentSessions },
+          { data: overdueByClientRows },
+          { data: latestServiceCheckins },
+          { data: highRiskOverrides },
+          { data: yesterdaySchedules },
+          { data: paymentsYesterday },
         ] = await Promise.all([
           supabase
             .from("client_schedules")
-            .select("client_id, clients(name)")
+            .select("client_id, clients(name, user_id, session_mode)")
             .eq("active", true)
             .eq("day_of_week", todayDayOfWeek),
           supabase
             .from("session_occurrences")
-            .select("client_id, clients(name)")
+            .select("client_id, clients(name, user_id, session_mode)")
             .eq("status", "scheduled")
             .eq("occurrence_date", todayDateStr),
           supabase.from("coach_events").select("title").eq("event_date", todayDateStr),
@@ -846,13 +860,170 @@ export async function GET(request: Request) {
             .eq("ready_to_transition", true)
             .neq("status", "converted")
             .neq("status", "archived"),
+          supabase
+            .from("clients")
+            .select("id, name, days_per_week")
+            .eq("is_test", false)
+            .is("archived_at", null)
+            .is("hold_started_at", null),
+          supabase
+            .from("session_occurrences")
+            .select("client_id, status, occurrence_date")
+            .gte("occurrence_date", riskLookback)
+            .lte("occurrence_date", todayDateStr)
+            .order("occurrence_date", { ascending: false }),
+          supabase.from("checkins").select("client_id, date").gte("date", riskLookback),
+          supabase.from("activities").select("client_id, date").gte("date", riskLookback),
+          supabase
+            .from("sessions")
+            .select("client_id, date, coached")
+            .gte("date", riskLookback),
+          supabase.from("payments").select("client_id").is("paid_on", null),
+          supabase
+            .from("service_checkins")
+            .select("client_id, satisfaction, date")
+            .order("date", { ascending: false }),
+          supabase.from("client_flag_overrides").select("client_id, until_date").eq("flag_key", "high_risk"),
+          supabase
+            .from("client_schedules")
+            .select("client_id, clients(name)")
+            .eq("active", true)
+            .eq("day_of_week", yesterdayDayOfWeek),
+          supabase
+            .from("payments")
+            .select("id, amount")
+            .eq("paid_on", yesterdayDateStr),
         ]);
 
         const todayClientNames = new Set<string>();
+        const todayInPersonUserIds = new Set<string>();
         for (const row of [...(todaySchedules ?? []), ...(todayOneOffs ?? [])]) {
           if (frozenClientIds.has(row.client_id)) continue;
+          const c = (row as unknown as {
+            clients: { name: string; user_id: string | null; session_mode: string | null } | null;
+          }).clients;
+          if (c?.name) todayClientNames.add(c.name);
+          if (c?.user_id && c.session_mode !== "virtual") todayInPersonUserIds.add(c.user_id);
+        }
+
+        // ---- At-risk clients: same risk heuristic as the roster board,
+        // same flag-override mechanism too -- a client she's already
+        // marked "not tracking by choice, don't flag" there stays quiet
+        // here as well, so there's exactly one place to tell the app
+        // "this client just isn't going to use it that way" rather than
+        // a second, redundant setting. ----
+        const nameById = new Map((activeClients ?? []).map((c) => [c.id, c.name]));
+        const overriddenHighRiskIds = new Set(
+          (highRiskOverrides ?? [])
+            .filter((o) => !o.until_date || o.until_date >= todayDateStr)
+            .map((o) => o.client_id)
+        );
+        const occurrencesByClient = new Map<string, string[]>();
+        for (const o of recentOccurrences ?? []) {
+          if (o.status === "scheduled") continue;
+          const list = occurrencesByClient.get(o.client_id) ?? [];
+          list.push(o.status);
+          occurrencesByClient.set(o.client_id, list);
+        }
+        const lastTrackedByClient = new Map<string, string>();
+        for (const r of [...(recentCheckins ?? []), ...(recentActivities ?? [])]) {
+          const existing = lastTrackedByClient.get(r.client_id);
+          if (!existing || r.date > existing) lastTrackedByClient.set(r.client_id, r.date);
+        }
+        const overdueClientIds = new Set((overdueByClientRows ?? []).map((p) => p.client_id));
+        const coachedCountByClient = new Map<string, number>();
+        const twentyEightDaysAgo = toDateString(new Date(now.getTime() - 28 * 86400000));
+        for (const s of recentSessions ?? []) {
+          if (!s.coached || s.date < twentyEightDaysAgo) continue;
+          coachedCountByClient.set(s.client_id, (coachedCountByClient.get(s.client_id) ?? 0) + 1);
+        }
+        const satisfactionByClient = new Map<string, number>();
+        for (const sc of latestServiceCheckins ?? []) {
+          if (sc.satisfaction == null) continue;
+          if (!satisfactionByClient.has(sc.client_id)) {
+            satisfactionByClient.set(sc.client_id, sc.satisfaction);
+          }
+        }
+
+        const atRiskNames: string[] = [];
+        for (const c of activeClients ?? []) {
+          if (overriddenHighRiskIds.has(c.id)) continue;
+          const lastTracked = lastTrackedByClient.get(c.id);
+          const daysSince = lastTracked
+            ? Math.floor((new Date(todayDateStr).getTime() - new Date(lastTracked).getTime()) / 86400000)
+            : null;
+          const expectedCount = (c.days_per_week ?? 3) * 4;
+          const consistencyPct =
+            expectedCount > 0
+              ? Math.min(100, Math.round(((coachedCountByClient.get(c.id) ?? 0) / expectedCount) * 100))
+              : null;
+          const { level } = computeCancellationRisk({
+            recentOccurrenceStatuses: (occurrencesByClient.get(c.id) ?? []) as OccurrenceStatus[],
+            daysSinceLastCheckinOrActivity: daysSince,
+            hasOverduePayment: overdueClientIds.has(c.id),
+            consistencyPct,
+            latestServiceCheckinSatisfaction: satisfactionByClient.get(c.id) ?? null,
+          });
+          if (level === "high") atRiskNames.push(c.name);
+        }
+
+        // ---- Yesterday recap: late cancellations, sessions nobody ever
+        // logged either way, and what came in. ----
+        const lateCancelledYesterdayNames = new Set<string>();
+        const resolvedYesterdayClientIds = new Set<string>();
+        for (const o of recentOccurrences ?? []) {
+          if (o.occurrence_date !== yesterdayDateStr) continue;
+          resolvedYesterdayClientIds.add(o.client_id);
+          if (o.status === "late_cancelled") {
+            const name = nameById.get(o.client_id);
+            if (name) lateCancelledYesterdayNames.add(name);
+          }
+        }
+        const loggedYesterdayClientIds = new Set(
+          (recentSessions ?? []).filter((s) => s.date === yesterdayDateStr).map((s) => s.client_id)
+        );
+        const notLoggedYesterdayNames = new Set<string>();
+        for (const row of yesterdaySchedules ?? []) {
+          if (frozenClientIds.has(row.client_id)) continue;
+          if (loggedYesterdayClientIds.has(row.client_id)) continue;
+          if (resolvedYesterdayClientIds.has(row.client_id)) continue;
           const name = (row as unknown as { clients: { name: string } | null }).clients?.name;
-          if (name) todayClientNames.add(name);
+          if (name) notLoggedYesterdayNames.add(name);
+        }
+        const paidYesterdayCount = (paymentsYesterday ?? []).length;
+        const paidYesterdayTotal = (paymentsYesterday ?? []).reduce(
+          (sum, p) => sum + Number(p.amount),
+          0
+        );
+
+        const recapParts = [
+          notLoggedYesterdayNames.size > 0
+            ? `${notLoggedYesterdayNames.size} not logged (${[...notLoggedYesterdayNames].join(", ")})`
+            : null,
+          lateCancelledYesterdayNames.size > 0
+            ? `${lateCancelledYesterdayNames.size} late cancel (${[...lateCancelledYesterdayNames].join(", ")})`
+            : null,
+          paidYesterdayCount > 0 ? `$${paidYesterdayTotal.toFixed(0)} collected (${paidYesterdayCount})` : null,
+        ].filter(Boolean);
+
+        // ---- Weather: best-effort, silent if no zip is set or either
+        // free API has a hiccup -- never worth failing the whole digest
+        // over. ----
+        let weatherLine: string | null = null;
+        if (morningSettings?.weather_zip) {
+          const weather = await getTodaysNotableWeather(morningSettings.weather_zip);
+          if (weather?.isNotable) {
+            weatherLine = weather.summary;
+            await Promise.all(
+              [...todayInPersonUserIds].map((userId) =>
+                sendPushToUser(supabase, userId, {
+                  title: "Weather heads up",
+                  body: `${weather.summary} — today's your session with Mickey.`,
+                  url: "/client/schedule",
+                }).catch((err) => console.error("Weather push failed", err))
+              )
+            );
+          }
         }
 
         const sessionCount = todayClientNames.size;
@@ -887,14 +1058,21 @@ export async function GET(request: Request) {
           (readyLeads ?? []).length > 0
             ? `${(readyLeads ?? []).length} lead${(readyLeads ?? []).length === 1 ? "" : "s"} ready`
             : null,
+          atRiskNames.length > 0
+            ? `${atRiskNames.length} at risk (${atRiskNames.join(", ")})`
+            : null,
         ].filter(Boolean);
         const adminLine = adminParts.length > 0 ? adminParts.join(", ") : "nothing pending";
+
+        const bodyLines = [`Today: ${scheduleLine}${namesPart}.`, `Admin: ${adminLine}.`];
+        if (recapParts.length > 0) bodyLines.push(`Yesterday: ${recapParts.join(", ")}.`);
+        if (weatherLine) bodyLines.push(`Weather: ${weatherLine}.`);
 
         const coachUserId = await getCoachUserId(supabase);
         if (coachUserId) {
           await sendPushToUser(supabase, coachUserId, {
             title: "Good morning ☀️",
-            body: `Today: ${scheduleLine}${namesPart}. Admin: ${adminLine}.`,
+            body: bodyLines.join(" "),
             url: "/coach/dashboard",
           });
           morningDigestSent = true;

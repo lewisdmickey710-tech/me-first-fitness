@@ -1626,6 +1626,22 @@ export async function updatePaymentMethods(formData: FormData) {
   revalidatePath("/client/schedule");
 }
 
+export async function updateWeatherZip(formData: FormData) {
+  const supabase = await createClient();
+  const zip = String(formData.get("weather_zip") ?? "").trim();
+  if (zip && !/^\d{5}$/.test(zip)) {
+    throw new Error("Enter a 5-digit US zip code.");
+  }
+
+  const { error } = await supabase
+    .from("business_settings")
+    .update({ weather_zip: zip || null, updated_at: new Date().toISOString() })
+    .eq("id", true);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/settings");
+}
+
 export async function updateBusinessFinanceSettings(formData: FormData) {
   const supabase = await createClient();
 
