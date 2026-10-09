@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { RegisterServiceWorker } from "@/components/register-service-worker";
+import { InstallPrompt } from "@/components/install-prompt";
 import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-bg text-ink antialiased">
         {children}
         <RegisterServiceWorker />
+        <InstallPrompt />
       </body>
     </html>
   );

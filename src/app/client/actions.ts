@@ -16,7 +16,7 @@ import { BUSINESS_TIMEZONE, convertWallTime, toDateString, nowInBusinessTz } fro
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { clientHasOverdueBalance } from "@/lib/payment-status";
 import { formatTimeOfDay } from "@/lib/schedule";
-import { sendNewRequestEmail } from "@/lib/email";
+import { sendNewRequestEmail, sendSessionCancelledByClientEmail } from "@/lib/email";
 import { getCoachEmail, getCoachUserId } from "@/lib/coach";
 import { sendPushToUser } from "@/lib/push";
 import type { PaymentSchedule, SessionEntry } from "@/lib/types";
@@ -626,6 +626,7 @@ export async function cancelMySession(
 
   if (error) throw new Error(error.message);
 
+  let feeApplied: number | null = null;
   if (isNewLateCancellation && !me.pro_bono) {
     const remaining = effectiveFreeRemaining(
       me.late_cancel_free_remaining,
@@ -640,10 +641,11 @@ export async function cancelMySession(
         .eq("id", me.id);
       if (remainingError) throw new Error(remainingError.message);
     } else {
+      feeApplied = lateCancellationFeeAmount(me.payment_schedule);
       const { error: feeError } = await supabase.from("payments").insert({
         client_id: me.id,
         description: "Late cancellation fee",
-        amount: lateCancellationFeeAmount(me.payment_schedule),
+        amount: feeApplied,
         due_date: new Date().toISOString().slice(0, 10),
         kind: "late_cancellation_fee",
         session_occurrence_id: occurrence.id,
@@ -656,6 +658,38 @@ export async function cancelMySession(
         .eq("id", me.id);
       if (remainingError) throw new Error(remainingError.message);
     }
+  }
+
+  // Nothing told the coach a client cancelled right in the app before this
+  // -- it just sat there until she happened to check. A failure here
+  // shouldn't undo an otherwise-successful cancellation.
+  try {
+    const admin = createAdminClient();
+    const whenText = timeOfDay
+      ? `${occurrenceDate} at ${formatTimeOfDay(timeOfDay)}`
+      : occurrenceDate;
+    const [coachEmail, coachUserId] = await Promise.all([
+      getCoachEmail(admin),
+      getCoachUserId(admin),
+    ]);
+    if (coachEmail) {
+      await sendSessionCancelledByClientEmail(
+        coachEmail,
+        me.name,
+        whenText,
+        late,
+        feeApplied
+      );
+    }
+    if (coachUserId) {
+      await sendPushToUser(admin, coachUserId, {
+        title: `${me.name} cancelled`,
+        body: whenText,
+        url: "/coach/schedule",
+      });
+    }
+  } catch (notifyError) {
+    console.error("Failed to send cancellation notification", notifyError);
   }
 
   revalidatePath("/client/schedule");

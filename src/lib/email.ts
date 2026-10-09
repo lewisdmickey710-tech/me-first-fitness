@@ -435,6 +435,39 @@ export async function sendClientCancelledSessionEmail(
   });
 }
 
+// To the coach, when a client cancels their own session right in the app
+// (as opposed to texting her -- that path already shows up on her
+// schedule/dashboard the moment she logs it herself). Nothing notified her
+// of a client's own in-app cancellation before this -- it just sat there
+// until she happened to check.
+export async function sendSessionCancelledByClientEmail(
+  to: string,
+  clientName: string,
+  whenText: string,
+  late: boolean,
+  feeAmount: number | null
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping client-cancellation notice");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `${clientName} cancelled — ${whenText}`,
+    html: wrapper(`
+      <p>${clientName} just cancelled their session on <strong>${whenText}</strong> in the app.</p>
+      ${
+        late
+          ? feeAmount
+            ? `<p>This was inside the 12-hour window — the $${feeAmount} late cancellation fee was applied automatically.</p>`
+            : `<p>This was inside the 12-hour window, but a free cancellation covered it — no fee.</p>`
+          : `<p>Plenty of notice, so no late cancellation fee applies.</p>`
+      }
+    `),
+  });
+}
+
 export async function sendDayBlockedEmail(
   to: string,
   clientName: string,
