@@ -86,7 +86,10 @@ export default async function RosterPage({
     supabase
       .from("requests")
       .select("client_id, reschedule_from_date, request_type")
-      .eq("status", "pending"),
+      .eq("status", "pending")
+      // Class/workshop interest isn't a scheduling request -- doesn't
+      // belong in the roster's pending-request badge.
+      .neq("request_type", "class_interest"),
     supabase.from("profiles").select("id").eq("role", "client"),
     clientIds.length > 0
       ? supabase

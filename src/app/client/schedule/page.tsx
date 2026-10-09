@@ -1,16 +1,23 @@
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getMyClient } from "@/lib/current-client";
-import { cancelMySession } from "@/app/client/actions";
+import { cancelMySession, submitClassInterest } from "@/app/client/actions";
 import { Badge, Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { PaymentMethods } from "@/components/payment-methods";
 import { ConfirmButton } from "@/components/confirm-button";
-import { DAY_NAMES, formatTimeOfDayForClient } from "@/lib/schedule";
+import { DAY_NAMES, formatTimeOfDay, formatTimeOfDayForClient } from "@/lib/schedule";
 import { hoursUntilOccurrence, LATE_CANCEL_NOTICE_HOURS } from "@/lib/cancellation";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
-import type { BusinessSettings, ClientSchedule, Payment, SessionOccurrence } from "@/lib/types";
+import type {
+  BusinessSettings,
+  ClientSchedule,
+  CoachEvent,
+  Payment,
+  SessionOccurrence,
+} from "@/lib/types";
 
 const DOT_TONE: Record<string, string> = {
   scheduled: "bg-teal",
@@ -194,6 +201,34 @@ export default async function ClientSchedulePage({
   const prevMonthKey = `${prevMonthDate.getUTCFullYear()}-${String(prevMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
   const nextMonthKey = `${nextMonthDate.getUTCFullYear()}-${String(nextMonthDate.getUTCMonth() + 1).padStart(2, "0")}`;
 
+  const [{ data: events }, { data: myInterest }] = await Promise.all([
+    supabase
+      .from("coach_events")
+      .select("*")
+      .eq("visible_to_clients", true)
+      .gte("event_date", todayStr)
+      .order("event_date", { ascending: true }) as unknown as Promise<{ data: CoachEvent[] | null }>,
+    supabase
+      .from("requests")
+      .select("event_id")
+      .eq("client_id", me.id)
+      .eq("request_type", "class_interest")
+      .in("status", ["pending", "confirmed"]),
+  ]);
+
+  const interestedEventIds = new Set((myInterest ?? []).map((r) => r.event_id));
+  const eventPdfPaths = (events ?? []).filter((e) => e.pdf_path).map((e) => e.pdf_path as string);
+  const eventPdfUrlByPath = new Map<string, string>();
+  if (eventPdfPaths.length > 0) {
+    const admin = createAdminClient();
+    await Promise.all(
+      eventPdfPaths.map(async (path) => {
+        const { data } = await admin.storage.from("class-pdfs").createSignedUrl(path, 3600);
+        if (data) eventPdfUrlByPath.set(path, data.signedUrl);
+      })
+    );
+  }
+
   return (
     <div className="space-y-6">
       <BackLink href="/client/dashboard" />
@@ -232,6 +267,49 @@ export default async function ClientSchedulePage({
           </Button>
         </Link>
       </Card>
+
+      {(events ?? []).length > 0 ? (
+        <div className="space-y-3">
+          <p className="font-medium text-ink">{t("Classes & Workshops")}</p>
+          {(events ?? []).map((e) => {
+            const interested = interestedEventIds.has(e.id);
+            const pdfUrl = e.pdf_path ? eventPdfUrlByPath.get(e.pdf_path) : undefined;
+            return (
+              <Card key={e.id} className="space-y-2">
+                <Badge tone={e.kind === "workshop" ? "gold" : "teal"}>
+                  {e.kind === "workshop" ? t("Workshop") : t("Group class")}
+                </Badge>
+                <p className="font-medium text-ink">{e.title}</p>
+                <p className="text-sm text-gray">
+                  {e.event_date} · {formatTimeOfDay(e.start_time)}–{formatTimeOfDay(e.end_time)}
+                </p>
+                {e.description ? <p className="text-sm text-ink">{e.description}</p> : null}
+                {pdfUrl ? (
+                  <a href={pdfUrl} target="_blank" rel="noreferrer" className="block text-sm text-rose hover:underline">
+                    {t("View class format →")}
+                  </a>
+                ) : null}
+                {interested ? (
+                  <p className="text-sm font-medium text-teal">
+                    {t("✓ You're on the list — Mickey will reach out.")}
+                  </p>
+                ) : (
+                  <form
+                    action={async () => {
+                      "use server";
+                      await submitClassInterest(e.id);
+                    }}
+                  >
+                    <Button type="submit" variant="secondary">
+                      {t("I'm interested")}
+                    </Button>
+                  </form>
+                )}
+              </Card>
+            );
+          })}
+        </div>
+      ) : null}
 
       <Card>
         <div className="flex items-center justify-between">

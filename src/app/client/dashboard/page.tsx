@@ -84,7 +84,10 @@ export default async function ClientDashboard() {
       .from("requests")
       .select("*")
       .eq("client_id", me.id)
-      .in("status", ["pending", "countered"]) as unknown as Promise<{
+      .in("status", ["pending", "countered"])
+      // Expressing interest in a class/workshop isn't a time-slot request
+      // awaiting confirmation -- it shouldn't trigger this banner.
+      .neq("request_type", "class_interest") as unknown as Promise<{
       data: SessionRequest[] | null;
     }>,
     getCurrentPhase(supabase, me.id),

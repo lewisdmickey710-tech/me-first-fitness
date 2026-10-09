@@ -190,7 +190,11 @@ export default async function CoachSchedulePage({
     supabase
       .from("requests")
       .select("*, clients(id, name)")
-      .in("status", ["pending", "countered"]) as unknown as Promise<{
+      .in("status", ["pending", "countered"])
+      // Class/workshop interest isn't a time-slot request -- it doesn't
+      // belong in this grid's pick-up/accept/counter-offer flow at all,
+      // it has its own simple list on the Classes page.
+      .neq("request_type", "class_interest") as unknown as Promise<{
       data: (SessionRequest & { clients: { id: string; name: string } | null })[] | null;
     }>,
     supabase

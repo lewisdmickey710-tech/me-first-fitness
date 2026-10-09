@@ -201,7 +201,7 @@ export interface Activity {
 
 export type RequestStatus = "pending" | "confirmed" | "declined" | "countered";
 
-export type RequestType = "session" | "checkin_call" | "video_session";
+export type RequestType = "session" | "checkin_call" | "video_session" | "class_interest";
 
 export interface SessionRequest {
   id: string;
@@ -215,6 +215,23 @@ export interface SessionRequest {
   countered_date: string | null;
   countered_time: string | null;
   duration_minutes: number;
+  created_at: string;
+  event_id: string | null;
+}
+
+export type CoachEventKind = "class" | "workshop";
+
+export interface CoachEvent {
+  id: string;
+  kind: CoachEventKind;
+  title: string;
+  description: string | null;
+  event_date: string;
+  start_time: string;
+  end_time: string;
+  pdf_path: string | null;
+  visible_to_clients: boolean;
+  blocked_date_id: string | null;
   created_at: string;
 }
 

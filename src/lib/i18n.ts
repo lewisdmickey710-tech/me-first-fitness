@@ -884,4 +884,13 @@ const ES: Record<string, string> = {
   "Edit your info →": "Editar mi información →",
   "Notifications, color scheme, download my data →":
     "Notificaciones, esquema de color, descargar mis datos →",
+
+  // Classes & workshops
+  "Classes & Workshops": "Clases y talleres",
+  Workshop: "Taller",
+  "Group class": "Clase grupal",
+  "View class format →": "Ver formato de la clase →",
+  "✓ You're on the list — Mickey will reach out.":
+    "✓ Estás en la lista — Mickey se pondrá en contacto.",
+  "I'm interested": "Me interesa",
 };

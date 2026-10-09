@@ -3453,7 +3453,9 @@ function RequestsTab({
           <Card key={r.id}>
             <div className="flex items-center justify-between">
               <div>
-                {r.request_type === "video_session" ? (
+                {r.request_type === "class_interest" ? (
+                  <p className="text-xs font-medium text-rose">Class/workshop interest</p>
+                ) : r.request_type === "video_session" ? (
                   <p className="text-xs font-medium text-rose">
                     Video session ({CALL_DURATION_MINUTES} min)
                   </p>

@@ -486,6 +486,73 @@ export async function submitRequest(formData: FormData) {
   redirect("/client/dashboard");
 }
 
+// A lightweight "let Mickey know I'd like to try this" ping for a shared
+// class/workshop -- not a time-slot booking (no availability/conflict
+// checks apply, the time is already blocked on her calendar by the event
+// itself), just a signal she follows up on herself. Reuses the requests
+// table/inbox rather than a new mechanism, with request_type =
+// 'class_interest' keeping it out of the actual scheduling flow
+// (setRequestStatus skips the session-booking side effects for it).
+export async function submitClassInterest(eventId: string) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const admin = createAdminClient();
+  const { data: event } = await admin
+    .from("coach_events")
+    .select("id, kind, title, event_date, start_time, visible_to_clients")
+    .eq("id", eventId)
+    .eq("visible_to_clients", true)
+    .maybeSingle();
+  if (!event) throw new Error("That class or workshop isn't available.");
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase
+    .from("requests")
+    .select("id")
+    .eq("client_id", me.id)
+    .eq("event_id", eventId)
+    .in("status", ["pending", "confirmed"])
+    .maybeSingle();
+  if (existing) return;
+
+  const { error } = await supabase.from("requests").insert({
+    client_id: me.id,
+    event_id: eventId,
+    request_type: "class_interest",
+    preferred_date: event.event_date,
+    preferred_time: event.start_time,
+    note: `Interested in ${event.kind === "workshop" ? "workshop" : "class"}: ${event.title}`,
+  });
+  if (error) throw new Error(error.message);
+
+  try {
+    const whenText = `${event.event_date} at ${formatTimeOfDay(event.start_time)}`;
+    const [to, coachUserId] = await Promise.all([getCoachEmail(admin), getCoachUserId(admin)]);
+    if (to) {
+      await sendNewRequestEmail(
+        to,
+        me.name,
+        `${event.kind === "workshop" ? "workshop" : "class"} spot — ${event.title}`,
+        whenText,
+        null,
+        null
+      );
+    }
+    if (coachUserId) {
+      await sendPushToUser(admin, coachUserId, {
+        title: `${me.name} is interested in ${event.title}`,
+        body: whenText,
+        url: "/coach/classes",
+      });
+    }
+  } catch (notifyError) {
+    console.error("Failed to send class-interest notification", notifyError);
+  }
+
+  revalidatePath("/client/schedule");
+}
+
 // Requests has no client-facing update policy (only coach: full access,
 // client: insert own) -- everything below runs through the admin client,
 // same reasoning as the cross-client conflict check in submitRequest.
