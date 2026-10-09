@@ -1222,15 +1222,17 @@ export async function setLogEntryCoachNotes(
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
-// Client-visible reply (emoji and/or text) on one of their own logged
-// workouts/activities or nutrition entries -- the client-facing
-// counterpart to setLogEntryCoachNotes above, deliberately a separate
-// table rather than another column, since a single item carries both a
-// private coach note and a public reply with different audiences. One
-// reply per item (upsertable); saving with both fields empty deletes it.
+// Client-visible reply (emoji and/or text) on something a client did on
+// their own between sessions -- a logged activity or nutrition entry.
+// Deliberately excludes sessions (coached or solo-but-logged-by-her):
+// she doesn't need to reply to a session she herself just logged.
+// Separate table rather than another column, since a single item could
+// otherwise carry both a private coach note and a public reply with
+// different audiences. One reply per item (upsertable); saving with
+// both fields empty deletes it.
 export async function setItemReply(
   clientId: string,
-  itemType: "session" | "activity" | "nutrition",
+  itemType: "activity" | "nutrition",
   itemId: string,
   emoji: string | null,
   note: string | null
@@ -2253,6 +2255,7 @@ export async function updateClientProfile(clientId: string, formData: FormData) 
       is_test: formData.get("is_test") === "on",
       session_rate: session_rate_raw ? Number(session_rate_raw) : null,
       self_led: formData.get("self_led") === "on",
+      flex_scheduling: formData.get("flex_scheduling") === "on",
     })
     .eq("id", clientId);
 

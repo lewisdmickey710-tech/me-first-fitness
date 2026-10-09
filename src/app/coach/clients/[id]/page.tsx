@@ -1387,6 +1387,19 @@ function ProfileTab({
                 checked in on them in a while.
               </p>
             </div>
+            <div className="mt-3">
+              <Checkbox
+                name="flex_scheduling"
+                label="Flex scheduling (no standing weekly time, books week to week)"
+                defaultChecked={client.flex_scheduling}
+              />
+              <p className="mt-1 text-xs text-gray">
+                Shows as &quot;Flex&quot; on the roster. Booking them fresh
+                most weeks is on you rather than a standing slot — worth
+                reflecting in the session rate below if that&apos;s worth
+                something to you.
+              </p>
+            </div>
             <div className="mt-2">
               <Checkbox
                 name="video_sessions_enabled"
@@ -2529,13 +2542,15 @@ async function LogTab({
                   </form>
                 </Collapsible>
 
-                <ItemReplyEditor
-                  clientId={clientId}
-                  itemType={s ? "session" : "activity"}
-                  itemId={entry.id}
-                  initialEmoji={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.emoji ?? null}
-                  initialNote={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.note ?? null}
-                />
+                {a ? (
+                  <ItemReplyEditor
+                    clientId={clientId}
+                    itemType="activity"
+                    itemId={entry.id}
+                    initialEmoji={replyByItemKey.get(`activity:${entry.id}`)?.emoji ?? null}
+                    initialNote={replyByItemKey.get(`activity:${entry.id}`)?.note ?? null}
+                  />
+                ) : null}
 
                 {s ? (
                   <div className="mt-2 flex items-center gap-3">

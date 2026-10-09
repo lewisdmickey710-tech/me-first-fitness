@@ -14,7 +14,7 @@ export function ItemReplyEditor({
   initialNote,
 }: {
   clientId: string;
-  itemType: "session" | "activity" | "nutrition";
+  itemType: "activity" | "nutrition";
   itemId: string;
   initialEmoji: string | null;
   initialNote: string | null;

@@ -772,6 +772,7 @@ export default async function RosterPage({
                 <p className="mt-0.5 text-sm text-gray">
                   {client.care_profiles?.name ?? "No care profile set"}
                   {client.self_led ? " · Self-Led" : ""}
+                  {client.flex_scheduling ? " · Flex" : ""}
                   {client.partner_client_id && clientNameById.get(client.partner_client_id)
                     ? ` · paired with ${clientNameById.get(client.partner_client_id)}`
                     : ""}

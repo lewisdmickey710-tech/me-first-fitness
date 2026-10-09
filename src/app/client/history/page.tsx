@@ -57,7 +57,7 @@ export default async function ClientHistoryPage() {
     .from("coach_item_replies")
     .select("*")
     .eq("client_id", me.id)
-    .in("item_type", ["session", "activity"])) as { data: CoachItemReply[] | null };
+    .eq("item_type", "activity")) as { data: CoachItemReply[] | null };
   const replyByItemKey = new Map(
     (itemReplies ?? []).map((r) => [`${r.item_type}:${r.item_id}`, r])
   );
@@ -189,11 +189,13 @@ export default async function ClientHistoryPage() {
                   />
                 ) : null}
                 {a?.notes ? <p className="text-sm text-ink">{a.notes}</p> : null}
-                <ItemReplyDisplay
-                  emoji={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.emoji ?? null}
-                  note={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.note ?? null}
-                  locale={me.language}
-                />
+                {a ? (
+                  <ItemReplyDisplay
+                    emoji={replyByItemKey.get(`activity:${entry.id}`)?.emoji ?? null}
+                    note={replyByItemKey.get(`activity:${entry.id}`)?.note ?? null}
+                    locale={me.language}
+                  />
+                ) : null}
                 {s && entry.loggedBy === "client" ? (
                   <form
                     action={async () => {

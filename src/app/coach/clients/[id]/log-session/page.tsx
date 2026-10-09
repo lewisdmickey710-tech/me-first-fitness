@@ -82,12 +82,14 @@ export default async function LogSessionPage({
 
   const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
 
-  const lastEntryReply = lastEntry
+  // Replies only exist on activities, never sessions -- nothing to look
+  // up when the last entry was a logged session.
+  const lastEntryReply = lastEntry?.activity
     ? ((
         await supabase
           .from("coach_item_replies")
           .select("emoji, note")
-          .eq("item_type", lastEntry.session ? "session" : "activity")
+          .eq("item_type", "activity")
           .eq("item_id", lastEntry.id)
           .maybeSingle()
       ).data ?? null)

@@ -61,6 +61,7 @@ export interface Client {
   notify_streaks: boolean;
   notify_tracking_reminders: boolean;
   last_celebrated_streak_length: number;
+  flex_scheduling: boolean;
 }
 
 export type AnnouncementCategory = "announcement" | "emergency";
@@ -220,7 +221,7 @@ export type RequestStatus = "pending" | "confirmed" | "declined" | "countered";
 
 export type RequestType = "session" | "checkin_call" | "video_session" | "class_interest";
 
-export type ReplyItemType = "session" | "activity" | "nutrition";
+export type ReplyItemType = "activity" | "nutrition";
 
 export interface CoachItemReply {
   id: string;
