@@ -158,6 +158,100 @@ export function ProgressRing({
   );
 }
 
+export interface RingSegment {
+  percent: number;
+  color: string;
+  name: string;
+  count: number;
+}
+
+// A single ring built from several categorical segments (e.g. in-person
+// sessions, solo workouts, a cancellation) instead of one color's
+// percent -- each segment is its own short arc with a small gap on
+// either side, drawn in the order given. Segment colors here are pulled
+// from this app's existing palette (reused meanings: rose = the
+// client's own accent/coached sessions, teal = solo, gold = other
+// activity, pink = cancelled -- same as LOG_ENTRY_KIND_TONE elsewhere)
+// rather than a chart-optimized categorical set, which the validator
+// flags as too close for some colorblind types at a glance -- the
+// legend below (swatch + name + count) is the required secondary
+// encoding so identity never depends on color alone.
+export function MultiProgressRing({
+  segments,
+  label,
+  sublabel,
+}: {
+  segments: RingSegment[];
+  label: string;
+  sublabel: string;
+}) {
+  const size = 72;
+  const stroke = 7;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const gapLen = (3 / 360) * circumference;
+
+  let cumulative = 0;
+  const arcs = segments
+    .filter((s) => s.percent > 0)
+    .map((s) => {
+      const rawLen = (Math.max(0, Math.min(100, s.percent)) / 100) * circumference;
+      const len = Math.max(0, rawLen - gapLen);
+      const offset = circumference - cumulative;
+      cumulative += rawLen;
+      return { ...s, len, offset };
+    });
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-1.5">
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="#EFEAE6"
+            strokeWidth={stroke}
+          />
+          {arcs.map((a, i) => (
+            <circle
+              key={i}
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={a.color}
+              strokeWidth={stroke}
+              strokeDasharray={`${a.len} ${circumference - a.len}`}
+              strokeDashoffset={a.offset}
+              strokeLinecap="round"
+            />
+          ))}
+        </svg>
+        <div className="text-center leading-tight">
+          <p className="text-sm font-semibold text-ink">{label}</p>
+          <p className="text-[11px] text-gray">{sublabel}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5">
+        {segments
+          .filter((s) => s.count > 0)
+          .map((s, i) => (
+            <span key={i} className="flex items-center gap-1 text-[11px] text-gray">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: s.color }}
+                aria-hidden
+              />
+              {s.name} {s.count}
+            </span>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export function DeltaField({
   label,
   value,

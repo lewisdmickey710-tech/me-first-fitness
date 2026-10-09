@@ -11,6 +11,7 @@ import {
   Collapsible,
   EmptyState,
   Heart,
+  MultiProgressRing,
   PhaseBanner,
   ProgressRing,
 } from "@/components/ui";
@@ -20,6 +21,7 @@ import { getCurrentPhase, weekInPhase } from "@/lib/phase";
 import { formatScheduleForClient, nextSessionForClient } from "@/lib/schedule";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
+import { THEME_SWATCHES, isClientTheme } from "@/lib/theme";
 import type {
   BusinessSettings,
   ClientDocumentAcknowledgment,
@@ -56,7 +58,6 @@ export default async function ClientDashboard() {
   const weekEndDate = new Date(weekStartDate);
   weekEndDate.setUTCDate(weekEndDate.getUTCDate() + 6);
   const weekEnd = toDateString(weekEndDate);
-  const monthStart = `${today.slice(0, 7)}-01`;
 
   const [
     { data: sessions },
@@ -67,8 +68,8 @@ export default async function ClientDashboard() {
     { data: payments },
     { data: documents },
     { data: acks },
-    { count: weeklySessionsCount },
-    { count: coachedSessionsMonthCount },
+    { data: weekSessions },
+    { data: weekActivities },
     { data: todaysNutrition },
   ] = await Promise.all([
     supabase
@@ -119,16 +120,16 @@ export default async function ClientDashboard() {
     }>,
     supabase
       .from("sessions")
-      .select("id", { count: "exact", head: true })
+      .select("coached")
       .eq("client_id", me.id)
       .gte("date", weekStart)
       .lte("date", weekEnd),
     supabase
-      .from("sessions")
-      .select("id", { count: "exact", head: true })
+      .from("activities")
+      .select("id")
       .eq("client_id", me.id)
-      .eq("coached", true)
-      .gte("date", monthStart),
+      .gte("date", weekStart)
+      .lte("date", weekEnd),
     supabase
       .from("client_nutrition_logs")
       .select("id")
@@ -142,29 +143,19 @@ export default async function ClientDashboard() {
     .eq("id", true)
     .maybeSingle()) as { data: BusinessSettings | null };
 
-  const [{ data: docAssignments }, { data: minorConsent }, { data: programDayRows }] =
-    await Promise.all([
-      supabase
-        .from("client_document_assignments")
-        .select("*")
-        .eq("client_id", me.id) as unknown as Promise<{
-        data: ClientDocumentAssignment[] | null;
-      }>,
-      supabase
-        .from("client_minor_consent")
-        .select("*")
-        .eq("client_id", me.id)
-        .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
-      me.care_profile_id && currentPhase
-        ? (supabase
-            .from("program_days")
-            .select("day_number")
-            .eq("care_profile_id", me.care_profile_id)
-            .eq("phase", currentPhase.phase) as unknown as Promise<{
-            data: { day_number: number }[] | null;
-          }>)
-        : Promise.resolve({ data: null }),
-    ]);
+  const [{ data: docAssignments }, { data: minorConsent }] = await Promise.all([
+    supabase
+      .from("client_document_assignments")
+      .select("*")
+      .eq("client_id", me.id) as unknown as Promise<{
+      data: ClientDocumentAssignment[] | null;
+    }>,
+    supabase
+      .from("client_minor_consent")
+      .select("*")
+      .eq("client_id", me.id)
+      .maybeSingle() as unknown as Promise<{ data: ClientMinorConsent | null }>,
+  ]);
 
   // On hold means nothing's really scheduled -- the "Your spot is on hold"
   // card above says so; showing an actionable "Next session" card too would
@@ -218,37 +209,59 @@ export default async function ClientDashboard() {
     .filter((m) => m.achieved_at && new Date(m.achieved_at) >= fourteenDaysAgo)
     .sort((a, b) => (b.achieved_at ?? "").localeCompare(a.achieved_at ?? ""));
 
-  // Three goal rings, each specific to this client rather than a shared
-  // default:
-  // - Programmed Days: how many distinct days their actual program (this
-  //   phase) calls for per week, filled by any session logged this week.
-  //   Falls back to their days-per-week only if they have no program
-  //   assigned at all (e.g. a fully custom/virtual client).
-  // - Sessions with Mickey: coached sessions specifically (not solo-logged
-  //   ones), goal on the same days-per-week x 4 monthly convention the
-  //   coach's own consistency scoring already uses.
-  // - Nutrition: a flat 3-meals-a-day target regardless of calorie
-  //   tracking -- logging more than that (snacks) overflows into a second,
-  //   overlapping ring instead of just capping at full.
-  const programmedDaysGoal =
-    programDayRows && programDayRows.length > 0
-      ? new Set(programDayRows.map((d) => d.day_number)).size
-      : me.days_per_week ?? 3;
-  const programmedDaysLogged = weeklySessionsCount ?? 0;
+  // One weekly movement ring instead of two separate ones -- in-person
+  // sessions, solo workouts, a cancellation (no reschedule), and other
+  // logged activity each get their own slice, filled in that priority
+  // order against a single weekly goal (in-person goal + solo goal) so
+  // the ring never overflows past 100%: in-person counts first, then
+  // solo, then a cancellation "spends" the slot it would have occupied,
+  // and any other activity fills whatever room is left as a bonus. A
+  // session that got rescheduled (not just cancelled) doesn't count
+  // against the goal at all -- its slot moved, it didn't disappear.
+  const accentHex = THEME_SWATCHES[isClientTheme(me.theme) ? me.theme : "rose"].hex;
+  const weeklyInPersonGoal =
+    me.weekly_inperson_goal ?? (schedules ?? []).length;
+  const weeklySoloGoal = me.weekly_solo_goal ?? 0;
+  const weeklyGoalTotal = weeklyInPersonGoal + weeklySoloGoal;
 
-  const coachedSessionGoal = (me.days_per_week ?? 3) * 4;
-  const coachedSessionsLogged = coachedSessionsMonthCount ?? 0;
+  const inPersonCount = (weekSessions ?? []).filter((s) => s.coached).length;
+  const soloCount = (weekSessions ?? []).filter((s) => !s.coached).length;
+  const cancelledCount = (occurrences ?? []).filter(
+    (o) =>
+      o.occurrence_date >= weekStart &&
+      o.occurrence_date <= weekEnd &&
+      (o.status === "cancelled" || o.status === "late_cancelled")
+  ).length;
+  const otherActivityCount = (weekActivities ?? []).length;
 
-  const NUTRITION_GOAL = 3;
+  let remaining = weeklyGoalTotal;
+  const inPersonFilled = Math.min(inPersonCount, remaining);
+  remaining -= inPersonFilled;
+  const soloFilled = Math.min(soloCount, remaining);
+  remaining -= soloFilled;
+  const cancelledFilled = Math.min(cancelledCount, remaining);
+  remaining -= cancelledFilled;
+  const activityFilled = Math.min(otherActivityCount, remaining);
+
+  const pct = (n: number) => (weeklyGoalTotal > 0 ? (n / weeklyGoalTotal) * 100 : 0);
+  const movementSegments = [
+    { percent: pct(inPersonFilled), color: accentHex, name: t("In-person"), count: inPersonCount },
+    { percent: pct(soloFilled), color: "#4A9A9A", name: t("Solo"), count: soloCount },
+    { percent: pct(cancelledFilled), color: "#E75480", name: t("Cancelled"), count: cancelledCount },
+    { percent: pct(activityFilled), color: "#C9A96E", name: t("Activity"), count: otherActivityCount },
+  ];
+  const movementFilled = inPersonFilled + soloFilled + cancelledFilled + activityFilled;
+
+  const nutritionGoal = me.nutrition_goal ?? 3;
   const nutritionCount = (todaysNutrition ?? []).length;
-  const nutritionOverflow = Math.max(0, nutritionCount - NUTRITION_GOAL);
+  const nutritionOverflow = Math.max(0, nutritionCount - nutritionGoal);
   const nutritionRing = {
-    percent: (Math.min(nutritionCount, NUTRITION_GOAL) / NUTRITION_GOAL) * 100,
+    percent: nutritionGoal > 0 ? (Math.min(nutritionCount, nutritionGoal) / nutritionGoal) * 100 : 0,
     overflowPercent:
-      nutritionOverflow > 0
-        ? (Math.min(nutritionOverflow, NUTRITION_GOAL) / NUTRITION_GOAL) * 100
+      nutritionOverflow > 0 && nutritionGoal > 0
+        ? (Math.min(nutritionOverflow, nutritionGoal) / nutritionGoal) * 100
         : undefined,
-    label: `${nutritionCount}/${NUTRITION_GOAL}`,
+    label: `${nutritionCount}/${nutritionGoal}`,
     sublabel:
       nutritionOverflow > 0
         ? t(nutritionOverflow > 1 ? "+{n} snacks today" : "+{n} snack today", {
@@ -472,11 +485,10 @@ export default async function ClientDashboard() {
       <Card>
         <p className="mb-3 text-sm font-medium text-gray">{t("Your goals")}</p>
         <div className="flex items-center justify-around">
-          <ProgressRing
-            percent={(programmedDaysLogged / programmedDaysGoal) * 100}
-            label={`${programmedDaysLogged}/${programmedDaysGoal}`}
-            sublabel={t("Programmed Days")}
-            color="#E75480"
+          <MultiProgressRing
+            segments={movementSegments}
+            label={`${movementFilled}/${weeklyGoalTotal}`}
+            sublabel={t("Movement this week")}
           />
           <ProgressRing
             percent={nutritionRing.percent}
@@ -484,12 +496,6 @@ export default async function ClientDashboard() {
             label={nutritionRing.label}
             sublabel={nutritionRing.sublabel}
             color="#2FA6A6"
-          />
-          <ProgressRing
-            percent={(coachedSessionsLogged / coachedSessionGoal) * 100}
-            label={`${coachedSessionsLogged}/${coachedSessionGoal}`}
-            sublabel={t("Sessions with Mickey")}
-            color="#D4A24C"
           />
         </div>
       </Card>

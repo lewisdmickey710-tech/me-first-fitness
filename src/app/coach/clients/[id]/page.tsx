@@ -3335,12 +3335,20 @@ function MeasurementsTab({
 
   return (
     <div className="space-y-6">
-      <Link
-        href={`/coach/clients/${clientId}/log-measurement`}
-        className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-      >
-        + Log measurement
-      </Link>
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={`/coach/clients/${clientId}/checkin`}
+          className="inline-block rounded-xl bg-rose px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+        >
+          + Check-in
+        </Link>
+        <Link
+          href={`/coach/clients/${clientId}/log-measurement`}
+          className="inline-block rounded-xl border border-grayLt bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
+        >
+          Just measurements
+        </Link>
+      </div>
 
       <div className="space-y-3">
         <p className="text-sm font-medium text-gray">Progress photos</p>

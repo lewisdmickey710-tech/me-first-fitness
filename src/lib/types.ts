@@ -62,6 +62,9 @@ export interface Client {
   notify_tracking_reminders: boolean;
   last_celebrated_streak_length: number;
   flex_scheduling: boolean;
+  weekly_inperson_goal: number | null;
+  weekly_solo_goal: number | null;
+  nutrition_goal: number | null;
 }
 
 export type AnnouncementCategory = "announcement" | "emergency";

@@ -1519,6 +1519,71 @@ export async function logCheckinAsCoach(clientId: string, formData: FormData) {
   redirect(`/coach/clients/${clientId}?tab=checkins`);
 }
 
+// The periodic in-depth check-in: measurements, the service_checkins
+// conversation (satisfaction, what's working, what they want to change,
+// testimonial consent), and the next 4 weeks' goals -- all logged
+// together instead of as three separate, disconnected forms. Each
+// section only writes a row if it actually has something in it, so
+// using this just to update goals (with no new measurement that day)
+// doesn't leave a blank measurements row behind.
+export async function submitCheckin(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+  const date = String(formData.get("date") ?? "").trim() || new Date().toISOString().slice(0, 10);
+
+  let hasMeasurement = false;
+  const measurementValues: Record<string, number | null> = {};
+  for (const field of MEASUREMENT_FIELDS) {
+    const raw = String(formData.get(field) ?? "").trim();
+    measurementValues[field] = raw ? Number(raw) : null;
+    if (raw) hasMeasurement = true;
+  }
+  const measurementNotes = String(formData.get("measurement_notes") ?? "").trim();
+  if (hasMeasurement || measurementNotes) {
+    const { error } = await supabase.from("measurements").insert({
+      client_id: clientId,
+      date,
+      ...measurementValues,
+      notes: measurementNotes || null,
+      logged_by: "coach",
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  const satisfactionRaw = String(formData.get("satisfaction") ?? "").trim();
+  const whatWorking = String(formData.get("what_working") ?? "").trim();
+  const whatWouldHelp = String(formData.get("what_would_help") ?? "").trim();
+  const anythingElse = String(formData.get("anything_else") ?? "").trim();
+  const testimonialConsent = formData.get("testimonial_consent") === "on";
+  if (satisfactionRaw || whatWorking || whatWouldHelp || anythingElse || testimonialConsent) {
+    const { error } = await supabase.from("service_checkins").insert({
+      client_id: clientId,
+      date,
+      satisfaction: satisfactionRaw ? Number(satisfactionRaw) : null,
+      what_working: whatWorking || null,
+      what_would_help: whatWouldHelp || null,
+      anything_else: anythingElse || null,
+      testimonial_consent: testimonialConsent,
+    });
+    if (error) throw new Error(error.message);
+  }
+
+  const inpersonGoalRaw = String(formData.get("weekly_inperson_goal") ?? "").trim();
+  const soloGoalRaw = String(formData.get("weekly_solo_goal") ?? "").trim();
+  const nutritionGoalRaw = String(formData.get("nutrition_goal") ?? "").trim();
+  const { error: goalError } = await supabase
+    .from("clients")
+    .update({
+      weekly_inperson_goal: inpersonGoalRaw ? Number(inpersonGoalRaw) : null,
+      weekly_solo_goal: soloGoalRaw ? Number(soloGoalRaw) : null,
+      nutrition_goal: nutritionGoalRaw ? Number(nutritionGoalRaw) : null,
+    })
+    .eq("id", clientId);
+  if (goalError) throw new Error(goalError.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  redirect(`/coach/clients/${clientId}`);
+}
+
 export async function addClientSchedule(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
