@@ -912,6 +912,7 @@ const ES: Record<string, string> = {
   "Turn any of these off if you don't want them -- session reminders and emergency messages are never optional.":
     "Desactiva las que no quieras — los recordatorios de sesión y los mensajes de emergencia nunca son opcionales.",
   "Announcements from Mickey": "Anuncios de Mickey",
+  "Announcements from Mickey ({count})": "Anuncios de Mickey ({count})",
   "Streak celebrations": "Celebraciones de rachas",
   "Reminders to track": "Recordatorios para registrar",
   "Session reminders": "Recordatorios de sesión",

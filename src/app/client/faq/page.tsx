@@ -100,11 +100,18 @@ export default async function ClientFaqPage() {
       </div>
 
       {announcements && announcements.length > 0 ? (
-        <Section title={t("Announcements from Mickey")}>
-          {announcements.map((a) => (
-            <Announcement key={a.id} announcement={a} locale={me?.language} />
-          ))}
-        </Section>
+        <Card>
+          <Collapsible
+            label={t("Announcements from Mickey ({count})", { count: announcements.length })}
+            labelClassName="text-lg font-semibold text-rose"
+          >
+            <div className="divide-y divide-grayLt">
+              {announcements.map((a) => (
+                <Announcement key={a.id} announcement={a} locale={me?.language} />
+              ))}
+            </div>
+          </Collapsible>
+        </Card>
       ) : null}
 
       <Section title={t("Tutorials: What Each Part Does")}>
