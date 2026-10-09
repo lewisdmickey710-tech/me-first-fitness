@@ -30,6 +30,18 @@ function Q({ q, children }: { q: string; children: React.ReactNode }) {
   );
 }
 
+// Unlike Q/Collapsible, these are meant to be scanned all at once like a
+// table of contents for the app -- nothing to expand, just "what's this
+// tab for and how do I use it."
+function Feature({ name, children }: { name: string; children: React.ReactNode }) {
+  return (
+    <div className="py-3 first:pt-0 last:pb-0">
+      <p className="font-medium text-ink">{name}</p>
+      <p className="mt-0.5 text-sm text-gray">{children}</p>
+    </div>
+  );
+}
+
 export default async function ClientFaqPage() {
   const me = await getMyClient();
   const t = makeT(me?.language);
@@ -51,6 +63,51 @@ export default async function ClientFaqPage() {
           .
         </p>
       </div>
+
+      <Section title={t("Tutorials: What Each Part Does")}>
+        <Feature name={t("Dashboard")}>
+          {t("Your home base -- your next session, quick links to log a workout or check in, and anything that needs your attention.")}
+        </Feature>
+        <Feature name={t("Schedule")}>
+          {t('See upcoming and past sessions, request a new time, reschedule, or cancel. Any group class or workshop Mickey\'s sharing shows up here too, with an "I\'m interested" button.')}
+        </Feature>
+        <Feature name={t("Program")}>
+          {t("Your current workout, organized by phase. Open a day, enter what you used and how it felt as you go, then log the whole day at the bottom.")}
+        </Feature>
+        <Feature name={t("Nutrition")}>
+          {t("Log meals and notes between nutrition-coaching sessions, whenever Mickey has you tracking something there.")}
+        </Feature>
+        <Feature name={t("Habits")}>
+          {t("Daily habits you and Mickey agree on -- tap one to mark it done for the day.")}
+        </Feature>
+        <Feature name={t("Symptoms")}>
+          {t("A private daily tracker for anything you want to monitor -- visible only to you and Mickey, never on Community.")}
+        </Feature>
+        <Feature name={t("Progress")}>
+          {t("Add a progress photo any time. Measurements Mickey logs during check-ins show up here too, with trend lines.")}
+        </Feature>
+        <Feature name={t("Milestones")}>
+          {t("A running record of wins and achievements Mickey marks for you along the way.")}
+        </Feature>
+        <Feature name={t("Community")}>
+          {t("An optional board to post wins, questions, or photos that other clients can see and support.")}
+        </Feature>
+        <Feature name={t("Documents")}>
+          {t("Anything Mickey's sent you to read or sign, plus any service check-in that's due.")}
+        </Feature>
+        <Feature name={t("Wellness Guide")}>
+          {t("Movement, nutrition, mindset, and recovery education to read at your own pace.")}
+        </Feature>
+        <Feature name={t("Settings")}>
+          {t("Turn on notifications, pick your own color scheme, or download all your data.")}
+        </Feature>
+        <Feature name={t("Profile")}>
+          {t("Your contact info, emergency contact, timezone, and language.")}
+        </Feature>
+        <Feature name={t("Payment plan / Payment history")}>
+          {t("See or switch your payment plan, and look back at everything you've paid.")}
+        </Feature>
+      </Section>
 
       <Section title={t("Using the App")}>
         <Q q={t("How do I log a workout?")}>

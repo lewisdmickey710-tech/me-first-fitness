@@ -388,6 +388,40 @@ const ES: Record<string, string> = {
   "Using the app, what to expect from coaching with Mickey, and a few general fitness basics. Tap a question to expand it — for the full wellness education (movement, nutrition, mindset, recovery), see your":
     "Cómo usar la aplicación, qué esperar del entrenamiento con Mickey, y algunos conceptos básicos de fitness. Toca una pregunta para expandirla — para la educación completa de bienestar (movimiento, nutrición, mentalidad, recuperación), consulta tu",
   "Wellness Guide": "Guía de Bienestar",
+  "Tutorials: What Each Part Does": "Tutoriales: Qué hace cada parte",
+  Dashboard: "Panel principal",
+  Schedule: "Horario",
+  Symptoms: "Síntomas",
+  Profile: "Perfil",
+  "Payment plan / Payment history": "Plan de pago / Historial de pagos",
+  "Your home base -- your next session, quick links to log a workout or check in, and anything that needs your attention.":
+    "Tu base principal — tu próxima sesión, enlaces rápidos para registrar un entrenamiento o hacer un check-in, y cualquier cosa que necesite tu atención.",
+  'See upcoming and past sessions, request a new time, reschedule, or cancel. Any group class or workshop Mickey\'s sharing shows up here too, with an "I\'m interested" button.':
+    'Ve tus sesiones próximas y pasadas, solicita un nuevo horario, reprograma o cancela. Cualquier clase grupal o taller que Mickey comparta también aparece aquí, con un botón de "Me interesa".',
+  "Your current workout, organized by phase. Open a day, enter what you used and how it felt as you go, then log the whole day at the bottom.":
+    "Tu entrenamiento actual, organizado por fase. Abre un día, anota lo que usaste y cómo te sentiste a medida que avanzas, y registra todo el día al final.",
+  "Log meals and notes between nutrition-coaching sessions, whenever Mickey has you tracking something there.":
+    "Registra comidas y notas entre sesiones de nutrición, cuando Mickey te pida hacer seguimiento de algo ahí.",
+  "Daily habits you and Mickey agree on -- tap one to mark it done for the day.":
+    "Hábitos diarios que acuerdas con Mickey — toca uno para marcarlo como hecho ese día.",
+  "A private daily tracker for anything you want to monitor -- visible only to you and Mickey, never on Community.":
+    "Un rastreador diario privado para cualquier cosa que quieras monitorear — visible solo para ti y Mickey, nunca en Comunidad.",
+  "Add a progress photo any time. Measurements Mickey logs during check-ins show up here too, with trend lines.":
+    "Añade una foto de progreso en cualquier momento. Las medidas que Mickey registra durante los check-ins también aparecen aquí, con líneas de tendencia.",
+  "A running record of wins and achievements Mickey marks for you along the way.":
+    "Un registro continuo de logros que Mickey va marcando para ti en el camino.",
+  "An optional board to post wins, questions, or photos that other clients can see and support.":
+    "Un tablero opcional para publicar logros, preguntas o fotos que otros clientes pueden ver y apoyar.",
+  "Anything Mickey's sent you to read or sign, plus any service check-in that's due.":
+    "Cualquier cosa que Mickey te haya enviado para leer o firmar, además de cualquier check-in de servicio pendiente.",
+  "Movement, nutrition, mindset, and recovery education to read at your own pace.":
+    "Educación sobre movimiento, nutrición, mentalidad y recuperación para leer a tu propio ritmo.",
+  "Turn on notifications, pick your own color scheme, or download all your data.":
+    "Activa las notificaciones, elige tu propio esquema de color, o descarga todos tus datos.",
+  "Your contact info, emergency contact, timezone, and language.":
+    "Tu información de contacto, contacto de emergencia, zona horaria e idioma.",
+  "See or switch your payment plan, and look back at everything you've paid.":
+    "Consulta o cambia tu plan de pago, y revisa todo lo que has pagado.",
   "Using the App": "Usando la Aplicación",
   "How do I log a workout?": "¿Cómo registro un entrenamiento?",
   "Program → open the day you did, enter what you used and how it felt as you go, then log the whole day at the bottom. It saves to your history and marks that day complete.":
