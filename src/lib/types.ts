@@ -57,6 +57,21 @@ export interface Client {
   self_led_last_checkin: string | null;
   digest_reviewed_at: string | null;
   theme: string;
+  notify_announcements: boolean;
+  notify_streaks: boolean;
+  notify_tracking_reminders: boolean;
+  last_celebrated_streak_length: number;
+}
+
+export type AnnouncementCategory = "announcement" | "emergency";
+
+export interface CoachAnnouncement {
+  id: string;
+  title: string;
+  body: string;
+  category: AnnouncementCategory;
+  recipient_count: number;
+  created_at: string;
 }
 
 export interface SessionEntry {

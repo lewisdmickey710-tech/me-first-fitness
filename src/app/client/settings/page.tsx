@@ -3,6 +3,7 @@ import { BackLink } from "@/components/back-link";
 import { Card, EmptyState, Heart } from "@/components/ui";
 import { getMyClient } from "@/lib/current-client";
 import { NotificationToggle } from "@/components/notification-toggle";
+import { NotificationPreferences } from "@/components/notification-preferences";
 import { ThemePicker } from "@/components/theme-picker";
 import { makeT } from "@/lib/i18n";
 import { isClientTheme } from "@/lib/theme";
@@ -42,6 +43,21 @@ export default async function ClientSettingsPage() {
           {t("Get an instant alert on this device for session reminders and other updates — on top of, not instead of, email.")}
         </p>
         <NotificationToggle locale={me.language} />
+      </Card>
+
+      <Card className="space-y-2">
+        <p className="font-medium text-ink">{t("What you get notified about")}</p>
+        <p className="text-sm text-gray">
+          {t("Turn any of these off if you don't want them -- session reminders and emergency messages are never optional.")}
+        </p>
+        <NotificationPreferences
+          initial={{
+            notify_announcements: me.notify_announcements,
+            notify_streaks: me.notify_streaks,
+            notify_tracking_reminders: me.notify_tracking_reminders,
+          }}
+          locale={me.language}
+        />
       </Card>
 
       <Card className="space-y-2">

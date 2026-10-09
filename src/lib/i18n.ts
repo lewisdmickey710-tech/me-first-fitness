@@ -905,6 +905,17 @@ const ES: Record<string, string> = {
   "Couldn't turn on notifications.": "No se pudieron activar las notificaciones.",
   "Couldn't turn off notifications.": "No se pudieron desactivar las notificaciones.",
 
+  // Notification preferences
+  "What you get notified about": "De qué quieres recibir notificaciones",
+  "Turn any of these off if you don't want them -- session reminders and emergency messages are never optional.":
+    "Desactiva las que no quieras — los recordatorios de sesión y los mensajes de emergencia nunca son opcionales.",
+  "Announcements from Mickey": "Anuncios de Mickey",
+  "Streak celebrations": "Celebraciones de rachas",
+  "Reminders to track": "Recordatorios para registrar",
+  "Session reminders": "Recordatorios de sesión",
+  "Emergency messages from Mickey": "Mensajes de emergencia de Mickey",
+  "Always on": "Siempre activado",
+
   // Color scheme picker
   "Color scheme": "Esquema de color",
   "Pick the accent color you see throughout the app -- just for your own view.":

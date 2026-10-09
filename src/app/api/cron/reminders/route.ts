@@ -16,6 +16,7 @@ import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDay, formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
+import { computeStreak, nextStreakCelebration } from "@/lib/streaks";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,9 @@ export async function GET(request: Request) {
   const tomorrowDayOfWeek = tomorrow.getUTCDay();
 
   const todayDateStr = toDateString(now);
+  const yesterday = new Date(now);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayDateStr = toDateString(yesterday);
   const paymentLookahead = new Date(now);
   paymentLookahead.setUTCDate(
     paymentLookahead.getUTCDate() + PAYMENT_LOOKAHEAD_DAYS
@@ -80,6 +84,7 @@ export async function GET(request: Request) {
   let serviceCheckinNudges = 0;
   let blockedDateReminders = 0;
   let eventReminders = 0;
+  let streakCelebrations = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -341,7 +346,7 @@ export async function GET(request: Request) {
   // ---- Inactivity nudges: no self-logged check-in/activity in a while ----
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, user_id, last_inactivity_nudge_sent_at, language")
+    .select("id, name, user_id, last_inactivity_nudge_sent_at, language, notify_tracking_reminders")
     .not("user_id", "is", null);
 
   const activeClients = (clients ?? []).filter(
@@ -374,22 +379,83 @@ export async function GET(request: Request) {
       if (trackedRecentlyIds.has(client.id)) continue;
       if (!client.user_id) continue;
 
-      const { data: userResult, error: userError } =
-        await supabase.auth.admin.getUserById(client.user_id);
-      if (userError || !userResult?.user?.email) {
+      const { data: userResult } = await supabase.auth.admin.getUserById(client.user_id);
+      if (!userResult?.user?.email) {
         errors.push(`No email for client ${client.name}`);
-        continue;
       }
 
       try {
-        await sendInactivityNudgeEmail(userResult.user.email, client.name, client.language);
+        if (userResult?.user?.email) {
+          await sendInactivityNudgeEmail(userResult.user.email, client.name, client.language);
+        }
+        if (client.notify_tracking_reminders) {
+          await sendPushToUser(supabase, client.user_id, {
+            title: "Haven't seen you track in a bit",
+            body: "No pressure -- just a nudge to log a check-in or activity when you get a chance.",
+            url: "/client/dashboard",
+          });
+        }
         await supabase
           .from("clients")
           .update({ last_inactivity_nudge_sent_at: new Date().toISOString() })
           .eq("id", client.id);
         inactivityNudges++;
       } catch (e) {
-        errors.push(`Inactivity email failed for ${client.name}: ${e}`);
+        errors.push(`Inactivity nudge failed for ${client.name}: ${e}`);
+      }
+    }
+  }
+
+  // ---- Streak celebrations: daily habit-tracking streaks that hit a
+  // fresh milestone as of yesterday. Only clients who logged a habit
+  // yesterday can possibly be mid-streak -- anyone else's streak already
+  // broke, and resets naturally the next time they log again. ----
+  const { data: loggedYesterday } = await supabase
+    .from("client_habit_logs")
+    .select("client_id")
+    .eq("log_date", yesterdayDateStr);
+  const streakCandidateIds = [...new Set((loggedYesterday ?? []).map((r) => r.client_id))];
+
+  if (streakCandidateIds.length > 0) {
+    const { data: streakClients } = await supabase
+      .from("clients")
+      .select("id, name, user_id, notify_streaks, last_celebrated_streak_length")
+      .in("id", streakCandidateIds)
+      .eq("notify_streaks", true)
+      .not("user_id", "is", null);
+
+    for (const client of streakClients ?? []) {
+      if (!client.user_id) continue;
+      try {
+        const { data: habitLogDates } = await supabase
+          .from("client_habit_logs")
+          .select("log_date")
+          .eq("client_id", client.id)
+          .gte("log_date", toDateString(new Date(yesterday.getTime() - 366 * 86400000)));
+        const loggedDates = new Set((habitLogDates ?? []).map((r) => r.log_date));
+
+        const currentStreak = computeStreak(loggedDates, yesterdayDateStr);
+        const { celebrate, newLastCelebrated } = nextStreakCelebration(
+          currentStreak,
+          client.last_celebrated_streak_length
+        );
+
+        if (celebrate) {
+          await sendPushToUser(supabase, client.user_id, {
+            title: `🔥 ${currentStreak}-day streak!`,
+            body: `You've tracked a habit ${currentStreak} days in a row. Keep it going!`,
+            url: "/client/habits",
+          });
+          streakCelebrations++;
+        }
+        if (newLastCelebrated !== client.last_celebrated_streak_length) {
+          await supabase
+            .from("clients")
+            .update({ last_celebrated_streak_length: newLastCelebrated })
+            .eq("id", client.id);
+        }
+      } catch (e) {
+        errors.push(`Streak celebration failed for ${client.name}: ${e}`);
       }
     }
   }
@@ -736,6 +802,7 @@ export async function GET(request: Request) {
     serviceCheckinNudges,
     blockedDateReminders,
     eventReminders,
+    streakCelebrations,
     retainerPayments,
     digestNudgeSent,
     errors,

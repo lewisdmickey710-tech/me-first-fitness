@@ -18,6 +18,7 @@ export default function CoachLayout({
           { href: "/coach/digest", label: "Digest" },
           { href: "/coach/schedule", label: "Schedule" },
           { href: "/coach/classes", label: "Classes" },
+          { href: "/coach/announce", label: "Announce" },
           { href: "/coach/sign-ons", label: "Sign-ons" },
           { href: "/coach/sliding-scale", label: "Sliding Scale" },
           { href: "/coach/programs", label: "Programs" },

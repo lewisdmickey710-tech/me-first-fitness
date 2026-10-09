@@ -1077,6 +1077,36 @@ export async function updateMyTheme(theme: ClientTheme) {
   revalidatePath("/client", "layout");
 }
 
+const NOTIFICATION_PREFERENCE_COLUMNS = [
+  "notify_announcements",
+  "notify_streaks",
+  "notify_tracking_reminders",
+] as const;
+type NotificationPreferenceColumn = (typeof NOTIFICATION_PREFERENCE_COLUMNS)[number];
+
+// Session reminders and emergency broadcasts are deliberately not settable
+// here -- there's no column for either, so there's nothing a client could
+// pass that would turn them off.
+export async function updateNotificationPreference(
+  column: NotificationPreferenceColumn,
+  value: boolean
+) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+  if (!NOTIFICATION_PREFERENCE_COLUMNS.includes(column)) {
+    throw new Error("Not a valid notification preference.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("clients")
+    .update({ [column]: value })
+    .eq("id", me.id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/client/settings");
+}
+
 export async function submitMinorConsent(formData: FormData) {
   const me = await getMyClient();
   if (!me) throw new Error("No linked client profile found.");
