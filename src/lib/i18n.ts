@@ -879,4 +879,9 @@ const ES: Record<string, string> = {
   Ocean: "Océano",
   Slate: "Pizarra",
   Amber: "Ámbar",
+  "Notifications, how the app looks, and your data.":
+    "Notificaciones, cómo se ve la aplicación y tus datos.",
+  "Edit your info →": "Editar mi información →",
+  "Notifications, color scheme, download my data →":
+    "Notificaciones, esquema de color, descargar mis datos →",
 };

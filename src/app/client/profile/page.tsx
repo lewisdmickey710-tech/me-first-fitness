@@ -4,11 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { submitClientProfile } from "@/app/client/actions";
 import { Badge, Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
-import { NotificationToggle } from "@/components/notification-toggle";
-import { ThemePicker } from "@/components/theme-picker";
 import { US_TIMEZONES } from "@/lib/timezone";
 import { LANGUAGES, makeT } from "@/lib/i18n";
-import { isClientTheme } from "@/lib/theme";
 import type {
   ClientDocumentAcknowledgment,
   ClientDocumentAssignment,
@@ -89,6 +86,11 @@ export default async function ClientProfilePage() {
           ? t("Just your contact info to start — quick and easy. You can update any of this any time it changes.")
           : t("Update any of this any time it changes.")}
       </p>
+      {!isFirstTime ? (
+        <Link href="/client/settings" className="text-sm text-rose hover:underline">
+          {t("Notifications, color scheme, download my data →")}
+        </Link>
+      ) : null}
 
       <Card>
         <form action={submitClientProfile} className="space-y-4">
@@ -292,43 +294,6 @@ export default async function ClientProfilePage() {
         </Card>
       ) : null}
 
-      {!isFirstTime ? (
-        <Card className="space-y-2">
-          <p className="font-medium text-ink">{t("Notifications")}</p>
-          <p className="text-sm text-gray">
-            {t("Get an instant alert on this device for session reminders and other updates — on top of, not instead of, email.")}
-          </p>
-          <NotificationToggle locale={me.language} />
-        </Card>
-      ) : null}
-
-      {!isFirstTime ? (
-        <Card className="space-y-2">
-          <p className="font-medium text-ink">{t("Color scheme")}</p>
-          <p className="text-sm text-gray">
-            {t("Pick the accent color you see throughout the app -- just for your own view.")}
-          </p>
-          <ThemePicker
-            current={isClientTheme(me.theme) ? me.theme : "rose"}
-            locale={me.language}
-          />
-        </Card>
-      ) : null}
-
-      {!isFirstTime ? (
-        <Card className="space-y-2">
-          <p className="font-medium text-ink">{t("Your data")}</p>
-          <p className="text-sm text-gray">
-            {t("Download everything tracked here for you — sessions, check-ins, measurements, documents you've signed, all of it — for your own records any time, including if you ever stop training with Mickey.")}
-          </p>
-          <a
-            href="/api/client/export"
-            className="inline-block rounded-xl border border-grayLt bg-white px-4 py-2 text-sm font-medium text-ink hover:bg-bg"
-          >
-            {t("Download my data")}
-          </a>
-        </Card>
-      ) : null}
     </div>
   );
 }

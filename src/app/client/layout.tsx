@@ -24,7 +24,7 @@ export default async function ClientAreaLayout({
       <TopNav
         title="MeFirstFitness"
         faqHref="/client/faq"
-        settingsHref="/client/profile"
+        settingsHref="/client/settings"
         locale={me?.language}
         tintClassName="bg-accentSoft"
       />
