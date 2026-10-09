@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { BackLink } from "@/components/back-link";
 import { getMyClient } from "@/lib/current-client";
-import { Card, Collapsible, Heart } from "@/components/ui";
+import { createClient } from "@/lib/supabase/server";
+import { Badge, Card, Collapsible, Heart } from "@/components/ui";
 import { CALL_DURATION_MINUTES, VIDEO_SESSION_RATE } from "@/lib/video-session";
 import { makeT } from "@/lib/i18n";
+import type { CoachAnnouncement } from "@/lib/types";
 
 function Section({
   title,
@@ -42,9 +44,42 @@ function Feature({ name, children }: { name: string; children: React.ReactNode }
   );
 }
 
+function Announcement({
+  announcement,
+  locale,
+}: {
+  announcement: CoachAnnouncement;
+  locale?: "en" | "es";
+}) {
+  const t = makeT(locale);
+  const dateLabel = new Date(announcement.created_at).toLocaleDateString(
+    locale === "es" ? "es" : "en-US",
+    { month: "short", day: "numeric", year: "numeric" }
+  );
+  return (
+    <div className="space-y-1 py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center justify-between gap-2">
+        <Badge tone={announcement.category === "emergency" ? "pink" : "teal"}>
+          {announcement.category === "emergency" ? t("Emergency") : t("Announcement")}
+        </Badge>
+        <p className="text-xs text-gray">{dateLabel}</p>
+      </div>
+      <p className="font-medium text-ink">{announcement.title}</p>
+      <p className="text-sm text-gray">{announcement.body}</p>
+    </div>
+  );
+}
+
 export default async function ClientFaqPage() {
   const me = await getMyClient();
   const t = makeT(me?.language);
+
+  const supabase = await createClient();
+  const { data: announcements } = (await supabase
+    .from("coach_announcements")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(20)) as { data: CoachAnnouncement[] | null };
 
   return (
     <div className="space-y-6">
@@ -63,6 +98,14 @@ export default async function ClientFaqPage() {
           .
         </p>
       </div>
+
+      {announcements && announcements.length > 0 ? (
+        <Section title={t("Announcements from Mickey")}>
+          {announcements.map((a) => (
+            <Announcement key={a.id} announcement={a} locale={me?.language} />
+          ))}
+        </Section>
+      ) : null}
 
       <Section title={t("Tutorials: What Each Part Does")}>
         <Feature name={t("Dashboard")}>

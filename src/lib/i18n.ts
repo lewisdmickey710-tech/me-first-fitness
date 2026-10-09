@@ -389,6 +389,8 @@ const ES: Record<string, string> = {
     "Cómo usar la aplicación, qué esperar del entrenamiento con Mickey, y algunos conceptos básicos de fitness. Toca una pregunta para expandirla — para la educación completa de bienestar (movimiento, nutrición, mentalidad, recuperación), consulta tu",
   "Wellness Guide": "Guía de Bienestar",
   "Tutorials: What Each Part Does": "Tutoriales: Qué hace cada parte",
+  Emergency: "Emergencia",
+  Announcement: "Anuncio",
   Dashboard: "Panel principal",
   Schedule: "Horario",
   Symptoms: "Síntomas",
