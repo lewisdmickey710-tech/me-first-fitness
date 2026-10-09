@@ -578,6 +578,77 @@ export async function sendBlockedDatesReminderEmail(
   });
 }
 
+// To a client who tapped "I'm interested" on a shared class/workshop, the
+// day before it happens -- the exact same "tomorrow" lookahead as a
+// regular session reminder, just without any cancellation-policy footer
+// since there's no fee or booking attached to this yet.
+export async function sendClassReminderEmail(
+  to: string,
+  clientName: string,
+  title: string,
+  kind: "class" | "workshop",
+  whenText: string,
+  locale: Locale = "en"
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping class reminder email");
+    return;
+  }
+  const isEs = locale === "es";
+  const kindLabel = isEs
+    ? kind === "workshop"
+      ? "taller"
+      : "clase"
+    : kind === "workshop"
+      ? "workshop"
+      : "class";
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: isEs ? `${title} es mañana` : `${title} is tomorrow`,
+    html: wrapper(
+      isEs
+        ? `
+      <p>Hola ${clientName},</p>
+      <p>Solo un aviso — ${kindLabel} que te interesa, <strong>${title}</strong>, es <strong>${whenText}</strong>.</p>
+    `
+        : `
+      <p>Hi ${clientName},</p>
+      <p>Just a heads up — the ${kindLabel} you're interested in, <strong>${title}</strong>, is <strong>${whenText}</strong>.</p>
+    `
+    ),
+  });
+}
+
+// To the coach, the day before a shared class/workshop she's hosting.
+export async function sendEventReminderEmail(
+  to: string,
+  title: string,
+  kind: "class" | "workshop",
+  whenText: string,
+  interestedCount: number
+) {
+  if (!resend) {
+    console.warn("RESEND_API_KEY not set — skipping event reminder email");
+    return;
+  }
+  await resend.emails.send({
+    from: FROM,
+    to,
+    subject: `${title} is tomorrow`,
+    html: wrapper(`
+      <p>Reminder — your ${kind} <strong>${title}</strong> is <strong>${whenText}</strong>.</p>
+      <p>${
+        interestedCount === 0
+          ? "No one's marked interest yet."
+          : interestedCount === 1
+            ? "1 person has marked interest."
+            : `${interestedCount} people have marked interest.`
+      }</p>
+    `),
+  });
+}
+
 export async function sendSessionRescheduledEmail(
   to: string,
   clientName: string,

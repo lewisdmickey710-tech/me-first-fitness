@@ -1,17 +1,19 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   sendBlockedDatesReminderEmail,
+  sendClassReminderEmail,
   sendDigestReadyEmail,
   sendDocumentsPendingEmail,
+  sendEventReminderEmail,
   sendInactivityNudgeEmail,
   sendPaymentReminderEmail,
   sendServiceCheckinDueEmail,
   sendSessionReminderEmail,
 } from "@/lib/email";
-import { getCoachEmail } from "@/lib/coach";
+import { getCoachEmail, getCoachUserId } from "@/lib/coach";
 import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
-import { formatTimeOfDayForClient } from "@/lib/schedule";
+import { formatTimeOfDay, formatTimeOfDayForClient } from "@/lib/schedule";
 import { INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 
@@ -77,6 +79,7 @@ export async function GET(request: Request) {
   let documentNudges = 0;
   let serviceCheckinNudges = 0;
   let blockedDateReminders = 0;
+  let eventReminders = 0;
   const errors: string[] = [];
 
   // ---- Session reminders: schedules whose day falls tomorrow ----
@@ -203,6 +206,86 @@ export async function GET(request: Request) {
       sessionReminders++;
     } catch (e) {
       errors.push(`Session email failed for ${client.name}: ${e}`);
+    }
+  }
+
+  // ---- Event reminders: shared classes/workshops happening tomorrow,
+  // to the coach and to everyone who's marked interest in it ----
+  const { data: tomorrowEvents } = await supabase
+    .from("coach_events")
+    .select("id, kind, title, start_time")
+    .eq("event_date", tomorrowDateStr)
+    .eq("visible_to_clients", true)
+    .is("reminder_sent_at", null);
+
+  for (const event of tomorrowEvents ?? []) {
+    try {
+      const { data: interested } = await supabase
+        .from("requests")
+        .select("clients(name, user_id, timezone, language)")
+        .eq("event_id", event.id)
+        .eq("request_type", "class_interest")
+        .in("status", ["pending", "confirmed"]);
+
+      const interestedClients = (interested ?? [])
+        .map(
+          (r) =>
+            (r as unknown as {
+              clients: { name: string; user_id: string | null; timezone: string; language: "en" | "es" } | null;
+            }).clients
+        )
+        .filter((c): c is { name: string; user_id: string | null; timezone: string; language: "en" | "es" } => !!c);
+
+      for (const client of interestedClients) {
+        if (!client.user_id) continue;
+        const { data: userResult } = await supabase.auth.admin.getUserById(client.user_id);
+        const whenText = `tomorrow at ${formatTimeOfDayForClient(tomorrowDateStr, event.start_time, client.timezone)}`;
+        if (userResult?.user?.email) {
+          await sendClassReminderEmail(
+            userResult.user.email,
+            client.name,
+            event.title,
+            event.kind,
+            whenText,
+            client.language
+          );
+        }
+        await sendPushToUser(supabase, client.user_id, {
+          title: `${event.title} is tomorrow`,
+          body: whenText,
+          url: "/client/schedule",
+        });
+      }
+
+      const coachWhenText = `tomorrow at ${formatTimeOfDay(event.start_time)}`;
+      const [coachEmail, coachUserId] = await Promise.all([
+        getCoachEmail(supabase),
+        getCoachUserId(supabase),
+      ]);
+      if (coachEmail) {
+        await sendEventReminderEmail(
+          coachEmail,
+          event.title,
+          event.kind,
+          coachWhenText,
+          interestedClients.length
+        );
+      }
+      if (coachUserId) {
+        await sendPushToUser(supabase, coachUserId, {
+          title: `${event.title} is tomorrow`,
+          body: coachWhenText,
+          url: "/coach/classes",
+        });
+      }
+
+      await supabase
+        .from("coach_events")
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq("id", event.id);
+      eventReminders++;
+    } catch (e) {
+      errors.push(`Event reminder failed for ${event.title}: ${e}`);
     }
   }
 
@@ -652,6 +735,7 @@ export async function GET(request: Request) {
     documentNudges,
     serviceCheckinNudges,
     blockedDateReminders,
+    eventReminders,
     retainerPayments,
     digestNudgeSent,
     errors,
