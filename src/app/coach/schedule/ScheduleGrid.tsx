@@ -51,6 +51,7 @@ interface DayBooking {
   durationMinutes: number;
   clientScheduleId: string | null;
   isHeld: boolean;
+  resolved: boolean;
 }
 
 interface PendingReschedule {
@@ -742,7 +743,14 @@ export function ScheduleGrid({
                     </div>
                   );
                 }
-                const movable = day.date >= todayStr;
+                // A past booking normally can't be picked up at all --
+                // nothing to move, it already happened. The exception is
+                // one nobody ever resolved either way (not logged, not
+                // cancelled, not rescheduled): that one should still be
+                // clickable so it can be rescheduled instead of just
+                // sitting there unresolved forever.
+                const needsAttention = day.date < todayStr && !b.resolved;
+                const movable = day.date >= todayStr || needsAttention;
                 const isPickedUp =
                   pickedUpBooking?.clientId === b.clientId && pickedUpBooking?.date === b.date;
                 const isPending = overdueClientIds.includes(b.clientId);
@@ -770,16 +778,20 @@ export function ScheduleGrid({
                     title={`${b.clientName} — ${formatTimeOfDay(b.timeOfDay)}${
                       isPending
                         ? " · pending: outstanding balance"
-                        : movable
-                          ? " · tap to reschedule"
-                          : ""
+                        : needsAttention
+                          ? " · never logged, cancelled, or rescheduled — tap to reschedule"
+                          : movable
+                            ? " · tap to reschedule"
+                            : ""
                     } · press and hold to log this session`}
                     className={`absolute inset-x-0 z-10 flex items-center justify-center rounded-md border text-[10px] font-medium leading-none text-ink ${
                       isPickedUp
                         ? "border-rose bg-rose/50 ring-2 ring-rose"
                         : isPending
                           ? "border-gold/70 bg-gold/40"
-                          : "border-pink/60 bg-pink/40"
+                          : needsAttention
+                            ? "border-2 border-dashed border-pink bg-white"
+                            : "border-pink/60 bg-pink/40"
                     } cursor-pointer`}
                     style={{ top: geometry.top, height: geometry.height }}
                   >
@@ -811,6 +823,10 @@ export function ScheduleGrid({
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-gold/40" /> Pending (balance owed)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded border-2 border-dashed border-pink bg-white" /> Needs
+          logging or rescheduling
         </span>
         <span className="flex items-center gap-1">
           <span className="h-3 w-3 rounded bg-grayLt opacity-60" /> On hold (placeholder)

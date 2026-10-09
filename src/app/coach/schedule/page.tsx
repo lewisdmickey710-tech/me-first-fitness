@@ -140,6 +140,7 @@ export default async function CoachSchedulePage({
     { data: weekOccurrences },
     { data: openRequests },
     { data: overduePayments },
+    { data: weekSessions },
   ] = await Promise.all([
     supabase
       .from("client_schedules")
@@ -205,6 +206,13 @@ export default async function CoachSchedulePage({
       .lt("due_date", todayStr) as unknown as Promise<{
       data: { client_id: string }[] | null;
     }>,
+    supabase
+      .from("sessions")
+      .select("client_id, date")
+      .gte("date", weekStartStr)
+      .lte("date", weekEndStr) as unknown as Promise<{
+      data: { client_id: string; date: string }[] | null;
+    }>,
   ]);
 
   const clientNameById = new Map((allClients ?? []).map((c) => [c.id, c.name]));
@@ -237,6 +245,17 @@ export default async function CoachSchedulePage({
   const weekOccByClientDate = new Map(
     (weekOccurrences ?? []).map((o) => [`${o.client_id}:${o.occurrence_date}`, o])
   );
+  // Logging a session (sessions table) never touches session_occurrences --
+  // they're independent, so "was this actually dealt with" has to check
+  // both: an occurrence row marked completed, or a real logged session on
+  // that date.
+  const loggedSessionDates = new Set(
+    (weekSessions ?? []).map((s) => `${s.client_id}:${s.date}`)
+  );
+  function isResolved(clientId: string, date: string): boolean {
+    const override = weekOccByClientDate.get(`${clientId}:${date}`);
+    return override?.status === "completed" || loggedSessionDates.has(`${clientId}:${date}`);
+  }
 
   const weekBookings: {
     clientId: string;
@@ -246,6 +265,7 @@ export default async function CoachSchedulePage({
     durationMinutes: number;
     clientScheduleId: string | null;
     isHeld: boolean;
+    resolved: boolean;
   }[] = [];
   for (const day of weekDays) {
     for (const s of scheduleByDayOfWeek.get(day.dayOfWeek) ?? []) {
@@ -268,6 +288,7 @@ export default async function CoachSchedulePage({
         durationMinutes: s.duration_minutes,
         clientScheduleId: s.id,
         isHeld: heldClientIds.has(s.client_id),
+        resolved: isResolved(s.client_id, day.date),
       });
     }
   }
@@ -283,6 +304,7 @@ export default async function CoachSchedulePage({
       durationMinutes: o.duration_minutes,
       clientScheduleId: null,
       isHeld: heldClientIds.has(o.client_id),
+      resolved: loggedSessionDates.has(`${o.client_id}:${o.occurrence_date}`),
     });
   }
 

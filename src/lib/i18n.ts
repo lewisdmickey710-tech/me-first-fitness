@@ -194,6 +194,7 @@ const ES: Record<string, string> = {
   Cancelled: "Cancelada",
   "Late cancelled": "Cancelada tarde",
   Rescheduled: "Reprogramada",
+  "Not yet logged": "Aún no registrada",
   "Cancellation policy": "Política de cancelación",
   "Cancelling with less than {hours} hours notice counts as a late cancellation. A first one is just noted — every one after that within 16 weeks brings a $10 fee and pauses your sessions until it's paid.":
     "Cancelar con menos de {hours} horas de aviso cuenta como una cancelación tardía. La primera solo se anota — cada una después de esa dentro de 16 semanas trae un cargo de $10 y pausa tus sesiones hasta que se pague.",

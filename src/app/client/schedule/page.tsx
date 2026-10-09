@@ -25,6 +25,7 @@ const DOT_TONE: Record<string, string> = {
   cancelled: "bg-pink",
   late_cancelled: "bg-pink",
   rescheduled: "bg-gold",
+  needs_logging: "bg-purple",
 };
 
 const WEEKDAY_SHORT_EN = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -58,6 +59,7 @@ export default async function ClientSchedulePage({
     cancelled: t("Cancelled"),
     late_cancelled: t("Late cancelled"),
     rescheduled: t("Rescheduled"),
+    needs_logging: t("Not yet logged"),
   };
   const MONTH_LABEL_FMT = new Intl.DateTimeFormat(isEs ? "es" : "en-US", {
     month: "long",
@@ -160,24 +162,35 @@ export default async function ClientSchedulePage({
     scheduleByDayOfWeek.set(s.day_of_week, list);
   }
 
-  const [{ data: monthOccurrences }, { data: businessSettings }] = await Promise.all([
-    supabase
-      .from("session_occurrences")
-      .select("*")
-      .eq("client_id", me.id)
-      .gte("occurrence_date", firstDateStr)
-      .lte("occurrence_date", lastDateStr),
-    supabase
-      .from("business_settings")
-      .select("*")
-      .eq("id", true)
-      .maybeSingle() as unknown as Promise<{ data: BusinessSettings | null }>,
-  ]);
+  const [{ data: monthOccurrences }, { data: businessSettings }, { data: monthSessions }] =
+    await Promise.all([
+      supabase
+        .from("session_occurrences")
+        .select("*")
+        .eq("client_id", me.id)
+        .gte("occurrence_date", firstDateStr)
+        .lte("occurrence_date", lastDateStr),
+      supabase
+        .from("business_settings")
+        .select("*")
+        .eq("id", true)
+        .maybeSingle() as unknown as Promise<{ data: BusinessSettings | null }>,
+      supabase
+        .from("sessions")
+        .select("date")
+        .eq("client_id", me.id)
+        .gte("date", firstDateStr)
+        .lte("date", lastDateStr),
+    ]);
 
   const occurrenceByDate = new Map<string, SessionOccurrence>();
   for (const o of monthOccurrences ?? []) {
     occurrenceByDate.set(o.occurrence_date, o);
   }
+  // Logging a session never touches session_occurrences -- they're
+  // independent -- so a day only reads as truly resolved if either one
+  // says so.
+  const loggedSessionDates = new Set((monthSessions ?? []).map((s) => s.date));
 
   const cells: { day: number; date: string; status: string | null }[] = [];
   for (let day = 1; day <= daysInMonth; day++) {
@@ -185,7 +198,10 @@ export default async function ClientSchedulePage({
     const dateStr = toDateString(date);
     const existing = occurrenceByDate.get(dateStr);
     const isScheduledDay = scheduleByDayOfWeek.has(date.getUTCDay());
-    const status = existing ? existing.status : isScheduledDay ? "scheduled" : null;
+    let status: string | null = existing ? existing.status : isScheduledDay ? "scheduled" : null;
+    if (status === "scheduled" && dateStr < todayStr && !loggedSessionDates.has(dateStr)) {
+      status = "needs_logging";
+    }
     cells.push({ day, date: dateStr, status });
   }
 
@@ -392,7 +408,9 @@ export default async function ClientSchedulePage({
                     ? "green"
                     : selectedCell.status === "scheduled"
                       ? "teal"
-                      : "gold"
+                      : selectedCell.status === "needs_logging"
+                        ? "purple"
+                        : "gold"
                 }
               >
                 {selectedCell.status === "scheduled"
