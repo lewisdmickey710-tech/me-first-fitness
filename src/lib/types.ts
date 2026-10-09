@@ -218,6 +218,19 @@ export type RequestStatus = "pending" | "confirmed" | "declined" | "countered";
 
 export type RequestType = "session" | "checkin_call" | "video_session" | "class_interest";
 
+export type ReplyItemType = "session" | "activity" | "nutrition";
+
+export interface CoachItemReply {
+  id: string;
+  item_type: ReplyItemType;
+  item_id: string;
+  client_id: string;
+  emoji: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface SessionRequest {
   id: string;
   client_id: string;

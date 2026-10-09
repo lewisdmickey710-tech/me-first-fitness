@@ -5,7 +5,8 @@ import { deleteNutritionLog } from "@/app/client/actions";
 import { Card, EmptyState, Heart } from "@/components/ui";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
-import type { ClientNutritionLog } from "@/lib/types";
+import { ItemReplyDisplay } from "@/components/item-reply-display";
+import type { ClientNutritionLog, CoachItemReply } from "@/lib/types";
 import { NutritionLogForm } from "@/app/client/nutrition/NutritionLogForm";
 
 export default async function ClientNutritionPage() {
@@ -30,6 +31,13 @@ export default async function ClientNutritionPage() {
     .eq("client_id", me.id)
     .order("log_date", { ascending: false })
     .limit(20)) as { data: ClientNutritionLog[] | null };
+
+  const { data: itemReplies } = (await supabase
+    .from("coach_item_replies")
+    .select("*")
+    .eq("client_id", me.id)
+    .eq("item_type", "nutrition")) as { data: CoachItemReply[] | null };
+  const replyByItemId = new Map((itemReplies ?? []).map((r) => [r.item_id, r]));
 
   const photoUrlByPath = new Map<string, string>();
   const photoPaths = [
@@ -121,6 +129,13 @@ export default async function ClientNutritionPage() {
               {n.notes ? (
                 <p className="mt-1 text-sm text-gray">{n.notes}</p>
               ) : null}
+              <div className="mt-2">
+                <ItemReplyDisplay
+                  emoji={replyByItemId.get(n.id)?.emoji ?? null}
+                  note={replyByItemId.get(n.id)?.note ?? null}
+                  locale={me.language}
+                />
+              </div>
             </Card>
           ))}
         </div>

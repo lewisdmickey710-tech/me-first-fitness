@@ -96,6 +96,7 @@ export function LogSessionForm({
   programDayOptions,
   defaultPhase,
   lastEntry,
+  lastEntryReply = null,
   existingSession,
   activeCompPackage = null,
   sessionRate = null,
@@ -105,6 +106,7 @@ export function LogSessionForm({
   programDayOptions: ProgramDayOption[];
   defaultPhase: string;
   lastEntry: LogEntry | null;
+  lastEntryReply?: { emoji: string | null; note: string | null } | null;
   existingSession?: ExistingSession | null;
   activeCompPackage?: CompSessionPackage | null;
   sessionRate?: number | null;
@@ -262,6 +264,14 @@ export function LogSessionForm({
             <p className="rounded-lg bg-white px-2 py-1.5 text-sm text-ink">
               <span className="font-medium">Your note: </span>
               {lastEntry.session?.coach_notes ?? lastEntry.activity?.coach_notes}
+            </p>
+          ) : null}
+          {lastEntryReply?.emoji || lastEntryReply?.note ? (
+            <p className="rounded-lg bg-white px-2 py-1.5 text-sm text-ink">
+              <span className="font-medium">
+                Your reply{lastEntryReply.emoji ? ` ${lastEntryReply.emoji}` : ""}:{" "}
+              </span>
+              {lastEntryReply.note}
             </p>
           ) : null}
           {lastEntry.session && lastEntry.session.entries.length > 0 ? (

@@ -1222,6 +1222,91 @@ export async function setLogEntryCoachNotes(
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Client-visible reply (emoji and/or text) on one of their own logged
+// workouts/activities or nutrition entries -- the client-facing
+// counterpart to setLogEntryCoachNotes above, deliberately a separate
+// table rather than another column, since a single item carries both a
+// private coach note and a public reply with different audiences. One
+// reply per item (upsertable); saving with both fields empty deletes it.
+export async function setItemReply(
+  clientId: string,
+  itemType: "session" | "activity" | "nutrition",
+  itemId: string,
+  emoji: string | null,
+  note: string | null
+) {
+  const supabase = await createClient();
+  const trimmedNote = note?.trim() || null;
+  const trimmedEmoji = emoji?.trim() || null;
+
+  if (!trimmedEmoji && !trimmedNote) {
+    const { error } = await supabase
+      .from("coach_item_replies")
+      .delete()
+      .eq("item_type", itemType)
+      .eq("item_id", itemId);
+    if (error) throw new Error(error.message);
+    revalidatePath(`/coach/clients/${clientId}`);
+    return;
+  }
+
+  const { error } = await supabase.from("coach_item_replies").upsert(
+    {
+      item_type: itemType,
+      item_id: itemId,
+      client_id: clientId,
+      emoji: trimmedEmoji,
+      note: trimmedNote,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "item_type,item_id" }
+  );
+  if (error) throw new Error(error.message);
+
+  try {
+    const { data: client } = await supabase
+      .from("clients")
+      .select("user_id")
+      .eq("id", clientId)
+      .single();
+    if (client?.user_id) {
+      const label = itemType === "nutrition" ? "nutrition log" : "workout";
+      await sendPushToUser(createAdminClient(), client.user_id, {
+        title: `Mickey replied ${trimmedEmoji ?? ""}`.trim(),
+        body: trimmedNote || `Left a reply on your ${label}`,
+        url: itemType === "nutrition" ? "/client/nutrition" : "/client/history",
+      });
+    }
+  } catch (pushError) {
+    console.error("Failed to send reply push", pushError);
+  }
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// A manual, one-off "go track something" push to a single client --
+// unlike the automated inactivity nudge, this always goes through
+// regardless of their own notify_tracking_reminders preference, since
+// it's a personal message from the coach rather than the kind of
+// automated nudge that preference exists to let them turn off.
+export async function sendTrackingNudge(clientId: string, formData: FormData) {
+  const supabase = await createClient();
+  const message = String(formData.get("message") ?? "").trim();
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("user_id")
+    .eq("id", clientId)
+    .single();
+  if (!client?.user_id) throw new Error("This client has no login linked.");
+
+  await sendPushToUser(createAdminClient(), client.user_id, {
+    title: "Mickey says...",
+    body: message || "Time to log something — habits, nutrition, a check-in, whatever's due.",
+    url: "/client/dashboard",
+  });
+}
+
 // Per-client edits to a prescribed exercise (swap it, change sets/reps, or
 // drop it entirely) without touching the shared care-profile template
 // everyone else on that track follows. One row per client + exercise slot

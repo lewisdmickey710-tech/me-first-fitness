@@ -793,6 +793,123 @@ export async function GET(request: Request) {
     }
   }
 
+  // ---- Morning digest: a single push to the coach, once a day, with
+  // today's schedule and what needs her attention -- dedup'd the same
+  // way as the weekly digest email, just daily instead of weekly and
+  // push instead of email. ----
+  let morningDigestSent = false;
+  {
+    const { data: morningSettings } = await supabase
+      .from("business_settings")
+      .select("last_morning_digest_sent_on")
+      .eq("id", true)
+      .maybeSingle();
+
+    if (morningSettings?.last_morning_digest_sent_on !== todayDateStr) {
+      try {
+        const todayDayOfWeek = now.getUTCDay();
+
+        const [
+          { data: todaySchedules },
+          { data: todayOneOffs },
+          { data: todayEvents },
+          { data: pendingRequests },
+          { data: overduePayments },
+          { data: pendingSlidingScale },
+          { data: readyLeads },
+        ] = await Promise.all([
+          supabase
+            .from("client_schedules")
+            .select("client_id, clients(name)")
+            .eq("active", true)
+            .eq("day_of_week", todayDayOfWeek),
+          supabase
+            .from("session_occurrences")
+            .select("client_id, clients(name)")
+            .eq("status", "scheduled")
+            .eq("occurrence_date", todayDateStr),
+          supabase.from("coach_events").select("title").eq("event_date", todayDateStr),
+          supabase
+            .from("requests")
+            .select("id")
+            .eq("status", "pending")
+            .neq("request_type", "class_interest"),
+          supabase
+            .from("payments")
+            .select("id")
+            .is("paid_on", null)
+            .lt("due_date", todayDateStr),
+          supabase.from("sliding_scale_applications").select("id").eq("status", "pending"),
+          supabase
+            .from("leads")
+            .select("id")
+            .eq("ready_to_transition", true)
+            .neq("status", "converted")
+            .neq("status", "archived"),
+        ]);
+
+        const todayClientNames = new Set<string>();
+        for (const row of [...(todaySchedules ?? []), ...(todayOneOffs ?? [])]) {
+          if (frozenClientIds.has(row.client_id)) continue;
+          const name = (row as unknown as { clients: { name: string } | null }).clients?.name;
+          if (name) todayClientNames.add(name);
+        }
+
+        const sessionCount = todayClientNames.size;
+        const classCount = (todayEvents ?? []).length;
+        const scheduleLine =
+          sessionCount === 0 && classCount === 0
+            ? "Nothing on the calendar today"
+            : [
+                sessionCount > 0 ? `${sessionCount} session${sessionCount === 1 ? "" : "s"}` : null,
+                classCount > 0 ? `${classCount} class${classCount === 1 ? "" : "es"}` : null,
+              ]
+                .filter(Boolean)
+                .join(", ");
+        const namesArr = [...todayClientNames];
+        const namesPart =
+          namesArr.length === 0
+            ? ""
+            : namesArr.length <= 4
+              ? ` — ${namesArr.join(", ")}`
+              : ` — ${namesArr.slice(0, 3).join(", ")} and ${namesArr.length - 3} more`;
+
+        const adminParts = [
+          (pendingRequests ?? []).length > 0
+            ? `${(pendingRequests ?? []).length} request${(pendingRequests ?? []).length === 1 ? "" : "s"}`
+            : null,
+          (overduePayments ?? []).length > 0
+            ? `${(overduePayments ?? []).length} overdue payment${(overduePayments ?? []).length === 1 ? "" : "s"}`
+            : null,
+          (pendingSlidingScale ?? []).length > 0
+            ? `${(pendingSlidingScale ?? []).length} sliding-scale app${(pendingSlidingScale ?? []).length === 1 ? "" : "s"}`
+            : null,
+          (readyLeads ?? []).length > 0
+            ? `${(readyLeads ?? []).length} lead${(readyLeads ?? []).length === 1 ? "" : "s"} ready`
+            : null,
+        ].filter(Boolean);
+        const adminLine = adminParts.length > 0 ? adminParts.join(", ") : "nothing pending";
+
+        const coachUserId = await getCoachUserId(supabase);
+        if (coachUserId) {
+          await sendPushToUser(supabase, coachUserId, {
+            title: "Good morning ☀️",
+            body: `Today: ${scheduleLine}${namesPart}. Admin: ${adminLine}.`,
+            url: "/coach/dashboard",
+          });
+          morningDigestSent = true;
+        }
+
+        await supabase
+          .from("business_settings")
+          .update({ last_morning_digest_sent_on: todayDateStr })
+          .eq("id", true);
+      } catch (e) {
+        errors.push(`Morning digest failed: ${e}`);
+      }
+    }
+  }
+
   return Response.json({
     ok: true,
     sessionReminders,
@@ -805,6 +922,7 @@ export async function GET(request: Request) {
     streakCelebrations,
     retainerPayments,
     digestNudgeSent,
+    morningDigestSent,
     errors,
   });
 }

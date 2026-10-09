@@ -82,6 +82,17 @@ export default async function LogSessionPage({
 
   const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
 
+  const lastEntryReply = lastEntry
+    ? ((
+        await supabase
+          .from("coach_item_replies")
+          .select("emoji, note")
+          .eq("item_type", lastEntry.session ? "session" : "activity")
+          .eq("item_id", lastEntry.id)
+          .maybeSingle()
+      ).data ?? null)
+    : null;
+
   const { data: activeCompPackage } = (await supabase
     .from("comp_session_packages")
     .select("*")
@@ -182,6 +193,7 @@ export default async function LogSessionPage({
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={lastEntry}
+        lastEntryReply={lastEntryReply}
         activeCompPackage={activeCompPackage}
         sessionRate={client.session_rate}
       />

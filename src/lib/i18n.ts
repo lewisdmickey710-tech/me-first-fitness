@@ -391,6 +391,7 @@ const ES: Record<string, string> = {
   "Tutorials: What Each Part Does": "Tutoriales: Qué hace cada parte",
   Emergency: "Emergencia",
   Announcement: "Anuncio",
+  "Mickey replied": "Mickey respondió",
   Dashboard: "Panel principal",
   Schedule: "Horario",
   Symptoms: "Síntomas",

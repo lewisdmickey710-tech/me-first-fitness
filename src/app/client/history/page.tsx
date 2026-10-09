@@ -12,7 +12,8 @@ import {
 } from "@/lib/log-entries";
 import { makeT } from "@/lib/i18n";
 import { NUTRITION_SESSION_FIELDS } from "@/lib/nutrition-session";
-import type { Activity, TrainingSession } from "@/lib/types";
+import { ItemReplyDisplay } from "@/components/item-reply-display";
+import type { Activity, CoachItemReply, TrainingSession } from "@/lib/types";
 
 export default async function ClientHistoryPage() {
   const me = await getMyClient();
@@ -51,6 +52,15 @@ export default async function ClientHistoryPage() {
       data: Activity[] | null;
     }>,
   ]);
+
+  const { data: itemReplies } = (await supabase
+    .from("coach_item_replies")
+    .select("*")
+    .eq("client_id", me.id)
+    .in("item_type", ["session", "activity"])) as { data: CoachItemReply[] | null };
+  const replyByItemKey = new Map(
+    (itemReplies ?? []).map((r) => [`${r.item_type}:${r.item_id}`, r])
+  );
 
   const entries = mergeLogEntries(sessions ?? [], activities ?? []);
 
@@ -179,6 +189,11 @@ export default async function ClientHistoryPage() {
                   />
                 ) : null}
                 {a?.notes ? <p className="text-sm text-ink">{a.notes}</p> : null}
+                <ItemReplyDisplay
+                  emoji={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.emoji ?? null}
+                  note={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.note ?? null}
+                  locale={me.language}
+                />
                 {s && entry.loggedBy === "client" ? (
                   <form
                     action={async () => {

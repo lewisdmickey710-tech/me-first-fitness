@@ -31,6 +31,7 @@ import {
   setClientPhase,
   setLogEntryCoachNotes,
   setRequestStatus,
+  sendTrackingNudge,
   startClientHold,
   touchProgramUpdated,
   unmarkMilestoneAchieved,
@@ -57,6 +58,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
+import { ItemReplyEditor } from "@/components/item-reply-editor";
 import { CalorieGoalField } from "@/components/calorie-goal-field";
 import { ACTIVITY_TYPES, formatReps, phaseInfo, PHASES } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
@@ -99,6 +101,7 @@ import type {
   ClientMinorConsent,
   ClientNote,
   ClientNutritionLog,
+  CoachItemReply,
   ClientPhaseHistory,
   ClientProgramOverride,
   ClientSchedule,
@@ -288,6 +291,14 @@ export default async function ClientDetailPage({
       data: ClientProgressPhoto[] | null;
     }>,
   ]);
+
+  const { data: itemReplies } = (await supabase
+    .from("coach_item_replies")
+    .select("*")
+    .eq("client_id", id)) as { data: CoachItemReply[] | null };
+  const replyByItemKey = new Map(
+    (itemReplies ?? []).map((r) => [`${r.item_type}:${r.item_id}`, r])
+  );
 
   const progressPhotoUrlByPath = new Map<string, string>();
   const progressPhotoPaths = [
@@ -561,6 +572,7 @@ export default async function ClientDetailPage({
           nutritionLogs={nutritionLogs ?? []}
           symptomLogs={symptomLogs ?? []}
           symptomTrackerEnabled={client.symptom_tracker_enabled}
+          replyByItemKey={replyByItemKey}
         />
       )}
       {tab === "attendance" && (
@@ -926,6 +938,24 @@ function Overview({
                   ? "Today"
                   : `${daysSinceLastCheckinOrActivity} day${daysSinceLastCheckinOrActivity === 1 ? "" : "s"} ago`}
             </p>
+            {client.user_id ? (
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  await sendTrackingNudge(client.id, formData);
+                }}
+                className="mt-2 flex flex-wrap items-center gap-2"
+              >
+                <Input
+                  name="message"
+                  placeholder="Optional custom message..."
+                  className="max-w-xs"
+                />
+                <Button type="submit" variant="secondary">
+                  Nudge to track
+                </Button>
+              </form>
+            ) : null}
           </div>
           <Link
             href="/coach/digest"
@@ -2261,6 +2291,7 @@ async function LogTab({
   nutritionLogs,
   symptomLogs,
   symptomTrackerEnabled,
+  replyByItemKey,
 }: {
   clientId: string;
   sessions: TrainingSession[];
@@ -2271,6 +2302,7 @@ async function LogTab({
   nutritionLogs: ClientNutritionLog[];
   symptomLogs: SharedSymptomDayLog[];
   symptomTrackerEnabled: boolean;
+  replyByItemKey: Map<string, CoachItemReply>;
 }) {
   const mediaPaths = [
     ...new Set([
@@ -2497,6 +2529,14 @@ async function LogTab({
                   </form>
                 </Collapsible>
 
+                <ItemReplyEditor
+                  clientId={clientId}
+                  itemType={s ? "session" : "activity"}
+                  itemId={entry.id}
+                  initialEmoji={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.emoji ?? null}
+                  initialNote={replyByItemKey.get(`${s ? "session" : "activity"}:${entry.id}`)?.note ?? null}
+                />
+
                 {s ? (
                   <div className="mt-2 flex items-center gap-3">
                     {entry.loggedBy !== "client" ? (
@@ -2537,7 +2577,12 @@ async function LogTab({
 
       <Card>
         <Collapsible label="Nutrition (client-tracked)">
-          <NutritionTab nutritionLogs={nutritionLogs} supabase={supabase} />
+          <NutritionTab
+            nutritionLogs={nutritionLogs}
+            supabase={supabase}
+            clientId={clientId}
+            replyByItemKey={replyByItemKey}
+          />
         </Collapsible>
       </Card>
 
@@ -3044,9 +3089,13 @@ function SymptomsTab({ symptomLogs }: { symptomLogs: SharedSymptomDayLog[] }) {
 async function NutritionTab({
   nutritionLogs,
   supabase,
+  clientId,
+  replyByItemKey,
 }: {
   nutritionLogs: ClientNutritionLog[];
   supabase: Awaited<ReturnType<typeof createClient>>;
+  clientId: string;
+  replyByItemKey: Map<string, CoachItemReply>;
 }) {
   const photoPaths = [
     ...new Set(nutritionLogs.map((n) => n.photo_path).filter(Boolean)),
@@ -3107,6 +3156,13 @@ async function NutritionTab({
               {n.notes ? (
                 <p className="mt-1 text-sm text-gray">{n.notes}</p>
               ) : null}
+              <ItemReplyEditor
+                clientId={clientId}
+                itemType="nutrition"
+                itemId={n.id}
+                initialEmoji={replyByItemKey.get(`nutrition:${n.id}`)?.emoji ?? null}
+                initialNote={replyByItemKey.get(`nutrition:${n.id}`)?.note ?? null}
+              />
             </Card>
           ))}
         </div>
