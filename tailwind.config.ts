@@ -9,7 +9,11 @@ const config: Config = {
         pink: "#E75480", // Phase 2 — Strength
         green: "#5D8A5E", // Phase 3 — Size
         gold: "#C9A96E", // Phase 4 — Power
-        rose: "#B9829A", // standalone/general
+        // Driven by a CSS variable (see globals.css) so a client's chosen
+        // color scheme can override it for their own subtree -- defaults
+        // to the same #B9829A everywhere nothing overrides the variable.
+        rose: "rgb(var(--accent-rgb) / <alpha-value>)",
+        accentSoft: "rgb(var(--accent-soft-rgb) / <alpha-value>)",
         purple: "#9B85C4", // time requests awaiting a decision
         ink: "#3E363A", // primary text
         gray: "#6B5F63", // secondary text

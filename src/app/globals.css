@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Default accent (the "rose" color) and its soft wash -- #B9829A, same
+     as before this was made variable. A client's chosen theme overrides
+     these on their own layout's wrapping element; everything else
+     (including the coach's own view) keeps reading this default. */
+  --accent-rgb: 185 130 154;
+  --accent-soft-rgb: 253 231 237;
+}
+
 body {
   background-color: #fbf9fa;
   color: #3e363a;

@@ -870,4 +870,13 @@ const ES: Record<string, string> = {
     "Las notificaciones están bloqueadas para este sitio — revisa la configuración de tu navegador o dispositivo para volver a activarlas.",
   "Couldn't turn on notifications.": "No se pudieron activar las notificaciones.",
   "Couldn't turn off notifications.": "No se pudieron desactivar las notificaciones.",
+
+  // Color scheme picker
+  "Color scheme": "Esquema de color",
+  "Pick the accent color you see throughout the app -- just for your own view.":
+    "Elige el color de acento que ves en toda la aplicación — solo para tu propia vista.",
+  Rose: "Rosa",
+  Ocean: "Océano",
+  Slate: "Pizarra",
+  Amber: "Ámbar",
 };

@@ -56,6 +56,7 @@ export interface Client {
   self_led: boolean;
   self_led_last_checkin: string | null;
   digest_reviewed_at: string | null;
+  theme: string;
 }
 
 export interface SessionEntry {

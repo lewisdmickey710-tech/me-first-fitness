@@ -10,16 +10,19 @@ export function TopNav({
   faqHref,
   settingsHref,
   locale,
+  tintClassName = "bg-pink/15",
 }: {
   title: string;
   links?: { href: string; label: string }[];
   faqHref?: string;
   settingsHref?: string;
   locale?: Locale;
+  /** Header wash color -- defaults to the brand pink everyone's always had. */
+  tintClassName?: string;
 }) {
   const t = makeT(locale);
   return (
-    <header className="border-b border-grayLt bg-pink/15 print:hidden">
+    <header className={`border-b border-grayLt ${tintClassName} print:hidden`}>
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <a href="/" className="shrink-0 font-semibold text-ink">
           <Heart className="mr-1.5" />

@@ -20,6 +20,7 @@ import { sendNewRequestEmail, sendSessionCancelledByClientEmail } from "@/lib/em
 import { getCoachEmail, getCoachUserId } from "@/lib/coach";
 import { sendPushToUser } from "@/lib/push";
 import type { PaymentSchedule, SessionEntry } from "@/lib/types";
+import { isClientTheme, type ClientTheme } from "@/lib/theme";
 
 const REQUEST_TYPE_LABEL: Record<string, string> = {
   session: "in-person session",
@@ -993,6 +994,20 @@ export async function submitClientProfile(formData: FormData) {
 
   revalidatePath("/client/dashboard");
   redirect("/client/dashboard");
+}
+
+export async function updateMyTheme(theme: ClientTheme) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+  if (!isClientTheme(theme)) throw new Error("Not a valid color scheme.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("clients").update({ theme }).eq("id", me.id);
+  if (error) throw new Error(error.message);
+
+  // Every client route reads the theme from the shared layout, so a
+  // layout-level revalidate is enough to repaint everywhere at once.
+  revalidatePath("/client", "layout");
 }
 
 export async function submitMinorConsent(formData: FormData) {
