@@ -20,7 +20,17 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.verifyOtp({ type, token_hash });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // Tapping this link from Mail (or any app) always opens Safari on
+      // iOS -- there's no way for a link tap to hand off into an
+      // already-installed home-screen PWA, even though they're the same
+      // origin and share the same login session underneath. Landing
+      // straight in the app after auth (the old behavior) left anyone
+      // who'd already installed the icon stuck in a plain Safari tab with
+      // no idea they should switch -- this interstitial says so instead
+      // of silently continuing into Safari.
+      return NextResponse.redirect(
+        `${origin}/auth/welcome?next=${encodeURIComponent(next)}`
+      );
     }
     console.error(`verifyOtp failed (type=${type}):`, error.status, error.code, error.message);
     return NextResponse.redirect(

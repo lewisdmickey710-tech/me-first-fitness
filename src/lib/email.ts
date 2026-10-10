@@ -115,6 +115,7 @@ export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
       <p>Here&apos;s your one-time login link:</p>
       <p><a href="${actionLink}" style="color: ${BRAND.accentColor}; font-weight: 600;">Log in →</a></p>
       <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new one.</p>
+      <p style="font-size: 13px; color: #8A8078;">Tip: if you've already added ${BRAND.name} to your phone's Home Screen, this link still opens in your browser first — just close that tab afterward and open the app from your Home Screen icon instead.</p>
     `),
   });
 }
