@@ -617,7 +617,6 @@ export default async function ClientDetailPage({
           currentPhase={currentPhase}
           programDays={programDays ?? []}
           overrides={programOverrides ?? []}
-          exerciseOptions={exerciseOptions ?? []}
           exerciseLibrary={exerciseLibraryEntries}
           customRowsByDayId={customRowsByDayId}
           recentFreestyleSessions={recentFreestyleSessions ?? []}
@@ -2238,7 +2237,6 @@ function ProgramTab({
   currentPhase,
   programDays,
   overrides,
-  exerciseOptions,
   exerciseLibrary,
   customRowsByDayId,
   recentFreestyleSessions,
@@ -2252,7 +2250,6 @@ function ProgramTab({
   currentPhase: ClientPhaseHistory | null;
   programDays: ProgramDayWithExercisesRow[];
   overrides: ClientProgramOverride[];
-  exerciseOptions: { id: string; name: string; movement_pattern: string | null }[];
   exerciseLibrary: ExerciseLibraryEntry[];
   customRowsByDayId: Map<
     string,
@@ -2401,7 +2398,7 @@ function ProgramTab({
                   <ProgramDayEditor
                     clientId={clientId}
                     exercises={ordered}
-                    exerciseOptions={exerciseOptions}
+                    exerciseLibrary={exerciseLibrary}
                   />
                   <form
                     action={promoteDayToCustom.bind(null, clientId, day.id)}

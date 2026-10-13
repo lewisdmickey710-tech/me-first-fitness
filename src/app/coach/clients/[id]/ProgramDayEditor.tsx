@@ -19,14 +19,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { reorderClientProgramDay, setClientProgramOverride } from "@/app/coach/actions";
-import { Button, Input, Select } from "@/components/ui";
-import { groupExercisesByPattern } from "@/lib/constants";
-
-interface ExerciseOption {
-  id: string;
-  name: string;
-  movement_pattern: string | null;
-}
+import { Button, Input } from "@/components/ui";
+import { ExerciseAutocomplete, type ExerciseLibraryEntry } from "@/components/exercise-autocomplete";
 
 export interface ProgramExerciseRow {
   pdeId: string;
@@ -44,11 +38,11 @@ export interface ProgramExerciseRow {
 export function ProgramDayEditor({
   clientId,
   exercises,
-  exerciseOptions,
+  exerciseLibrary,
 }: {
   clientId: string;
   exercises: ProgramExerciseRow[];
-  exerciseOptions: ExerciseOption[];
+  exerciseLibrary: ExerciseLibraryEntry[];
 }) {
   const [order, setOrder] = useState(exercises.map((e) => e.pdeId));
   const byId = new Map(exercises.map((e) => [e.pdeId, e]));
@@ -85,7 +79,7 @@ export function ProgramDayEditor({
                 key={pdeId}
                 clientId={clientId}
                 exercise={exercise}
-                exerciseOptions={exerciseOptions}
+                exerciseLibrary={exerciseLibrary}
               />
             );
           })}
@@ -98,11 +92,11 @@ export function ProgramDayEditor({
 function SortableExerciseCard({
   clientId,
   exercise,
-  exerciseOptions,
+  exerciseLibrary,
 }: {
   clientId: string;
   exercise: ProgramExerciseRow;
-  exerciseOptions: ExerciseOption[];
+  exerciseLibrary: ExerciseLibraryEntry[];
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: exercise.pdeId });
@@ -111,6 +105,12 @@ function SortableExerciseCard({
     transition,
   };
   const boundSave = setClientProgramOverride.bind(null, clientId);
+
+  const initialSubstitute = exercise.substituteExerciseId
+    ? exerciseLibrary.find((e) => e.id === exercise.substituteExerciseId) ?? null
+    : null;
+  const [substituteText, setSubstituteText] = useState(initialSubstitute?.name ?? "");
+  const [substituteId, setSubstituteId] = useState(exercise.substituteExerciseId ?? "");
 
   return (
     <div
@@ -149,21 +149,37 @@ function SortableExerciseCard({
         <form action={boundSave} className="space-y-2">
           <input type="hidden" name="program_day_exercise_id" value={exercise.pdeId} />
           <div className="grid grid-cols-2 gap-2">
-            <Select
-              name="substitute_exercise_id"
-              defaultValue={exercise.substituteExerciseId ?? ""}
-            >
-              <option value="">— No swap (use prescribed) —</option>
-              {groupExercisesByPattern(exerciseOptions).map(([group, options]) => (
-                <optgroup key={group} label={group}>
-                  {options.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </Select>
+            <div className="flex gap-1">
+              <div className="flex-1">
+                <ExerciseAutocomplete
+                  value={substituteText}
+                  exercises={exerciseLibrary}
+                  placeholder="Search to swap..."
+                  onChangeText={(text) => {
+                    setSubstituteText(text);
+                    setSubstituteId("");
+                  }}
+                  onSelect={(ex) => {
+                    setSubstituteText(ex.name);
+                    setSubstituteId(ex.id);
+                  }}
+                />
+              </div>
+              {substituteText ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSubstituteText("");
+                    setSubstituteId("");
+                  }}
+                  className="shrink-0 text-xs text-gray hover:text-ink"
+                  title="Clear swap -- use prescribed"
+                >
+                  ✕
+                </button>
+              ) : null}
+              <input type="hidden" name="substitute_exercise_id" value={substituteId} />
+            </div>
             <label className="flex items-center gap-2 rounded-xl border border-grayLt px-3 py-2 text-sm text-ink">
               <input
                 type="checkbox"
@@ -174,6 +190,12 @@ function SortableExerciseCard({
               Remove for this client
             </label>
           </div>
+          {substituteText && !substituteId ? (
+            <p className="text-xs text-pink">
+              Pick a suggestion from the list, or clear this field -- typed
+              text alone won&apos;t be saved as a swap.
+            </p>
+          ) : null}
           <div className="grid grid-cols-3 gap-2">
             <Input
               name="sets_override"
