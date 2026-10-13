@@ -37,6 +37,7 @@ import {
   unmarkMilestoneAchieved,
   updateClientProfile,
   promoteDayToCustom,
+  setProgramDayFromSession,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { CustomProgramDayEditor } from "./CustomProgramDayEditor";
@@ -115,6 +116,7 @@ import type {
   OccurrenceStatus,
   Payment,
   ServiceCheckin,
+  SessionEntry,
   SessionOccurrence,
   SessionRequest,
   SessionType,
@@ -463,6 +465,24 @@ export default async function ClientDetailPage({
     list.push(row);
     customRowsByDayId.set(row.program_day_id, list);
   }
+
+  // Freestyle days already logged for this client -- lets her pull one
+  // straight into the program instead of re-typing it into the custom
+  // day editor, for a day that's been evolving session-to-session before
+  // it's ready to be "the" plan.
+  interface RecentFreestyleSession {
+    id: string;
+    date: string;
+    day_label: string;
+    entries: SessionEntry[];
+  }
+  const { data: recentFreestyleSessions } = (await supabase
+    .from("sessions")
+    .select("id, date, day_label, entries")
+    .eq("client_id", id)
+    .eq("session_type", "freestyle")
+    .order("date", { ascending: false })
+    .limit(20)) as unknown as { data: RecentFreestyleSession[] | null };
   const exerciseLibraryEntries = (exerciseOptions ?? []).map((e) => ({
     id: e.id,
     name: e.name,
@@ -600,6 +620,7 @@ export default async function ClientDetailPage({
           exerciseOptions={exerciseOptions ?? []}
           exerciseLibrary={exerciseLibraryEntries}
           customRowsByDayId={customRowsByDayId}
+          recentFreestyleSessions={recentFreestyleSessions ?? []}
           recentSessions={sessions ?? []}
           sessionMode={client.session_mode}
           programLastUpdatedAt={client.program_last_updated_at}
@@ -2220,6 +2241,7 @@ function ProgramTab({
   exerciseOptions,
   exerciseLibrary,
   customRowsByDayId,
+  recentFreestyleSessions,
   recentSessions,
   sessionMode,
   programLastUpdatedAt,
@@ -2236,6 +2258,7 @@ function ProgramTab({
     string,
     { id: string; program_day_id: string; position: number; exercise_name: string; sets: string | null; reps: string | null }[]
   >;
+  recentFreestyleSessions: { id: string; date: string; day_label: string; entries: SessionEntry[] }[];
   recentSessions: TrainingSession[];
   sessionMode: Client["session_mode"];
   programLastUpdatedAt: string | null;
@@ -2336,6 +2359,30 @@ function ProgramTab({
                 </span>
               ) : null}
             </p>
+            {recentFreestyleSessions.length > 0 ? (
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  const sourceSessionId = String(formData.get("source_session_id") ?? "");
+                  if (sourceSessionId) {
+                    await setProgramDayFromSession(clientId, day.id, sourceSessionId);
+                  }
+                }}
+                className="mt-2 flex flex-wrap items-center gap-2"
+              >
+                <Select name="source_session_id" defaultValue="" className="max-w-xs">
+                  <option value="">— Use a recent freestyle workout instead —</option>
+                  {recentFreestyleSessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.date} — {s.day_label} ({s.entries.length} exercises)
+                    </option>
+                  ))}
+                </Select>
+                <Button type="submit" variant="secondary">
+                  Set as this day
+                </Button>
+              </form>
+            ) : null}
             <div className="mt-3">
               {customRows.length > 0 ? (
                 <CustomProgramDayEditor

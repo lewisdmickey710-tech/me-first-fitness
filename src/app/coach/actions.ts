@@ -1585,6 +1585,33 @@ export async function clearClientCustomProgramDay(clientId: string, programDayId
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Pulls a freestyle day she's already logged for this client straight
+// into their program -- the exercises from that session fully replace
+// this client's version of the day, same "promote to custom" mechanism
+// as "Add to program"/"make permanent" on the log form, just sourced from
+// a past session instead of one being logged right now.
+export async function setProgramDayFromSession(
+  clientId: string,
+  programDayId: string,
+  sourceSessionId: string
+) {
+  const supabase = await createClient();
+
+  const { data: source } = await supabase
+    .from("sessions")
+    .select("entries")
+    .eq("id", sourceSessionId)
+    .eq("client_id", clientId)
+    .eq("session_type", "freestyle")
+    .maybeSingle();
+
+  if (!source) throw new Error("That workout couldn't be found.");
+
+  await syncClientCustomProgramDay(supabase, clientId, programDayId, source.entries as SessionEntry[]);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 export async function logSessionOccurrence(
   clientId: string,
   formData: FormData
