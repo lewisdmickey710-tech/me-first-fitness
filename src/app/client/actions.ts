@@ -1521,6 +1521,9 @@ export async function logRepeatWorkout(sourceSessionId: string, formData: FormDa
     };
     const noteTrimmed = notes[i]?.trim();
     if (noteTrimmed) entry.notes = noteTrimmed;
+    // Carried over from the original logging -- if that exercise was
+    // matched to the library, the repeated instance stays linked too.
+    if (e.exercise_id) entry.exercise_id = e.exercise_id;
     return entry;
   });
 

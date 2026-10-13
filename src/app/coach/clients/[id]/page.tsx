@@ -2340,6 +2340,33 @@ async function LogTab({
   const today = new Date().toISOString().slice(0, 10);
   const entries = mergeLogEntries(sessions, activities);
 
+  // An entry logged against a matched exercise from the library (picked
+  // from the autocomplete while logging, program day or freestyle alike)
+  // carries exercise_id -- resolve those here so she sees the same
+  // cues/description/demo looking back at a past session.
+  const loggedExerciseIds = [
+    ...new Set(
+      (sessions ?? []).flatMap((s) =>
+        s.entries.map((e) => e.exercise_id).filter((v): v is string => !!v)
+      )
+    ),
+  ];
+  const { data: loggedExercises } = loggedExerciseIds.length
+    ? await supabase
+        .from("exercises")
+        .select("id, name, client_description, coach_cues, video_url")
+        .in("id", loggedExerciseIds)
+    : {
+        data: [] as {
+          id: string;
+          name: string;
+          client_description: string | null;
+          coach_cues: string | null;
+          video_url: string | null;
+        }[],
+      };
+  const loggedExerciseById = new Map((loggedExercises ?? []).map((e) => [e.id, e]));
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
@@ -2435,34 +2462,62 @@ async function LogTab({
 
                 {s && s.entries.length > 0 ? (
                   <ul className="mt-2 space-y-1 text-sm text-gray">
-                    {s.entries.map((e, i) => (
-                      <li key={i}>
-                        {e.exercise}
-                        {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
-                        {e.weight ? ` @ ${e.weight}` : ""}
-                        {e.substitute_exercise_id ? (
-                          <span className="text-xs text-rose">
-                            {" "}
-                            (client swapped from {e.prescribed_exercise || "prescribed movement"})
-                          </span>
-                        ) : null}
-                        {e.notes ? (
-                          <span className="block text-xs text-gray/80">
-                            {e.notes}
-                          </span>
-                        ) : null}
-                        {e.media_path && mediaUrlByPath.has(e.media_path) ? (
-                          <a
-                            href={mediaUrlByPath.get(e.media_path)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block text-xs text-rose hover:underline"
-                          >
-                            View photo/video →
-                          </a>
-                        ) : null}
-                      </li>
-                    ))}
+                    {s.entries.map((e, i) => {
+                      const matched = e.exercise_id ? loggedExerciseById.get(e.exercise_id) : null;
+                      return (
+                        <li key={i}>
+                          {e.exercise}
+                          {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
+                          {e.weight ? ` @ ${e.weight}` : ""}
+                          {e.substitute_exercise_id ? (
+                            <span className="text-xs text-rose">
+                              {" "}
+                              (client swapped from {e.prescribed_exercise || "prescribed movement"})
+                            </span>
+                          ) : null}
+                          {e.notes ? (
+                            <span className="block text-xs text-gray/80">
+                              {e.notes}
+                            </span>
+                          ) : null}
+                          {e.media_path && mediaUrlByPath.has(e.media_path) ? (
+                            <a
+                              href={mediaUrlByPath.get(e.media_path)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-xs text-rose hover:underline"
+                            >
+                              View photo/video →
+                            </a>
+                          ) : null}
+                          {matched?.client_description || matched?.coach_cues ? (
+                            <Collapsible label="Library notes">
+                              {matched.client_description ? (
+                                <p className="whitespace-pre-wrap text-sm text-gray">
+                                  {matched.client_description}
+                                </p>
+                              ) : null}
+                              {matched.coach_cues ? (
+                                <p className="mt-1 whitespace-pre-wrap text-sm text-gray">
+                                  <span className="font-medium text-ink">Cues: </span>
+                                  {matched.coach_cues}
+                                </p>
+                              ) : null}
+                            </Collapsible>
+                          ) : null}
+                          {matched?.video_url ? (
+                            <a
+                              href={matched.video_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-xs font-medium text-rose hover:underline"
+                            >
+                              ▶ Watch demo
+                            </a>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
                 {s?.rating ? (

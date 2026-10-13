@@ -59,7 +59,7 @@ export default async function EditSessionPage({
         .maybeSingle()) as { data: { amount: number } | null })
     : { data: null };
 
-  const [{ data: days }, currentPhase] = await Promise.all([
+  const [{ data: days }, currentPhase, { data: exerciseLibrary }] = await Promise.all([
     client.care_profile_id
       ? (supabase
           .from("program_days")
@@ -71,6 +71,9 @@ export default async function EditSessionPage({
         }>)
       : Promise.resolve({ data: null }),
     getCurrentPhase(supabase, id),
+    supabase.from("exercises").select("id, name").order("name") as unknown as Promise<{
+      data: { id: string; name: string }[] | null;
+    }>,
   ]);
 
   const allPdeIds = (days ?? []).flatMap((d) =>
@@ -173,6 +176,7 @@ export default async function EditSessionPage({
         today={session.date}
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
+        exerciseLibrary={exerciseLibrary ?? []}
         lastEntry={null}
         existingSession={existingSession}
         sessionRate={client.session_rate}

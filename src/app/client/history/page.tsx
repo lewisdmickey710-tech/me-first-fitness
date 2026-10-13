@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getMyClient } from "@/lib/current-client";
 import { deleteMyLoggedSession } from "@/app/client/actions";
 import { ConfirmButton } from "@/components/confirm-button";
-import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { Badge, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { gbtcCoverage } from "@/lib/payment-status";
 import {
   LOG_ENTRY_KIND_LABEL,
@@ -63,6 +63,33 @@ export default async function ClientHistoryPage() {
   );
 
   const entries = mergeLogEntries(sessions ?? [], activities ?? []);
+
+  // A session entry logged against a matched exercise from the library
+  // (picked from the autocomplete while logging, in a program day or a
+  // freestyle workout alike) carries exercise_id -- resolve those here so
+  // the client can see the same description/demo they'd see on their
+  // program page, even looking back at a one-off freestyle session.
+  const exerciseIds = [
+    ...new Set(
+      (sessions ?? []).flatMap((s) =>
+        s.entries.map((e) => e.exercise_id).filter((id): id is string => !!id)
+      )
+    ),
+  ];
+  const { data: exercises } = exerciseIds.length
+    ? await supabase
+        .from("exercises")
+        .select("id, name, client_description, video_url")
+        .in("id", exerciseIds)
+    : {
+        data: [] as {
+          id: string;
+          name: string;
+          client_description: string | null;
+          video_url: string | null;
+        }[],
+      };
+  const exerciseById = new Map((exercises ?? []).map((e) => [e.id, e]));
 
   const photoUrlByPath = new Map<string, string>();
   const photoPaths = [
@@ -141,25 +168,45 @@ export default async function ClientHistoryPage() {
                 ) : null}
                 {s && s.entries.length > 0 ? (
                   <ul className="space-y-1 text-sm text-gray">
-                    {s.entries.map((e, i) => (
-                      <li key={i}>
-                        {e.exercise} — {e.sets}x{e.reps}
-                        {e.weight ? ` @ ${e.weight}` : ""}
-                        {e.substitute_exercise_id ? (
-                          <span className="text-xs text-rose">
-                            {" "}
-                            {t("(swapped from {name})", {
-                              name: e.prescribed_exercise || t("prescribed movement"),
-                            })}
-                          </span>
-                        ) : null}
-                        {e.notes ? (
-                          <span className="block text-xs text-gray/80">
-                            {e.notes}
-                          </span>
-                        ) : null}
-                      </li>
-                    ))}
+                    {s.entries.map((e, i) => {
+                      const matched = e.exercise_id ? exerciseById.get(e.exercise_id) : null;
+                      return (
+                        <li key={i}>
+                          {e.exercise} — {e.sets}x{e.reps}
+                          {e.weight ? ` @ ${e.weight}` : ""}
+                          {e.substitute_exercise_id ? (
+                            <span className="text-xs text-rose">
+                              {" "}
+                              {t("(swapped from {name})", {
+                                name: e.prescribed_exercise || t("prescribed movement"),
+                              })}
+                            </span>
+                          ) : null}
+                          {e.notes ? (
+                            <span className="block text-xs text-gray/80">
+                              {e.notes}
+                            </span>
+                          ) : null}
+                          {matched?.client_description ? (
+                            <Collapsible label={t("About this movement")}>
+                              <p className="whitespace-pre-wrap text-sm text-gray">
+                                {matched.client_description}
+                              </p>
+                            </Collapsible>
+                          ) : null}
+                          {matched?.video_url ? (
+                            <a
+                              href={matched.video_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block text-sm font-medium text-rose hover:underline"
+                            >
+                              {t("▶ Watch demo")}
+                            </a>
+                          ) : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
                 {s?.day_notes ? (

@@ -881,6 +881,7 @@ export async function logSession(clientId: string, formData: FormData) {
   const reps = formData.getAll("reps") as string[];
   const weights = formData.getAll("weight") as string[];
   const exerciseNotes = formData.getAll("exercise_notes") as string[];
+  const exerciseIds = formData.getAll("exercise_id") as string[];
   const files = formData.getAll("file");
 
   const entries: SessionEntry[] = (
@@ -909,6 +910,11 @@ export async function logSession(clientId: string, formData: FormData) {
         if (media_path) entry.media_path = media_path;
         const noteTrimmed = exerciseNotes[i]?.trim();
         if (noteTrimmed) entry.notes = noteTrimmed;
+        // Set when she picked a suggestion from the exercise library while
+        // typing -- lets the client see that movement's description/demo
+        // later, in a freestyle session same as a program one.
+        const exerciseId = exerciseIds[i]?.trim();
+        if (exerciseId) entry.exercise_id = exerciseId;
         return entry;
       })
     )
@@ -1084,6 +1090,7 @@ export async function updateSession(
   const reps = formData.getAll("reps") as string[];
   const weights = formData.getAll("weight") as string[];
   const exerciseNotes = formData.getAll("exercise_notes") as string[];
+  const exerciseIds = formData.getAll("exercise_id") as string[];
   const files = formData.getAll("file");
   const existingMediaPaths = formData.getAll("existing_media_path") as string[];
 
@@ -1113,6 +1120,8 @@ export async function updateSession(
         if (media_path) entry.media_path = media_path;
         const noteTrimmed = exerciseNotes[i]?.trim();
         if (noteTrimmed) entry.notes = noteTrimmed;
+        const exerciseId = exerciseIds[i]?.trim();
+        if (exerciseId) entry.exercise_id = exerciseId;
         return entry;
       })
     )

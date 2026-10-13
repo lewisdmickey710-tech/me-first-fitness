@@ -6,6 +6,7 @@ import { addHabitForClient, addMilestone, logSession, updateSession } from "@/ap
 import { Badge, Button, Card, Checkbox, Input, Select, Textarea } from "@/components/ui";
 import { BodyMapInput } from "@/components/body-map";
 import { WeightInput } from "@/components/weight-input";
+import { ExerciseAutocomplete, type ExerciseLibraryEntry } from "@/components/exercise-autocomplete";
 import { PHASES } from "@/lib/constants";
 import { LOG_ENTRY_KIND_LABEL, LOG_ENTRY_KIND_TONE, type LogEntry } from "@/lib/log-entries";
 import { NUTRITION_SESSION_FIELDS } from "@/lib/nutrition-session";
@@ -48,6 +49,7 @@ interface Row {
   weight: string;
   notes: string;
   existingMediaPath?: string;
+  exerciseId?: string;
 }
 
 const BLANK_ROWS = 6;
@@ -60,6 +62,7 @@ function rowsFromEntries(entries: SessionEntry[]): Row[] {
     weight: e.weight,
     notes: e.notes ?? "",
     existingMediaPath: e.media_path ?? undefined,
+    exerciseId: e.exercise_id ?? undefined,
   }));
   return [...filled, ...blankRows(2)];
 }
@@ -102,6 +105,7 @@ export function LogSessionForm({
   existingSession,
   activeCompPackage = null,
   sessionRate = null,
+  exerciseLibrary = [],
 }: {
   clientId: string;
   today: string;
@@ -112,6 +116,7 @@ export function LogSessionForm({
   existingSession?: ExistingSession | null;
   activeCompPackage?: CompSessionPackage | null;
   sessionRate?: number | null;
+  exerciseLibrary?: ExerciseLibraryEntry[];
 }) {
   const compRemaining = activeCompPackage
     ? activeCompPackage.comp_sessions_total - activeCompPackage.comp_sessions_used
@@ -227,6 +232,7 @@ export function LogSessionForm({
       reps: e.reps,
       weight: "",
       notes: "",
+      exerciseId: e.exercise_id ?? undefined,
     }));
     setRows([...filled, ...blankRows(2)]);
   }
@@ -241,7 +247,22 @@ export function LogSessionForm({
 
   function updateRow(i: number, field: keyof Row, value: string) {
     setRows((prev) =>
-      prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r))
+      prev.map((r, idx) => {
+        if (idx !== i) return r;
+        // Typing the exercise name freehand (rather than picking a
+        // suggestion) means it's no longer guaranteed to match that exact
+        // library entry, so the link is dropped rather than left stale.
+        if (field === "exercise") return { ...r, exercise: value, exerciseId: undefined };
+        return { ...r, [field]: value };
+      })
+    );
+  }
+
+  function selectExerciseForRow(i: number, exercise: ExerciseLibraryEntry) {
+    setRows((prev) =>
+      prev.map((r, idx) =>
+        idx === i ? { ...r, exercise: exercise.name, exerciseId: exercise.id } : r
+      )
     );
   }
 
@@ -546,13 +567,15 @@ export function LogSessionForm({
                 {rows.map((row, i) => (
                   <div key={i} className="space-y-1">
                     <div className="grid grid-cols-12 gap-2">
-                      <Input
-                        name="exercise"
+                      <ExerciseAutocomplete
+                        value={row.exercise}
+                        exercises={exerciseLibrary}
                         placeholder="Exercise"
                         className="col-span-5"
-                        value={row.exercise}
-                        onChange={(e) => updateRow(i, "exercise", e.target.value)}
+                        onChangeText={(text) => updateRow(i, "exercise", text)}
+                        onSelect={(ex) => selectExerciseForRow(i, ex)}
                       />
+                      <input type="hidden" name="exercise_id" value={row.exerciseId ?? ""} />
                       <Input
                         name="sets"
                         placeholder="Sets"

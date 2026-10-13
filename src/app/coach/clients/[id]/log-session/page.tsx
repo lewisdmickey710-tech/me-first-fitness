@@ -54,7 +54,7 @@ export default async function LogSessionPage({
         .single()) as { data: { id: string; name: string } | null })
     : { data: null };
 
-  const [{ data: days }, currentPhase, { data: lastSessions }, { data: lastActivities }] =
+  const [{ data: days }, currentPhase, { data: lastSessions }, { data: lastActivities }, { data: exerciseLibrary }] =
     await Promise.all([
       client.care_profile_id
         ? (supabase
@@ -79,6 +79,9 @@ export default async function LogSessionPage({
         .eq("client_id", id)
         .order("date", { ascending: false })
         .limit(1) as unknown as Promise<{ data: Activity[] | null }>,
+      supabase.from("exercises").select("id, name").order("name") as unknown as Promise<{
+        data: { id: string; name: string }[] | null;
+      }>,
     ]);
 
   const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
@@ -198,6 +201,7 @@ export default async function LogSessionPage({
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={lastEntry}
         lastEntryReply={lastEntryReply}
+        exerciseLibrary={exerciseLibrary ?? []}
         activeCompPackage={activeCompPackage}
         sessionRate={client.session_rate}
       />
