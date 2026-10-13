@@ -36,16 +36,16 @@ import {
   unmarkMilestoneAchieved,
   updateClientProfile,
   promoteDayToCustom,
-  setProgramDayFromLoggedWorkout,
   hideProgramDayForClient,
   unhideProgramDayForClient,
-  addExtraProgramDay,
   removeExtraProgramDay,
-  setProgramDayFromActivity,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { CustomProgramDayEditor } from "./CustomProgramDayEditor";
 import { AddActivityForm } from "./AddActivityForm";
+import { AddActivityToProgramButton } from "./AddActivityToProgramButton";
+import { AddDayForm } from "./AddDayForm";
+import { SetDayFromWorkoutForm } from "./SetDayFromWorkoutForm";
 import type { ExerciseLibraryEntry } from "@/components/exercise-autocomplete";
 import { BackLink } from "@/components/back-link";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -2499,35 +2499,11 @@ function ProgramTab({
                 </button>
               </form>
             </div>
-            {recentLoggedWorkouts.length > 0 ? (
-              <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  const sourceKey = String(formData.get("source_key") ?? "");
-                  if (sourceKey) {
-                    await setProgramDayFromLoggedWorkout(
-                      clientId,
-                      { programDayId: day.id },
-                      sourceKey
-                    );
-                  }
-                }}
-                className="mt-2 flex flex-wrap items-center gap-2"
-              >
-                <Select name="source_key" defaultValue="" className="max-w-xs">
-                  <option value="">— Use a recent logged workout instead —</option>
-                  {recentLoggedWorkouts.map((w) => (
-                    <option key={`${w.source}-${w.id}`} value={`${w.source}:${w.id}`}>
-                      {w.date} — {w.label} ({w.entries.length} exercises
-                      {w.source === "activity" ? ", class" : ""})
-                    </option>
-                  ))}
-                </Select>
-                <Button type="submit" variant="secondary">
-                  Set as this day
-                </Button>
-              </form>
-            ) : null}
+            <SetDayFromWorkoutForm
+              clientId={clientId}
+              target={{ programDayId: day.id }}
+              recentLoggedWorkouts={recentLoggedWorkouts}
+            />
             <div className="mt-3">
               {customRows.length > 0 ? (
                 <CustomProgramDayEditor
@@ -2597,35 +2573,11 @@ function ProgramTab({
                 </button>
               </form>
             </div>
-            {recentLoggedWorkouts.length > 0 ? (
-              <form
-                action={async (formData: FormData) => {
-                  "use server";
-                  const sourceKey = String(formData.get("source_key") ?? "");
-                  if (sourceKey) {
-                    await setProgramDayFromLoggedWorkout(
-                      clientId,
-                      { extraDayId: day.id },
-                      sourceKey
-                    );
-                  }
-                }}
-                className="mt-2 flex flex-wrap items-center gap-2"
-              >
-                <Select name="source_key" defaultValue="" className="max-w-xs">
-                  <option value="">— Use a recent logged workout instead —</option>
-                  {recentLoggedWorkouts.map((w) => (
-                    <option key={`${w.source}-${w.id}`} value={`${w.source}:${w.id}`}>
-                      {w.date} — {w.label} ({w.entries.length} exercises
-                      {w.source === "activity" ? ", class" : ""})
-                    </option>
-                  ))}
-                </Select>
-                <Button type="submit" variant="secondary">
-                  Set as this day
-                </Button>
-              </form>
-            ) : null}
+            <SetDayFromWorkoutForm
+              clientId={clientId}
+              target={{ extraDayId: day.id }}
+              recentLoggedWorkouts={recentLoggedWorkouts}
+            />
             <div className="mt-3">
               <CustomProgramDayEditor
                 clientId={clientId}
@@ -2650,18 +2602,7 @@ function ProgramTab({
         <p className="text-xs text-gray">
           Only shows up on their program -- nobody else on this track gets it.
         </p>
-        <form
-          action={async (formData: FormData) => {
-            "use server";
-            await addExtraProgramDay(clientId, currentPhase.phase, formData);
-          }}
-          className="flex flex-wrap items-center gap-2"
-        >
-          <Input name="day_label" placeholder="e.g. Core & Mobility" className="max-w-xs" />
-          <Button type="submit" variant="secondary">
-            + Add day
-          </Button>
-        </form>
+        <AddDayForm clientId={clientId} phase={currentPhase.phase} />
       </Card>
     </div>
   );
@@ -2920,20 +2861,11 @@ async function LogTab({
                         </li>
                       ))}
                     </ul>
-                    <form
-                      action={async () => {
-                        "use server";
-                        await setProgramDayFromActivity(
-                          clientId,
-                          { newDayPhase: currentPhase.phase },
-                          a.id
-                        );
-                      }}
-                    >
-                      <Button type="submit" variant="secondary">
-                        Add as a new day
-                      </Button>
-                    </form>
+                    <AddActivityToProgramButton
+                      clientId={clientId}
+                      phase={currentPhase.phase}
+                      activityId={a.id}
+                    />
                     <p className="mt-1 text-xs text-gray">
                       Adds a day with these exercises to this client&apos;s
                       program -- only for them, not the shared track
