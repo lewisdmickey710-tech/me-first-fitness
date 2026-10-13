@@ -18,6 +18,7 @@ import type {
 } from "@/lib/types";
 
 export interface ProgramDayOption {
+  id: string;
   phase: string;
   dayNumber: number;
   label: string;
@@ -154,6 +155,17 @@ export function LogSessionForm({
     existingSession?.payment_status ?? ""
   );
   const [activeDayKey, setActiveDayKey] = useState<string | null>(null);
+  // Snapshot of the exercise/sets/reps she started from when she applied a
+  // program day -- compared against the current rows to tell whether she's
+  // changed anything worth offering to make permanent. Only exercise/sets/
+  // reps count; weight and per-exercise notes are expected to vary every
+  // session and shouldn't trigger the prompt.
+  const [originalDayRows, setOriginalDayRows] = useState<
+    { exercise: string; sets: string; reps: string }[] | null
+  >(null);
+  const [makePermanent, setMakePermanent] = useState(false);
+  const [addToProgram, setAddToProgram] = useState(false);
+  const [addToProgramDayId, setAddToProgramDayId] = useState("");
   const [habitName, setHabitName] = useState("");
   const [milestoneTitle, setMilestoneTitle] = useState("");
   const [dayLabelTouched, setDayLabelTouched] = useState(!!existingSession);
@@ -171,6 +183,22 @@ export function LogSessionForm({
   const showProgramPicker = sessionType === "program" && availablePhases.length > 0;
   const showNutritionFields = sessionType === "nutritionist";
 
+  const activeProgramDay = activeDayKey
+    ? programDayOptions.find((d) => `${d.phase}-${d.dayNumber}` === activeDayKey) ?? null
+    : null;
+
+  // Only exercise/sets/reps count toward "has she changed the program" --
+  // weight and per-exercise notes are expected to differ every session.
+  const filledRows = rows
+    .filter((r) => r.exercise.trim())
+    .map((r) => ({ exercise: r.exercise.trim(), sets: r.sets.trim(), reps: r.reps.trim() }));
+  const hasDivergedFromProgramDay =
+    sessionType === "program" &&
+    !existingSession &&
+    !!activeProgramDay &&
+    !!originalDayRows &&
+    JSON.stringify(filledRows) !== JSON.stringify(originalDayRows);
+
   function applyDay(day: ProgramDayOption) {
     setActiveDayKey(`${day.phase}-${day.dayNumber}`);
     setDayLabel(day.label);
@@ -183,6 +211,8 @@ export function LogSessionForm({
       notes: "",
     }));
     setRows([...filled, ...blankRows(2)]);
+    setOriginalDayRows(day.exercises.map((e) => ({ ...e })));
+    setMakePermanent(false);
   }
 
   function applyLastEntry() {
@@ -205,6 +235,8 @@ export function LogSessionForm({
     setActiveDayKey(null);
     setDayLabel("");
     setRows(blankRows(BLANK_ROWS));
+    setOriginalDayRows(null);
+    setMakePermanent(false);
   }
 
   function updateRow(i: number, field: keyof Row, value: string) {
@@ -573,6 +605,60 @@ export function LogSessionForm({
               <p className="mt-1 text-xs text-gray">
                 Leave a row blank to skip it. Attach a photo or video of
                 their form if it&apos;s worth keeping.
+              </p>
+            </div>
+          ) : null}
+
+          {sessionType === "freestyle" && programDayOptions.length > 0 ? (
+            <div className="space-y-2 rounded-xl border border-grayLt bg-cream/50 p-3">
+              <Checkbox
+                name="_add_to_program_ui"
+                label="Add this to their program"
+                checked={addToProgram}
+                onChange={(e) => setAddToProgram(e.target.checked)}
+              />
+              {addToProgram ? (
+                <>
+                  <Select
+                    name="add_to_program_day_id"
+                    value={addToProgramDayId}
+                    onChange={(e) => setAddToProgramDayId(e.target.value)}
+                    required
+                  >
+                    <option value="">— Pick a day —</option>
+                    {programDayOptions.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {PHASES.find((p) => p.id === d.phase)?.name ?? `Phase ${d.phase}`} ·{" "}
+                        {d.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <p className="text-xs text-gray">
+                    These exercises become that day&apos;s plan for this
+                    client only — nobody else on their program gets
+                    changed, and whatever was there before is replaced.
+                  </p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
+
+          {hasDivergedFromProgramDay && activeProgramDay ? (
+            <div className="space-y-2 rounded-xl border border-gold/40 bg-gold/5 p-3">
+              <input type="hidden" name="permanent_program_day_id" value={activeProgramDay.id} />
+              <Checkbox
+                name="make_permanent"
+                label={`Make this the new permanent version of ${activeProgramDay.label} (${
+                  PHASES.find((p) => p.id === activeProgramDay.phase)?.name ??
+                  `Phase ${activeProgramDay.phase}`
+                }) for this client?`}
+                checked={makePermanent}
+                onChange={(e) => setMakePermanent(e.target.checked)}
+              />
+              <p className="text-xs text-gray">
+                This differs from what&apos;s currently in their program for
+                this day. Leave unchecked and it just logs as today&apos;s
+                session — their program stays as-is.
               </p>
             </div>
           ) : null}

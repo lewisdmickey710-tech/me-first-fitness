@@ -125,6 +125,33 @@ export default async function ClientProgramPage({
       if (sub) extraIds.add(sub);
     }
   }
+  // A day the coach fully replaced with a custom list (via "Add to
+  // program"/"make permanent" on the log form) renders that list instead
+  // of the shared template below -- see client_custom_program_days.
+  interface CustomDayRow {
+    id: string;
+    program_day_id: string;
+    position: number;
+    exercise_name: string;
+    sets: string | null;
+    reps: string | null;
+  }
+  const allDayIds = programDays.map((d) => d.id);
+  const { data: customRows } = allDayIds.length
+    ? await supabase
+        .from("client_custom_program_days")
+        .select("id, program_day_id, position, exercise_name, sets, reps")
+        .eq("client_id", me.id)
+        .in("program_day_id", allDayIds)
+        .order("position")
+    : { data: [] as CustomDayRow[] };
+  const customByDayId = new Map<string, CustomDayRow[]>();
+  for (const row of (customRows ?? []) as CustomDayRow[]) {
+    const list = customByDayId.get(row.program_day_id) ?? [];
+    list.push(row);
+    customByDayId.set(row.program_day_id, list);
+  }
+
   const { data: extraExercises } = extraIds.size
     ? await supabase
         .from("exercises")
@@ -199,6 +226,8 @@ export default async function ClientProgramPage({
       ) : (
         <div className="space-y-4">
           {programDays.map((day) => {
+            const customExercises = customByDayId.get(day.id) ?? [];
+            const isCustomDay = customExercises.length > 0;
             const sortedExercises = day.program_day_exercises
               .filter((pde) => !overrideByPdeId.get(pde.id)?.removed)
               .slice()
@@ -275,6 +304,35 @@ export default async function ClientProgramPage({
                   {t("Enter what you used and how it felt as you go, then log the whole day at the bottom.")}
                 </p>
 
+                {isCustomDay ? (
+                  <div className="mt-3 space-y-4">
+                    {customExercises.map((c) => (
+                      <div
+                        key={c.id}
+                        className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-ink">{c.exercise_name}</p>
+                          <p className="whitespace-nowrap text-sm text-gray">
+                            {c.sets}×{c.reps}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <WeightInput
+                            form={logFormId}
+                            name={`weight_${c.id}`}
+                            placeholder={t("Weight used")}
+                          />
+                          <Input
+                            form={logFormId}
+                            name={`notes_${c.id}`}
+                            placeholder={t("Notes (optional)")}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                 <div className="mt-3 space-y-4">
                   {sortedExercises.map((pde) => {
                     const base = pde.exercises;
@@ -520,12 +578,13 @@ export default async function ClientProgramPage({
                     );
                   })}
                 </div>
+                )}
 
                 <WorkoutLogForm
                   id={logFormId}
                   dayId={day.id}
                   clientId={me.id}
-                  pdeIds={sortedExercises.map((pde) => pde.id)}
+                  pdeIds={isCustomDay ? customExercises.map((c) => c.id) : sortedExercises.map((pde) => pde.id)}
                 >
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">

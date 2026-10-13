@@ -427,12 +427,16 @@ export function Checkbox({
   name,
   value,
   defaultChecked,
+  checked,
+  onChange,
   required,
 }: {
   label: string;
   name: string;
   value?: string;
   defaultChecked?: boolean;
+  checked?: boolean;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   required?: boolean;
 }) {
   return (
@@ -441,7 +445,9 @@ export function Checkbox({
         type="checkbox"
         name={name}
         value={value}
-        defaultChecked={defaultChecked}
+        defaultChecked={checked === undefined ? defaultChecked : undefined}
+        checked={checked}
+        onChange={onChange}
         required={required}
         className="h-4 w-4 rounded border-grayLt text-rose focus:ring-1 focus:ring-rose"
       />

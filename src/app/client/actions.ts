@@ -1309,70 +1309,99 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
 
   if (!day) throw new Error("Program day not found.");
 
-  const { data: overrides } = await supabase
-    .from("client_program_overrides")
-    .select("program_day_exercise_id, substitute_exercise_id, sets_override")
+  // A client whose coach fully replaced this day with a custom list (via
+  // "Add to program"/"make permanent") logs against that list instead of
+  // the shared template -- see client_custom_program_days.
+  const { data: customRows } = await supabase
+    .from("client_custom_program_days")
+    .select("id, position, exercise_name, sets, reps")
     .eq("client_id", me.id)
-    .eq("active", true);
+    .eq("program_day_id", programDayId)
+    .order("position");
 
-  const overrideMap = new Map(
-    (overrides ?? []).map((o) => [o.program_day_exercise_id, o.substitute_exercise_id])
-  );
-  const setsOverrideMap = new Map(
-    (overrides ?? []).map((o) => [o.program_day_exercise_id, o.sets_override])
-  );
+  let entries: SessionEntry[];
 
-  const substituteIds = [...overrideMap.values()].filter(
-    (id): id is string => !!id
-  );
-  const { data: subs } = substituteIds.length
-    ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
-    : { data: [] as { id: string; name: string }[] };
-  const subNameById = new Map((subs ?? []).map((s) => [s.id, s.name]));
-
-  type Pde = {
-    id: string;
-    position: number;
-    sets: string | null;
-    reps: string | null;
-    exercise_id: string;
-    exercises: { name: string } | null;
-  };
-  const pdes = ((day.program_day_exercises ?? []) as unknown as Pde[])
-    .slice()
-    .sort((a, b) => a.position - b.position);
-
-  const entries = await Promise.all(
-    pdes.map(async (pde) => {
-      const substituteId = overrideMap.get(pde.id) ?? null;
-      const effectiveName = substituteId
-        ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
-        : pde.exercises?.name ?? "";
-      const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
-      const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
-
-      // Uploaded client-side straight to Storage before this action runs
-      // (see WorkoutLogForm) -- see addNutritionLog above for why.
+  if (customRows && customRows.length > 0) {
+    entries = customRows.map((c) => {
+      const weight = String(formData.get(`weight_${c.id}`) ?? "").trim();
+      const notes = String(formData.get(`notes_${c.id}`) ?? "").trim();
       const mediaPath =
-        String(formData.get(`media_path_${pde.id}`) ?? "").trim() || null;
-
+        String(formData.get(`media_path_${c.id}`) ?? "").trim() || null;
       return {
-        exercise: effectiveName,
-        // Only ever differs from `exercise` when substituteId is set --
-        // stored as a plain string (not re-derived from exercise_id at
-        // render time) so an old log entry still reads correctly even if
-        // the exercise is later renamed or removed from the library.
-        prescribed_exercise: pde.exercises?.name ?? "",
-        exercise_id: pde.exercise_id,
-        substitute_exercise_id: substituteId,
-        sets: setsOverrideMap.get(pde.id) || pde.sets || "",
-        reps: pde.reps ?? "",
+        exercise: c.exercise_name,
+        sets: c.sets ?? "",
+        reps: c.reps ?? "",
         weight,
         notes,
         media_path: mediaPath,
       };
-    })
-  );
+    });
+  } else {
+    const { data: overrides } = await supabase
+      .from("client_program_overrides")
+      .select("program_day_exercise_id, substitute_exercise_id, sets_override")
+      .eq("client_id", me.id)
+      .eq("active", true);
+
+    const overrideMap = new Map(
+      (overrides ?? []).map((o) => [o.program_day_exercise_id, o.substitute_exercise_id])
+    );
+    const setsOverrideMap = new Map(
+      (overrides ?? []).map((o) => [o.program_day_exercise_id, o.sets_override])
+    );
+
+    const substituteIds = [...overrideMap.values()].filter(
+      (id): id is string => !!id
+    );
+    const { data: subs } = substituteIds.length
+      ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
+      : { data: [] as { id: string; name: string }[] };
+    const subNameById = new Map((subs ?? []).map((s) => [s.id, s.name]));
+
+    type Pde = {
+      id: string;
+      position: number;
+      sets: string | null;
+      reps: string | null;
+      exercise_id: string;
+      exercises: { name: string } | null;
+    };
+    const pdes = ((day.program_day_exercises ?? []) as unknown as Pde[])
+      .slice()
+      .sort((a, b) => a.position - b.position);
+
+    entries = await Promise.all(
+      pdes.map(async (pde) => {
+        const substituteId = overrideMap.get(pde.id) ?? null;
+        const effectiveName = substituteId
+          ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
+          : pde.exercises?.name ?? "";
+        const weight = String(formData.get(`weight_${pde.id}`) ?? "").trim();
+        const notes = String(formData.get(`notes_${pde.id}`) ?? "").trim();
+
+        // Uploaded client-side straight to Storage before this action runs
+        // (see WorkoutLogForm) -- see addNutritionLog above for why.
+        const mediaPath =
+          String(formData.get(`media_path_${pde.id}`) ?? "").trim() || null;
+
+        return {
+          exercise: effectiveName,
+          // Only ever differs from `exercise` when substituteId is set --
+          // stored as a plain string (not re-derived from exercise_id at
+          // render time) so an old log entry still reads correctly even if
+          // the exercise is later renamed or removed from the library.
+          prescribed_exercise: pde.exercises?.name ?? "",
+          exercise_id: pde.exercise_id,
+          substitute_exercise_id: substituteId,
+          sets: setsOverrideMap.get(pde.id) || pde.sets || "",
+          reps: pde.reps ?? "",
+          weight,
+          notes,
+          media_path: mediaPath,
+        };
+      })
+    );
+  }
 
   // Auto-detected rather than asked -- coached if this date matches an
   // actual scheduled/confirmed time (recurring weekly slot, or a

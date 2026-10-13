@@ -10,6 +10,7 @@ import type { Activity, Client, CompSessionPackage, TrainingSession } from "@/li
 import { LogSessionForm, type ProgramDayOption } from "./LogSessionForm";
 
 interface ProgramDayJoinRow {
+  id: string;
   phase: string;
   day_number: number;
   day_label: string;
@@ -58,7 +59,7 @@ export default async function LogSessionPage({
       client.care_profile_id
         ? (supabase
             .from("program_days")
-            .select("phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name, laterality))")
+            .select("id, phase, day_number, day_label, program_day_exercises(id, position, sets, reps, exercises(name, laterality))")
             .eq("care_profile_id", client.care_profile_id)
             .order("phase")
             .order("day_number") as unknown as Promise<{
@@ -138,6 +139,7 @@ export default async function LogSessionPage({
   const substituteById = new Map((substituteExercises ?? []).map((e) => [e.id, e]));
 
   const programDayOptions: ProgramDayOption[] = (days ?? []).map((d) => ({
+    id: d.id,
     phase: d.phase,
     dayNumber: d.day_number,
     label: d.day_label,

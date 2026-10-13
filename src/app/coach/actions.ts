@@ -805,6 +805,45 @@ async function syncSessionPayment(
   return null;
 }
 
+// Fully replaces one client's version of a program day (Phase X, Day N)
+// with the exercises just logged -- either because she checked "Add this
+// to their program" on a freestyle workout, or because a program-day
+// session she edited diverged from the template and she chose to make it
+// permanent. Delete-then-insert rather than trying to diff/merge against
+// whatever was there before (default template or an earlier custom day):
+// simpler, and matches "fully replace" rather than a partial patch. Only
+// ever touches this one client's client_custom_program_days rows -- the
+// shared program_days/program_day_exercises template, and every other
+// client assigned to it, are untouched.
+async function syncClientCustomProgramDay(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  clientId: string,
+  programDayId: string,
+  entries: SessionEntry[]
+) {
+  const { error: deleteError } = await supabase
+    .from("client_custom_program_days")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("program_day_id", programDayId);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (entries.length === 0) return;
+
+  const rows = entries.map((e, i) => ({
+    client_id: clientId,
+    program_day_id: programDayId,
+    position: i,
+    exercise_name: e.exercise,
+    sets: e.sets || null,
+    reps: e.reps || null,
+  }));
+  const { error: insertError } = await supabase
+    .from("client_custom_program_days")
+    .insert(rows);
+  if (insertError) throw new Error(insertError.message);
+}
+
 export async function logSession(clientId: string, formData: FormData) {
   const supabase = await createClient();
 
@@ -939,6 +978,18 @@ export async function logSession(clientId: string, formData: FormData) {
 
   if (compPackageId && compPackageUse) {
     await applyCompPackageSessionUse(supabase, compPackageId, compPackageUse);
+  }
+
+  // "Add this to their program" (freestyle) or "make this permanent"
+  // (an edited program day) -- either way, fully replaces this client's
+  // version of that one program day with what was just logged.
+  const addToProgramDayId = String(formData.get("add_to_program_day_id") ?? "").trim();
+  const makePermanent = formData.get("make_permanent") === "on";
+  const permanentProgramDayId = String(formData.get("permanent_program_day_id") ?? "").trim();
+  const targetProgramDayId =
+    addToProgramDayId || (makePermanent ? permanentProgramDayId : "");
+  if (targetProgramDayId) {
+    await syncClientCustomProgramDay(supabase, clientId, targetProgramDayId, entries);
   }
 
   // Quick wellness pulse-check and priority note, both optional -- offered
@@ -1120,6 +1171,17 @@ export async function updateSession(
     { client_id: clientId, occurrence_date: date, status: "completed" },
     { onConflict: "client_id,occurrence_date" }
   );
+
+  // Same as logSession -- "add to program" or "make permanent" on the
+  // edit form fully replaces this client's version of that program day.
+  const addToProgramDayId = String(formData.get("add_to_program_day_id") ?? "").trim();
+  const makePermanent = formData.get("make_permanent") === "on";
+  const permanentProgramDayId = String(formData.get("permanent_program_day_id") ?? "").trim();
+  const targetProgramDayId =
+    addToProgramDayId || (makePermanent ? permanentProgramDayId : "");
+  if (targetProgramDayId) {
+    await syncClientCustomProgramDay(supabase, clientId, targetProgramDayId, entries);
+  }
 
   revalidatePath(`/coach/clients/${clientId}`);
   revalidatePath("/coach/finances");
