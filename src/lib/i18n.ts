@@ -157,6 +157,17 @@ const ES: Record<string, string> = {
   pending: "pendiente",
   "My program": "Mi programa",
   "This week's exercises & cues": "Ejercicios y señales de esta semana",
+  "My Workouts": "Mis entrenamientos",
+  "Repeat a freestyle workout": "Repetir un entrenamiento libre",
+  "Freestyle workouts you and your coach built together -- repeat any of them on your own anytime.":
+    "Entrenamientos libres que hiciste con tu entrenadora -- repite cualquiera de ellos por tu cuenta cuando quieras.",
+  "When your coach names a freestyle workout you've done together, it'll show up here to repeat.":
+    "Cuando tu entrenadora le dé nombre a un entrenamiento libre que hicieron juntas, aparecerá aquí para que lo repitas.",
+  "Done {n} times": "Hecho {n} veces",
+  "Last done {date}": "Última vez el {date}",
+  "Repeat this workout": "Repetir este entrenamiento",
+  "Log today's weights and notes for each move -- the exercises, sets & reps carry over from last time.":
+    "Registra los pesos y notas de hoy para cada movimiento -- los ejercicios, series y repeticiones se mantienen igual que la última vez.",
   "My schedule": "Mi horario",
   "View & manage your sessions": "Ver y administrar tus sesiones",
   Nutrition: "Nutrición",

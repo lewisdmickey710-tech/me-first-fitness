@@ -147,6 +147,7 @@ export default async function EditSessionPage({
     body_map: session.body_map,
     nutrition_details: session.nutrition_details,
     coached: session.coached,
+    workout_name: session.workout_name,
   };
 
   return (

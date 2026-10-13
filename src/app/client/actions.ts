@@ -1451,6 +1451,98 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
   return day.day_number;
 }
 
+// Repeats a freestyle workout the coach named (and so marked repeatable) --
+// pulls the saved exercise/sets/reps straight from that session's entries,
+// letting the client only fill in weight/notes for today, same shape as a
+// normal program-day log but sourced from a one-off session instead of
+// program_day_exercises.
+export async function logRepeatWorkout(sourceSessionId: string, formData: FormData) {
+  const me = await getMyClient();
+  if (!me) throw new Error("No linked client profile found.");
+
+  const supabase = await createClient();
+
+  const { data: source } = await supabase
+    .from("sessions")
+    .select("entries, workout_name")
+    .eq("id", sourceSessionId)
+    .eq("client_id", me.id)
+    .eq("session_type", "freestyle")
+    .not("workout_name", "is", null)
+    .maybeSingle();
+
+  if (!source) throw new Error("That workout couldn't be found.");
+
+  const date = String(formData.get("date") ?? "");
+  if (!date) throw new Error("Date is required.");
+  const dayNotes = String(formData.get("day_notes") ?? "").trim();
+  const ratingRaw = String(formData.get("rating") ?? "").trim();
+  const rating = ratingRaw ? Number(ratingRaw) : null;
+
+  const weights = formData.getAll("weight") as string[];
+  const notes = formData.getAll("notes") as string[];
+
+  const sourceEntries = source.entries as SessionEntry[];
+  const entries: SessionEntry[] = sourceEntries.map((e, i) => {
+    const entry: SessionEntry = {
+      exercise: e.exercise,
+      sets: e.sets,
+      reps: e.reps,
+      weight: weights[i]?.trim() ?? "",
+    };
+    const noteTrimmed = notes[i]?.trim();
+    if (noteTrimmed) entry.notes = noteTrimmed;
+    return entry;
+  });
+
+  // Same auto-detection as logMyWorkout -- coached if this date matches an
+  // actual scheduled/confirmed time, solo otherwise.
+  const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
+  const { data: scheduleMatch } = await supabase
+    .from("client_schedules")
+    .select("id")
+    .eq("client_id", me.id)
+    .eq("day_of_week", dayOfWeek)
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+  const { data: occurrenceMatch } = await supabase
+    .from("session_occurrences")
+    .select("id")
+    .eq("client_id", me.id)
+    .eq("occurrence_date", date)
+    .in("status", ["scheduled", "completed"])
+    .limit(1)
+    .maybeSingle();
+  const coached = !!(scheduleMatch || occurrenceMatch);
+
+  const { error } = await supabase.from("sessions").insert({
+    client_id: me.id,
+    day_label: source.workout_name,
+    date,
+    entries,
+    rating,
+    day_notes: dayNotes || null,
+    logged_by: "client",
+    session_type: "freestyle",
+    workout_name: source.workout_name,
+    coached,
+  });
+
+  if (error) throw new Error(error.message);
+
+  // Same as logMyWorkout -- a logged workout means that date's occurrence
+  // was attended.
+  await supabase.from("session_occurrences").upsert(
+    { client_id: me.id, occurrence_date: date, status: "completed" },
+    { onConflict: "client_id,occurrence_date" }
+  );
+
+  revalidatePath("/client/my-workouts");
+  revalidatePath("/client/dashboard");
+  return source.workout_name as string;
+}
+
 // Lets a client remove a workout she logged herself -- most often an
 // accidental duplicate from re-submitting the log form. Scoped to her own
 // client-logged sessions only; a coach-logged session can't be touched

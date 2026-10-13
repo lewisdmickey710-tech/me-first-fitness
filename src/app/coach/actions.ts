@@ -820,6 +820,12 @@ export async function logSession(clientId: string, formData: FormData) {
       ? sessionTypeRaw
       : "freestyle"
   ) as SessionType;
+  // Only freestyle sessions can be named, and only a name makes it
+  // repeatable on the client's My Workouts page.
+  const workout_name =
+    session_type === "freestyle"
+      ? String(formData.get("workout_name") ?? "").trim() || null
+      : null;
   const bodyMapRaw = String(formData.get("body_map") ?? "");
   let body_map: BodyMapMarker[] | null = null;
   if (bodyMapRaw) {
@@ -913,6 +919,7 @@ export async function logSession(clientId: string, formData: FormData) {
     day_notes: day_notes || null,
     logged_by: "coach",
     session_type,
+    workout_name,
     body_map,
     payment_status: effectivePaymentStatus,
     payment_id: paymentId,
@@ -1006,6 +1013,10 @@ export async function updateSession(
       ? sessionTypeRaw
       : "freestyle"
   ) as SessionType;
+  const workout_name =
+    session_type === "freestyle"
+      ? String(formData.get("workout_name") ?? "").trim() || null
+      : null;
   const bodyMapRaw = String(formData.get("body_map") ?? "");
   let body_map: BodyMapMarker[] | null = null;
   if (bodyMapRaw) {
@@ -1092,6 +1103,7 @@ export async function updateSession(
       rating: ratingRaw ? Number(ratingRaw) : null,
       day_notes: day_notes || null,
       session_type,
+      workout_name,
       body_map,
       payment_status,
       payment_id: paymentId,

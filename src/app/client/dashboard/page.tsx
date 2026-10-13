@@ -566,6 +566,11 @@ export default async function ClientDashboard() {
           description={t("This week's exercises & cues")}
         />
         <ActionTile
+          href="/client/my-workouts"
+          label={t("My Workouts")}
+          description={t("Repeat a freestyle workout")}
+        />
+        <ActionTile
           href="/client/schedule"
           label={t("My schedule")}
           description={t("View & manage your sessions")}

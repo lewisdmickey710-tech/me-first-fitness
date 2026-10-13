@@ -37,6 +37,7 @@ export interface ExistingSession {
   body_map: BodyMapMarker[] | null;
   nutrition_details: NutritionSessionDetails | null;
   coached: boolean;
+  workout_name: string | null;
 }
 
 interface Row {
@@ -140,6 +141,7 @@ export function LogSessionForm({
       : availablePhases[0]?.id ?? ""
   );
   const [dayLabel, setDayLabel] = useState(existingSession?.day_label ?? "");
+  const [workoutName, setWorkoutName] = useState(existingSession?.workout_name ?? "");
   const [rows, setRows] = useState<Row[]>(
     existingSession ? rowsFromEntries(existingSession.entries) : blankRows(BLANK_ROWS)
   );
@@ -164,6 +166,7 @@ export function LogSessionForm({
 
   const daysForPhase = programDayOptions.filter((d) => d.phase === phase);
   const showExerciseGrid = sessionType === "program" || sessionType === "freestyle";
+  const showWorkoutNameField = sessionType === "freestyle";
   const showRecoveryField = sessionType === "recovery";
   const showProgramPicker = sessionType === "program" && availablePhases.length > 0;
   const showNutritionFields = sessionType === "nutritionist";
@@ -422,6 +425,26 @@ export function LogSessionForm({
               <Input name="date" type="date" required defaultValue={existingSession?.date ?? today} />
             </div>
           </div>
+
+          {showWorkoutNameField ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-ink">
+                Name this workout{" "}
+                <span className="font-normal text-gray">(optional)</span>
+              </label>
+              <Input
+                name="workout_name"
+                placeholder="e.g. Leg Day"
+                value={workoutName}
+                onChange={(e) => setWorkoutName(e.target.value)}
+              />
+              <p className="mt-1 text-xs text-gray">
+                Naming it lets the client find this exact workout under
+                &quot;My Workouts&quot; and repeat it on their own anytime.
+                Leave it blank to log it as a normal one-off session.
+              </p>
+            </div>
+          ) : null}
 
           {existingSession ? null : (
             <div className="space-y-3 rounded-xl border border-grayLt bg-cream/50 p-3">

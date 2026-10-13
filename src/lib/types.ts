@@ -136,6 +136,9 @@ export interface TrainingSession {
   nutrition_details: NutritionSessionDetails | null;
   coached: boolean;
   coach_notes: string | null;
+  // Only ever set on a freestyle session -- naming it is what makes it
+  // show up as a repeatable workout on the client's My Workouts page.
+  workout_name: string | null;
   created_at: string;
 }
 
