@@ -2507,6 +2507,7 @@ function ProgramTab({
             <div className="mt-3">
               {customRows.length > 0 ? (
                 <CustomProgramDayEditor
+                  key={customRows.map((r) => r.id).join(",")}
                   clientId={clientId}
                   target={{ programDayId: day.id }}
                   trackName={trackName}
@@ -2580,6 +2581,7 @@ function ProgramTab({
             />
             <div className="mt-3">
               <CustomProgramDayEditor
+                key={customRows.map((r) => r.id).join(",")}
                 clientId={clientId}
                 target={{ extraDayId: day.id }}
                 trackName={trackName}
