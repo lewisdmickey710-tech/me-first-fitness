@@ -4,7 +4,6 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { CareProfilePicker } from "@/app/coach/roster/new/CareProfilePicker";
 import {
-  addActivityAsCoach,
   addClientNote,
   addMilestone,
   addFlagOverride,
@@ -37,14 +36,16 @@ import {
   unmarkMilestoneAchieved,
   updateClientProfile,
   promoteDayToCustom,
-  setProgramDayFromSession,
+  setProgramDayFromLoggedWorkout,
   hideProgramDayForClient,
   unhideProgramDayForClient,
   addExtraProgramDay,
   removeExtraProgramDay,
+  setProgramDayFromActivity,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { CustomProgramDayEditor } from "./CustomProgramDayEditor";
+import { AddActivityForm } from "./AddActivityForm";
 import type { ExerciseLibraryEntry } from "@/components/exercise-autocomplete";
 import { BackLink } from "@/components/back-link";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -514,7 +515,8 @@ export default async function ClientDetailPage({
     }
   }
 
-  // Freestyle days already logged for this client -- lets her pull one
+  // Freestyle sessions and structured activities (a class with real
+  // exercises) already logged for this client -- lets her pull one
   // straight into the program instead of re-typing it into the custom
   // day editor, for a day that's been evolving session-to-session before
   // it's ready to be "the" plan.
@@ -524,13 +526,48 @@ export default async function ClientDetailPage({
     day_label: string;
     entries: SessionEntry[];
   }
-  const { data: recentFreestyleSessions } = (await supabase
-    .from("sessions")
-    .select("id, date, day_label, entries")
-    .eq("client_id", id)
-    .eq("session_type", "freestyle")
-    .order("date", { ascending: false })
-    .limit(20)) as unknown as { data: RecentFreestyleSession[] | null };
+  const [{ data: recentFreestyleSessionRows }, { data: recentStructuredActivities }] =
+    await Promise.all([
+      supabase
+        .from("sessions")
+        .select("id, date, day_label, entries")
+        .eq("client_id", id)
+        .eq("session_type", "freestyle")
+        .order("date", { ascending: false })
+        .limit(20) as unknown as Promise<{ data: RecentFreestyleSession[] | null }>,
+      supabase
+        .from("activities")
+        .select("id, date, type, entries")
+        .eq("client_id", id)
+        .order("date", { ascending: false })
+        .limit(20) as unknown as Promise<{
+        data: { id: string; date: string; type: string; entries: SessionEntry[] }[] | null;
+      }>,
+    ]);
+  const recentLoggedWorkouts: {
+    source: "session" | "activity";
+    id: string;
+    date: string;
+    label: string;
+    entries: SessionEntry[];
+  }[] = [
+    ...(recentFreestyleSessionRows ?? []).map((s) => ({
+      source: "session" as const,
+      id: s.id,
+      date: s.date,
+      label: s.day_label,
+      entries: s.entries,
+    })),
+    ...(recentStructuredActivities ?? [])
+      .filter((a) => a.entries.length > 0)
+      .map((a) => ({
+        source: "activity" as const,
+        id: a.id,
+        date: a.date,
+        label: a.type,
+        entries: a.entries,
+      })),
+  ].sort((a, b) => (a.date < b.date ? 1 : -1));
   const exerciseLibraryEntries = (exerciseOptions ?? []).map((e) => ({
     id: e.id,
     name: e.name,
@@ -670,7 +707,7 @@ export default async function ClientDetailPage({
           hiddenDayIds={hiddenDayIds}
           extraDays={extraDays ?? []}
           extraCustomRowsByExtraDayId={extraCustomRowsByExtraDayId}
-          recentFreestyleSessions={recentFreestyleSessions ?? []}
+          recentLoggedWorkouts={recentLoggedWorkouts}
           recentSessions={sessions ?? []}
           sessionMode={client.session_mode}
           programLastUpdatedAt={client.program_last_updated_at}
@@ -688,6 +725,8 @@ export default async function ClientDetailPage({
           symptomLogs={symptomLogs ?? []}
           symptomTrackerEnabled={client.symptom_tracker_enabled}
           replyByItemKey={replyByItemKey}
+          exerciseLibrary={exerciseLibraryEntries}
+          currentPhase={currentPhase}
         />
       )}
       {tab === "attendance" && (
@@ -2303,7 +2342,7 @@ function ProgramTab({
   hiddenDayIds,
   extraDays,
   extraCustomRowsByExtraDayId,
-  recentFreestyleSessions,
+  recentLoggedWorkouts,
   recentSessions,
   sessionMode,
   programLastUpdatedAt,
@@ -2319,7 +2358,13 @@ function ProgramTab({
   hiddenDayIds: Set<string>;
   extraDays: { id: string; day_number: number; day_label: string }[];
   extraCustomRowsByExtraDayId: Map<string, CustomDayRowShape[]>;
-  recentFreestyleSessions: { id: string; date: string; day_label: string; entries: SessionEntry[] }[];
+  recentLoggedWorkouts: {
+    source: "session" | "activity";
+    id: string;
+    date: string;
+    label: string;
+    entries: SessionEntry[];
+  }[];
   recentSessions: TrainingSession[];
   sessionMode: Client["session_mode"];
   programLastUpdatedAt: string | null;
@@ -2454,26 +2499,27 @@ function ProgramTab({
                 </button>
               </form>
             </div>
-            {recentFreestyleSessions.length > 0 ? (
+            {recentLoggedWorkouts.length > 0 ? (
               <form
                 action={async (formData: FormData) => {
                   "use server";
-                  const sourceSessionId = String(formData.get("source_session_id") ?? "");
-                  if (sourceSessionId) {
-                    await setProgramDayFromSession(
+                  const sourceKey = String(formData.get("source_key") ?? "");
+                  if (sourceKey) {
+                    await setProgramDayFromLoggedWorkout(
                       clientId,
                       { programDayId: day.id },
-                      sourceSessionId
+                      sourceKey
                     );
                   }
                 }}
                 className="mt-2 flex flex-wrap items-center gap-2"
               >
-                <Select name="source_session_id" defaultValue="" className="max-w-xs">
-                  <option value="">— Use a recent freestyle workout instead —</option>
-                  {recentFreestyleSessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.date} — {s.day_label} ({s.entries.length} exercises)
+                <Select name="source_key" defaultValue="" className="max-w-xs">
+                  <option value="">— Use a recent logged workout instead —</option>
+                  {recentLoggedWorkouts.map((w) => (
+                    <option key={`${w.source}-${w.id}`} value={`${w.source}:${w.id}`}>
+                      {w.date} — {w.label} ({w.entries.length} exercises
+                      {w.source === "activity" ? ", class" : ""})
                     </option>
                   ))}
                 </Select>
@@ -2551,26 +2597,27 @@ function ProgramTab({
                 </button>
               </form>
             </div>
-            {recentFreestyleSessions.length > 0 ? (
+            {recentLoggedWorkouts.length > 0 ? (
               <form
                 action={async (formData: FormData) => {
                   "use server";
-                  const sourceSessionId = String(formData.get("source_session_id") ?? "");
-                  if (sourceSessionId) {
-                    await setProgramDayFromSession(
+                  const sourceKey = String(formData.get("source_key") ?? "");
+                  if (sourceKey) {
+                    await setProgramDayFromLoggedWorkout(
                       clientId,
                       { extraDayId: day.id },
-                      sourceSessionId
+                      sourceKey
                     );
                   }
                 }}
                 className="mt-2 flex flex-wrap items-center gap-2"
               >
-                <Select name="source_session_id" defaultValue="" className="max-w-xs">
-                  <option value="">— Use a recent freestyle workout instead —</option>
-                  {recentFreestyleSessions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.date} — {s.day_label} ({s.entries.length} exercises)
+                <Select name="source_key" defaultValue="" className="max-w-xs">
+                  <option value="">— Use a recent logged workout instead —</option>
+                  {recentLoggedWorkouts.map((w) => (
+                    <option key={`${w.source}-${w.id}`} value={`${w.source}:${w.id}`}>
+                      {w.date} — {w.label} ({w.entries.length} exercises
+                      {w.source === "activity" ? ", class" : ""})
                     </option>
                   ))}
                 </Select>
@@ -2604,7 +2651,10 @@ function ProgramTab({
           Only shows up on their program -- nobody else on this track gets it.
         </p>
         <form
-          action={addExtraProgramDay.bind(null, clientId, currentPhase.phase)}
+          action={async (formData: FormData) => {
+            "use server";
+            await addExtraProgramDay(clientId, currentPhase.phase, formData);
+          }}
           className="flex flex-wrap items-center gap-2"
         >
           <Input name="day_label" placeholder="e.g. Core & Mobility" className="max-w-xs" />
@@ -2628,6 +2678,8 @@ async function LogTab({
   symptomLogs,
   symptomTrackerEnabled,
   replyByItemKey,
+  exerciseLibrary,
+  currentPhase,
 }: {
   clientId: string;
   sessions: TrainingSession[];
@@ -2639,6 +2691,8 @@ async function LogTab({
   symptomLogs: SharedSymptomDayLog[];
   symptomTrackerEnabled: boolean;
   replyByItemKey: Map<string, CoachItemReply>;
+  exerciseLibrary: ExerciseLibraryEntry[];
+  currentPhase: ClientPhaseHistory | null;
 }) {
   const mediaPaths = [
     ...new Set([
@@ -2659,7 +2713,6 @@ async function LogTab({
     );
   }
 
-  const boundAddActivity = addActivityAsCoach.bind(null, clientId);
   const today = new Date().toISOString().slice(0, 10);
   const entries = mergeLogEntries(sessions, activities);
 
@@ -2703,38 +2756,7 @@ async function LogTab({
 
       <Card>
         <Collapsible label="+ Log activity for this client">
-          <form action={boundAddActivity} className="mt-2 space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink">Date</label>
-                <Input name="date" type="date" required defaultValue={today} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium text-ink">Type</label>
-                <Select name="type" required defaultValue="">
-                  <option value="" disabled>
-                    Choose one
-                  </option>
-                  {ACTIVITY_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            <Input name="duration" placeholder="Duration (optional) -- e.g. 30 min" />
-            <Textarea name="notes" rows={2} placeholder="Notes (optional)" />
-            <input
-              type="file"
-              name="photo"
-              accept="image/*"
-              className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-            />
-            <Button type="submit" variant="secondary">
-              Log activity
-            </Button>
-          </form>
+          <AddActivityForm clientId={clientId} today={today} exerciseLibrary={exerciseLibrary} />
         </Collapsible>
       </Card>
 
@@ -2886,6 +2908,39 @@ async function LogTab({
                       <p className="mt-1 text-sm text-ink">{a.notes}</p>
                     ) : null}
                   </>
+                ) : null}
+
+                {a && a.entries.length > 0 && currentPhase ? (
+                  <Collapsible label="Add to program" className="mt-2">
+                    <ul className="mb-2 space-y-0.5 text-sm text-gray">
+                      {a.entries.map((e, i) => (
+                        <li key={i}>
+                          {e.exercise}
+                          {e.sets || e.reps ? ` — ${e.sets}x${e.reps}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await setProgramDayFromActivity(
+                          clientId,
+                          { newDayPhase: currentPhase.phase },
+                          a.id
+                        );
+                      }}
+                    >
+                      <Button type="submit" variant="secondary">
+                        Add as a new day
+                      </Button>
+                    </form>
+                    <p className="mt-1 text-xs text-gray">
+                      Adds a day with these exercises to this client&apos;s
+                      program -- only for them, not the shared track
+                      template. To set an existing day from this instead,
+                      use the picker on that day in the Program tab.
+                    </p>
+                  </Collapsible>
                 ) : null}
 
                 <Collapsible

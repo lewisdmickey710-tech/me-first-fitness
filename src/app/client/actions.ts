@@ -79,6 +79,26 @@ export async function logActivity(formData: FormData) {
   // LogActivityForm) -- see addNutritionLog above for why.
   const photoPath = String(formData.get("photo_path") ?? "").trim() || null;
 
+  // Optional -- lets a structured activity (a class with real exercises,
+  // say) carry enough for the coach to later turn it into a program day.
+  const exercises = formData.getAll("exercise") as string[];
+  const sets = formData.getAll("sets") as string[];
+  const reps = formData.getAll("reps") as string[];
+  const exerciseIds = formData.getAll("exercise_id") as string[];
+  const entries: SessionEntry[] = exercises
+    .map((exercise, i) => {
+      const entry: SessionEntry = {
+        exercise: exercise?.trim() ?? "",
+        sets: sets[i]?.trim() ?? "",
+        reps: reps[i]?.trim() ?? "",
+        weight: "",
+      };
+      const exerciseId = exerciseIds[i]?.trim();
+      if (exerciseId) entry.exercise_id = exerciseId;
+      return entry;
+    })
+    .filter((e) => e.exercise);
+
   const { error } = await supabase.from("activities").insert({
     client_id: me.id,
     date,
@@ -87,6 +107,7 @@ export async function logActivity(formData: FormData) {
     notes: notes || null,
     logged_by: "client",
     photo_path: photoPath,
+    entries,
   });
 
   if (error) throw new Error(error.message);

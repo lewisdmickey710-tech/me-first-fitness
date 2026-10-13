@@ -1281,6 +1281,27 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
     photoPath = path;
   }
 
+  // Optional -- lets a structured activity (a class with real exercises,
+  // say) carry enough to later become a program day. Most activities
+  // leave this empty.
+  const exercises = formData.getAll("exercise") as string[];
+  const sets = formData.getAll("sets") as string[];
+  const reps = formData.getAll("reps") as string[];
+  const exerciseIds = formData.getAll("exercise_id") as string[];
+  const entries: SessionEntry[] = exercises
+    .map((exercise, i) => {
+      const entry: SessionEntry = {
+        exercise: exercise?.trim() ?? "",
+        sets: sets[i]?.trim() ?? "",
+        reps: reps[i]?.trim() ?? "",
+        weight: "",
+      };
+      const exerciseId = exerciseIds[i]?.trim();
+      if (exerciseId) entry.exercise_id = exerciseId;
+      return entry;
+    })
+    .filter((e) => e.exercise);
+
   const { error } = await supabase.from("activities").insert({
     client_id: clientId,
     date,
@@ -1289,6 +1310,7 @@ export async function addActivityAsCoach(clientId: string, formData: FormData) {
     notes: notes || null,
     logged_by: "coach",
     photo_path: photoPath,
+    entries,
   });
   if (error) throw new Error(error.message);
 
@@ -1635,6 +1657,67 @@ export async function setProgramDayFromSession(
   revalidatePath(`/coach/clients/${clientId}`);
 }
 
+// Turns a logged activity (most often a class) into a program day -- only
+// possible when it was logged with exercise/sets/reps entries (see
+// activities.entries). "new" creates a day for it (auto-labeled from the
+// activity's type); otherwise fully replaces an existing day, same as
+// setProgramDayFromSession.
+export async function setProgramDayFromActivity(
+  clientId: string,
+  target: { programDayId: string } | { extraDayId: string } | { newDayPhase: string },
+  activityId: string
+) {
+  const supabase = await createClient();
+
+  const { data: activity } = await supabase
+    .from("activities")
+    .select("entries, type")
+    .eq("id", activityId)
+    .eq("client_id", clientId)
+    .maybeSingle();
+
+  if (!activity) throw new Error("That activity couldn't be found.");
+  const entries = (activity.entries ?? []) as SessionEntry[];
+  if (entries.length === 0) {
+    throw new Error("This activity has no exercises logged to add to the program.");
+  }
+
+  let syncTarget: CustomDayTarget;
+  if ("programDayId" in target) {
+    syncTarget = { program_day_id: target.programDayId };
+  } else if ("extraDayId" in target) {
+    syncTarget = { extra_day_id: target.extraDayId };
+  } else {
+    const labelFormData = new FormData();
+    labelFormData.set("day_label", activity.type || "Class");
+    const newDayId = await addExtraProgramDay(clientId, target.newDayPhase, labelFormData);
+    syncTarget = { extra_day_id: newDayId };
+  }
+
+  await syncClientCustomProgramDay(supabase, clientId, syncTarget, entries);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// The "use a recent logged workout" picker on a day card offers both
+// freestyle sessions and structured activities in one dropdown -- this
+// dispatches to whichever source the picked option names. sourceKey is
+// "session:<id>" or "activity:<id>".
+export async function setProgramDayFromLoggedWorkout(
+  clientId: string,
+  target: { programDayId: string } | { extraDayId: string },
+  sourceKey: string
+) {
+  const [source, sourceId] = sourceKey.split(":");
+  if (!source || !sourceId) throw new Error("No workout selected.");
+
+  if (source === "activity") {
+    await setProgramDayFromActivity(clientId, target, sourceId);
+  } else {
+    await setProgramDayFromSession(clientId, target, sourceId);
+  }
+}
+
 // Hides a prescribed day for this client only -- e.g. she's only training
 // 2x/week with them right now, not the track's usual 3. Doesn't touch
 // program_days (the shared template) or any other client assigned to it;
@@ -1708,15 +1791,20 @@ export async function addExtraProgramDay(
     ...(extraDays ?? []).map((d) => d.day_number)
   );
 
-  const { error } = await supabase.from("client_extra_program_days").insert({
-    client_id: clientId,
-    phase,
-    day_number: highestDayNumber + 1,
-    day_label,
-  });
+  const { data: newDay, error } = await supabase
+    .from("client_extra_program_days")
+    .insert({
+      client_id: clientId,
+      phase,
+      day_number: highestDayNumber + 1,
+      day_label,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
+  return newDay.id as string;
 }
 
 // Removes a day that only existed for this client -- cascades to delete

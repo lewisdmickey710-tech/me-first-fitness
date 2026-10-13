@@ -45,7 +45,7 @@ export default async function ClientHistoryPage() {
       .from("activities")
       // coach_notes is deliberately excluded -- coach's-eyes-only.
       .select(
-        "id, client_id, date, type, duration, notes, logged_by, photo_path, created_at"
+        "id, client_id, date, type, duration, notes, logged_by, photo_path, entries, created_at"
       )
       .eq("client_id", me.id)
       .order("date", { ascending: false }) as unknown as Promise<{

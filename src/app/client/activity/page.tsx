@@ -13,6 +13,7 @@ import {
 import { WeightInput } from "@/components/weight-input";
 import { toDateString } from "@/lib/timezone";
 import { makeT } from "@/lib/i18n";
+import { exerciseTagLabel } from "@/lib/constants";
 import type { Activity } from "@/lib/types";
 import { LogActivityForm } from "@/app/client/activity/LogActivityForm";
 
@@ -37,7 +38,7 @@ export default async function ClientActivityPage() {
     .from("activities")
     // coach_notes is deliberately excluded -- coach's-eyes-only.
     .select(
-      "id, client_id, date, type, duration, notes, logged_by, photo_path, created_at"
+      "id, client_id, date, type, duration, notes, logged_by, photo_path, entries, created_at"
     )
     .eq("client_id", me.id)
     .order("date", { ascending: false })) as { data: Activity[] | null };
@@ -59,6 +60,26 @@ export default async function ClientActivityPage() {
 
   const today = toDateString(new Date());
 
+  const { data: exerciseOptions } = (await supabase
+    .from("exercises")
+    .select("id, name, movement_pattern, plane_of_motion, primary_muscle_group")
+    .order("name")) as unknown as {
+    data:
+      | {
+          id: string;
+          name: string;
+          movement_pattern: string | null;
+          plane_of_motion: string | null;
+          primary_muscle_group: string | null;
+        }[]
+      | null;
+  };
+  const exerciseLibrary = (exerciseOptions ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    tag: exerciseTagLabel(e) || undefined,
+  }));
+
   return (
     <div className="space-y-6">
       <BackLink href="/client/dashboard" />
@@ -75,7 +96,12 @@ export default async function ClientActivityPage() {
         {t("instead, so it counts toward that.")}
       </p>
 
-      <LogActivityForm clientId={me.id} today={today} locale={me.language} />
+      <LogActivityForm
+        clientId={me.id}
+        today={today}
+        locale={me.language}
+        exerciseLibrary={exerciseLibrary}
+      />
 
       <div>
         <h2 className="text-lg font-semibold text-ink">

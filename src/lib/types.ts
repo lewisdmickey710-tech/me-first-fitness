@@ -220,6 +220,11 @@ export interface Activity {
   logged_by: "coach" | "client";
   coach_notes: string | null;
   photo_path: string | null;
+  // Optional exercise/sets/reps rows -- same shape as a session's entries,
+  // populated when the activity (most often a class) was structured
+  // enough to describe that way. Lets it be promoted into a program day;
+  // most activities leave this empty.
+  entries: SessionEntry[];
   created_at: string;
 }
 
