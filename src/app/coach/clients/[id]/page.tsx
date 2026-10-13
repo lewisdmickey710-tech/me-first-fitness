@@ -38,6 +38,10 @@ import {
   updateClientProfile,
   promoteDayToCustom,
   setProgramDayFromSession,
+  hideProgramDayForClient,
+  unhideProgramDayForClient,
+  addExtraProgramDay,
+  removeExtraProgramDay,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
 import { CustomProgramDayEditor } from "./CustomProgramDayEditor";
@@ -442,28 +446,72 @@ export default async function ClientDetailPage({
         .order("name")) as unknown as { data: ExerciseOptionRow[] | null })
     : { data: [] as ExerciseOptionRow[] };
 
+  const programDayIds = (programDays ?? []).map((d) => d.id);
+
+  // Days hidden for this client (prescribed by the track, but not
+  // something she's doing with this client right now) and days that
+  // exist only for this client (not part of the track at all) -- both
+  // scoped to the current phase, neither touching the shared template or
+  // any other client assigned to it.
+  const { data: hiddenProgramDays } = programDayIds.length
+    ? ((await supabase
+        .from("client_hidden_program_days")
+        .select("program_day_id")
+        .eq("client_id", id)
+        .in("program_day_id", programDayIds)) as unknown as {
+        data: { program_day_id: string }[] | null;
+      })
+    : { data: [] as { program_day_id: string }[] };
+  const hiddenDayIds = new Set((hiddenProgramDays ?? []).map((r) => r.program_day_id));
+
+  interface ExtraProgramDay {
+    id: string;
+    day_number: number;
+    day_label: string;
+  }
+  const { data: extraDays } = currentPhase
+    ? ((await supabase
+        .from("client_extra_program_days")
+        .select("id, day_number, day_label")
+        .eq("client_id", id)
+        .eq("phase", currentPhase.phase)
+        .order("day_number")) as unknown as { data: ExtraProgramDay[] | null })
+    : { data: [] as ExtraProgramDay[] };
+  const extraDayIds = (extraDays ?? []).map((d) => d.id);
+
   interface CustomProgramDayRow {
     id: string;
-    program_day_id: string;
+    program_day_id: string | null;
+    extra_day_id: string | null;
     position: number;
     exercise_name: string;
     sets: string | null;
     reps: string | null;
   }
-  const programDayIds = (programDays ?? []).map((d) => d.id);
-  const { data: customProgramDayRows } = programDayIds.length
+  const dayFilters = [
+    programDayIds.length ? `program_day_id.in.(${programDayIds.join(",")})` : null,
+    extraDayIds.length ? `extra_day_id.in.(${extraDayIds.join(",")})` : null,
+  ].filter((f): f is string => !!f);
+  const { data: customProgramDayRows } = dayFilters.length
     ? ((await supabase
         .from("client_custom_program_days")
-        .select("id, program_day_id, position, exercise_name, sets, reps")
+        .select("id, program_day_id, extra_day_id, position, exercise_name, sets, reps")
         .eq("client_id", id)
-        .in("program_day_id", programDayIds)
+        .or(dayFilters.join(","))
         .order("position")) as unknown as { data: CustomProgramDayRow[] | null })
     : { data: [] as CustomProgramDayRow[] };
   const customRowsByDayId = new Map<string, CustomProgramDayRow[]>();
+  const extraCustomRowsByExtraDayId = new Map<string, CustomProgramDayRow[]>();
   for (const row of customProgramDayRows ?? []) {
-    const list = customRowsByDayId.get(row.program_day_id) ?? [];
-    list.push(row);
-    customRowsByDayId.set(row.program_day_id, list);
+    if (row.program_day_id) {
+      const list = customRowsByDayId.get(row.program_day_id) ?? [];
+      list.push(row);
+      customRowsByDayId.set(row.program_day_id, list);
+    } else if (row.extra_day_id) {
+      const list = extraCustomRowsByExtraDayId.get(row.extra_day_id) ?? [];
+      list.push(row);
+      extraCustomRowsByExtraDayId.set(row.extra_day_id, list);
+    }
   }
 
   // Freestyle days already logged for this client -- lets her pull one
@@ -619,6 +667,9 @@ export default async function ClientDetailPage({
           overrides={programOverrides ?? []}
           exerciseLibrary={exerciseLibraryEntries}
           customRowsByDayId={customRowsByDayId}
+          hiddenDayIds={hiddenDayIds}
+          extraDays={extraDays ?? []}
+          extraCustomRowsByExtraDayId={extraCustomRowsByExtraDayId}
           recentFreestyleSessions={recentFreestyleSessions ?? []}
           recentSessions={sessions ?? []}
           sessionMode={client.session_mode}
@@ -2230,6 +2281,16 @@ function ClientIntakeSummary({ intake }: { intake: ClientIntake }) {
   );
 }
 
+interface CustomDayRowShape {
+  id: string;
+  program_day_id: string | null;
+  extra_day_id: string | null;
+  position: number;
+  exercise_name: string;
+  sets: string | null;
+  reps: string | null;
+}
+
 function ProgramTab({
   clientId,
   clientName,
@@ -2239,6 +2300,9 @@ function ProgramTab({
   overrides,
   exerciseLibrary,
   customRowsByDayId,
+  hiddenDayIds,
+  extraDays,
+  extraCustomRowsByExtraDayId,
   recentFreestyleSessions,
   recentSessions,
   sessionMode,
@@ -2251,10 +2315,10 @@ function ProgramTab({
   programDays: ProgramDayWithExercisesRow[];
   overrides: ClientProgramOverride[];
   exerciseLibrary: ExerciseLibraryEntry[];
-  customRowsByDayId: Map<
-    string,
-    { id: string; program_day_id: string; position: number; exercise_name: string; sets: string | null; reps: string | null }[]
-  >;
+  customRowsByDayId: Map<string, CustomDayRowShape[]>;
+  hiddenDayIds: Set<string>;
+  extraDays: { id: string; day_number: number; day_label: string }[];
+  extraCustomRowsByExtraDayId: Map<string, CustomDayRowShape[]>;
   recentFreestyleSessions: { id: string; date: string; day_label: string; entries: SessionEntry[] }[];
   recentSessions: TrainingSession[];
   sessionMode: Client["session_mode"];
@@ -2278,7 +2342,7 @@ function ProgramTab({
     );
   }
 
-  if (programDays.length === 0) {
+  if (programDays.length === 0 && extraDays.length === 0) {
     return (
       <EmptyState
         title="No program days set up"
@@ -2319,6 +2383,29 @@ function ProgramTab({
         everyone else on their track follows is unchanged.
       </p>
       {programDays.map((day) => {
+        const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+        const isHidden = hiddenDayIds.has(day.id);
+
+        if (isHidden) {
+          return (
+            <Card key={day.id} className="flex items-center justify-between border-grayLt/60 bg-cream/40">
+              <p className="text-sm text-gray">
+                {dayLabel} — <span className="italic">hidden for {clientName}</span>
+              </p>
+              <form
+                action={async () => {
+                  "use server";
+                  await unhideProgramDayForClient(clientId, day.id);
+                }}
+              >
+                <button type="submit" className="text-xs text-rose hover:underline">
+                  Restore this day
+                </button>
+              </form>
+            </Card>
+          );
+        }
+
         const ordered = day.program_day_exercises
           .slice()
           .sort(
@@ -2342,27 +2429,42 @@ function ProgramTab({
             };
           });
 
-        const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
         const isCompleted = completedDayLabels.has(dayLabel);
         const customRows = customRowsByDayId.get(day.id) ?? [];
         return (
           <Card key={day.id}>
-            <p className="font-medium text-ink">
-              {dayLabel}
-              {isCompleted ? (
-                <span className="text-teal" aria-label="Completed">
-                  {" "}
-                  ✓
-                </span>
-              ) : null}
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-ink">
+                {dayLabel}
+                {isCompleted ? (
+                  <span className="text-teal" aria-label="Completed">
+                    {" "}
+                    ✓
+                  </span>
+                ) : null}
+              </p>
+              <form
+                action={async () => {
+                  "use server";
+                  await hideProgramDayForClient(clientId, day.id);
+                }}
+              >
+                <button type="submit" className="text-xs text-gray hover:text-pink">
+                  Hide this day for {clientName}
+                </button>
+              </form>
+            </div>
             {recentFreestyleSessions.length > 0 ? (
               <form
                 action={async (formData: FormData) => {
                   "use server";
                   const sourceSessionId = String(formData.get("source_session_id") ?? "");
                   if (sourceSessionId) {
-                    await setProgramDayFromSession(clientId, day.id, sourceSessionId);
+                    await setProgramDayFromSession(
+                      clientId,
+                      { programDayId: day.id },
+                      sourceSessionId
+                    );
                   }
                 }}
                 className="mt-2 flex flex-wrap items-center gap-2"
@@ -2384,7 +2486,7 @@ function ProgramTab({
               {customRows.length > 0 ? (
                 <CustomProgramDayEditor
                   clientId={clientId}
-                  programDayId={day.id}
+                  target={{ programDayId: day.id }}
                   trackName={trackName}
                   initialRows={customRows.map((r) => ({
                     exercise: r.exercise_name,
@@ -2418,6 +2520,99 @@ function ProgramTab({
           </Card>
         );
       })}
+
+      {extraDays.map((day) => {
+        const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+        const isCompleted = completedDayLabels.has(dayLabel);
+        const customRows = extraCustomRowsByExtraDayId.get(day.id) ?? [];
+        return (
+          <Card key={day.id} className="border-teal/40 bg-teal/5">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-medium text-ink">
+                {dayLabel}
+                {isCompleted ? (
+                  <span className="text-teal" aria-label="Completed">
+                    {" "}
+                    ✓
+                  </span>
+                ) : null}
+                <span className="ml-2 text-xs font-normal text-gray">
+                  only on {clientName}&apos;s program
+                </span>
+              </p>
+              <form
+                action={async () => {
+                  "use server";
+                  await removeExtraProgramDay(clientId, day.id);
+                }}
+              >
+                <button type="submit" className="text-xs text-gray hover:text-pink">
+                  Remove this day
+                </button>
+              </form>
+            </div>
+            {recentFreestyleSessions.length > 0 ? (
+              <form
+                action={async (formData: FormData) => {
+                  "use server";
+                  const sourceSessionId = String(formData.get("source_session_id") ?? "");
+                  if (sourceSessionId) {
+                    await setProgramDayFromSession(
+                      clientId,
+                      { extraDayId: day.id },
+                      sourceSessionId
+                    );
+                  }
+                }}
+                className="mt-2 flex flex-wrap items-center gap-2"
+              >
+                <Select name="source_session_id" defaultValue="" className="max-w-xs">
+                  <option value="">— Use a recent freestyle workout instead —</option>
+                  {recentFreestyleSessions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.date} — {s.day_label} ({s.entries.length} exercises)
+                    </option>
+                  ))}
+                </Select>
+                <Button type="submit" variant="secondary">
+                  Set as this day
+                </Button>
+              </form>
+            ) : null}
+            <div className="mt-3">
+              <CustomProgramDayEditor
+                clientId={clientId}
+                target={{ extraDayId: day.id }}
+                trackName={trackName}
+                initialRows={customRows.map((r) => ({
+                  exercise: r.exercise_name,
+                  sets: r.sets ?? "",
+                  reps: r.reps ?? "",
+                }))}
+                exerciseLibrary={exerciseLibrary}
+              />
+            </div>
+          </Card>
+        );
+      })}
+
+      <Card className="space-y-2">
+        <p className="text-sm font-medium text-ink">
+          Add a day for {clientName}
+        </p>
+        <p className="text-xs text-gray">
+          Only shows up on their program -- nobody else on this track gets it.
+        </p>
+        <form
+          action={addExtraProgramDay.bind(null, clientId, currentPhase.phase)}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <Input name="day_label" placeholder="e.g. Core & Mobility" className="max-w-xs" />
+          <Button type="submit" variant="secondary">
+            + Add day
+          </Button>
+        </form>
+      </Card>
     </div>
   );
 }

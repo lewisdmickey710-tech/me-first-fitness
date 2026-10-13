@@ -805,34 +805,39 @@ async function syncSessionPayment(
   return null;
 }
 
-// Fully replaces one client's version of a program day (Phase X, Day N)
-// with the exercises just logged -- either because she checked "Add this
-// to their program" on a freestyle workout, or because a program-day
-// session she edited diverged from the template and she chose to make it
-// permanent. Delete-then-insert rather than trying to diff/merge against
-// whatever was there before (default template or an earlier custom day):
-// simpler, and matches "fully replace" rather than a partial patch. Only
-// ever touches this one client's client_custom_program_days rows -- the
-// shared program_days/program_day_exercises template, and every other
-// client assigned to it, are untouched.
+// Fully replaces one client's version of a day -- either an existing
+// template day (target: program_day_id) or a day that exists only for
+// this client (target: extra_day_id, see client_extra_program_days) --
+// with the exercises just logged or edited. Delete-then-insert rather
+// than trying to diff/merge against whatever was there before: simpler,
+// and matches "fully replace" rather than a partial patch. Only ever
+// touches this one client's client_custom_program_days rows -- the shared
+// program_days/program_day_exercises template, and every other client
+// assigned to it, are untouched.
+type CustomDayTarget = { program_day_id: string } | { extra_day_id: string };
+
 async function syncClientCustomProgramDay(
   supabase: Awaited<ReturnType<typeof createClient>>,
   clientId: string,
-  programDayId: string,
+  target: CustomDayTarget,
   entries: SessionEntry[]
 ) {
-  const { error: deleteError } = await supabase
+  let deleteQuery = supabase
     .from("client_custom_program_days")
     .delete()
-    .eq("client_id", clientId)
-    .eq("program_day_id", programDayId);
+    .eq("client_id", clientId);
+  deleteQuery =
+    "program_day_id" in target
+      ? deleteQuery.eq("program_day_id", target.program_day_id)
+      : deleteQuery.eq("extra_day_id", target.extra_day_id);
+  const { error: deleteError } = await deleteQuery;
   if (deleteError) throw new Error(deleteError.message);
 
   if (entries.length === 0) return;
 
   const rows = entries.map((e, i) => ({
     client_id: clientId,
-    program_day_id: programDayId,
+    ...target,
     position: i,
     exercise_name: e.exercise,
     sets: e.sets || null,
@@ -995,7 +1000,12 @@ export async function logSession(clientId: string, formData: FormData) {
   const targetProgramDayId =
     addToProgramDayId || (makePermanent ? permanentProgramDayId : "");
   if (targetProgramDayId) {
-    await syncClientCustomProgramDay(supabase, clientId, targetProgramDayId, entries);
+    await syncClientCustomProgramDay(
+      supabase,
+      clientId,
+      { program_day_id: targetProgramDayId },
+      entries
+    );
   }
 
   // Quick wellness pulse-check and priority note, both optional -- offered
@@ -1189,7 +1199,12 @@ export async function updateSession(
   const targetProgramDayId =
     addToProgramDayId || (makePermanent ? permanentProgramDayId : "");
   if (targetProgramDayId) {
-    await syncClientCustomProgramDay(supabase, clientId, targetProgramDayId, entries);
+    await syncClientCustomProgramDay(
+      supabase,
+      clientId,
+      { program_day_id: targetProgramDayId },
+      entries
+    );
   }
 
   revalidatePath(`/coach/clients/${clientId}`);
@@ -1534,7 +1549,7 @@ export async function promoteDayToCustom(clientId: string, programDayId: string)
     };
   });
 
-  await syncClientCustomProgramDay(supabase, clientId, programDayId, entries);
+  await syncClientCustomProgramDay(supabase, clientId, { program_day_id: programDayId }, entries);
 
   revalidatePath(`/coach/clients/${clientId}`);
 }
@@ -1546,7 +1561,7 @@ export async function promoteDayToCustom(clientId: string, programDayId: string)
 // the day each time it's saved.
 export async function setClientCustomProgramDay(
   clientId: string,
-  programDayId: string,
+  target: { programDayId: string } | { extraDayId: string },
   formData: FormData
 ) {
   const supabase = await createClient();
@@ -1564,7 +1579,11 @@ export async function setClientCustomProgramDay(
     }))
     .filter((e) => e.exercise);
 
-  await syncClientCustomProgramDay(supabase, clientId, programDayId, entries);
+  const syncTarget: CustomDayTarget =
+    "programDayId" in target
+      ? { program_day_id: target.programDayId }
+      : { extra_day_id: target.extraDayId };
+  await syncClientCustomProgramDay(supabase, clientId, syncTarget, entries);
 
   revalidatePath(`/coach/clients/${clientId}`);
 }
@@ -1592,7 +1611,7 @@ export async function clearClientCustomProgramDay(clientId: string, programDayId
 // a past session instead of one being logged right now.
 export async function setProgramDayFromSession(
   clientId: string,
-  programDayId: string,
+  target: { programDayId: string } | { extraDayId: string },
   sourceSessionId: string
 ) {
   const supabase = await createClient();
@@ -1607,7 +1626,112 @@ export async function setProgramDayFromSession(
 
   if (!source) throw new Error("That workout couldn't be found.");
 
-  await syncClientCustomProgramDay(supabase, clientId, programDayId, source.entries as SessionEntry[]);
+  const syncTarget: CustomDayTarget =
+    "programDayId" in target
+      ? { program_day_id: target.programDayId }
+      : { extra_day_id: target.extraDayId };
+  await syncClientCustomProgramDay(supabase, clientId, syncTarget, source.entries as SessionEntry[]);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Hides a prescribed day for this client only -- e.g. she's only training
+// 2x/week with them right now, not the track's usual 3. Doesn't touch
+// program_days (the shared template) or any other client assigned to it;
+// reversible any time via unhideProgramDayForClient.
+export async function hideProgramDayForClient(clientId: string, programDayId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("client_hidden_program_days")
+    .upsert(
+      { client_id: clientId, program_day_id: programDayId },
+      { onConflict: "client_id,program_day_id" }
+    );
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+export async function unhideProgramDayForClient(clientId: string, programDayId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("client_hidden_program_days")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("program_day_id", programDayId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Adds a day that exists only for this client -- not part of the shared
+// track template, so nobody else assigned to the same care profile sees
+// it. day_number continues on from whatever days (template + already
+// added) exist for this client in this phase, so it reads as "Day 4",
+// "Day 5", etc. alongside the prescribed ones.
+export async function addExtraProgramDay(
+  clientId: string,
+  phase: string,
+  formData: FormData
+) {
+  const day_label = String(formData.get("day_label") ?? "").trim();
+  if (!day_label) throw new Error("Day label is required.");
+
+  const supabase = await createClient();
+
+  const { data: client } = await supabase
+    .from("clients")
+    .select("care_profile_id")
+    .eq("id", clientId)
+    .single();
+
+  const [{ data: templateDays }, { data: extraDays }] = await Promise.all([
+    client?.care_profile_id
+      ? supabase
+          .from("program_days")
+          .select("day_number")
+          .eq("care_profile_id", client.care_profile_id)
+          .eq("phase", phase)
+      : Promise.resolve({ data: [] as { day_number: number }[] }),
+    supabase
+      .from("client_extra_program_days")
+      .select("day_number")
+      .eq("client_id", clientId)
+      .eq("phase", phase),
+  ]);
+
+  const highestDayNumber = Math.max(
+    0,
+    ...(templateDays ?? []).map((d) => d.day_number),
+    ...(extraDays ?? []).map((d) => d.day_number)
+  );
+
+  const { error } = await supabase.from("client_extra_program_days").insert({
+    client_id: clientId,
+    phase,
+    day_number: highestDayNumber + 1,
+    day_label,
+  });
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Removes a day that only existed for this client -- cascades to delete
+// its exercises (client_custom_program_days rows keyed by extra_day_id).
+// Never touches a prescribed template day; use hideProgramDayForClient
+// for that instead.
+export async function removeExtraProgramDay(clientId: string, extraDayId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("client_extra_program_days")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("id", extraDayId);
+  if (error) throw new Error(error.message);
 
   revalidatePath(`/coach/clients/${clientId}`);
 }

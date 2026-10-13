@@ -84,7 +84,20 @@ export default async function ClientProgramPage({
         })
       : { data: null };
 
-  const programDays = days ?? [];
+  // A day the coach hid for just this client (not part of their current
+  // plan right now, though still prescribed for everyone else on their
+  // track) is skipped entirely here, same as it never existed.
+  const allDayIdsBeforeHiding = (days ?? []).map((d) => d.id);
+  const { data: hiddenRows } = allDayIdsBeforeHiding.length
+    ? await supabase
+        .from("client_hidden_program_days")
+        .select("program_day_id")
+        .eq("client_id", me.id)
+        .in("program_day_id", allDayIdsBeforeHiding)
+    : { data: [] as { program_day_id: string }[] };
+  const hiddenDayIds = new Set((hiddenRows ?? []).map((r) => r.program_day_id));
+
+  const programDays = (days ?? []).filter((d) => !hiddenDayIds.has(d.id));
   const allPdeIds = programDays.flatMap((d) =>
     d.program_day_exercises.map((pde) => pde.id)
   );
@@ -151,6 +164,46 @@ export default async function ClientProgramPage({
     const list = customByDayId.get(row.program_day_id) ?? [];
     list.push(row);
     customByDayId.set(row.program_day_id, list);
+  }
+
+  // Days that exist only for this client, not part of their track's
+  // template at all (added from the coach's Program tab).
+  interface ExtraDay {
+    id: string;
+    day_number: number;
+    day_label: string;
+  }
+  const { data: extraDaysRaw } = currentPhase
+    ? await supabase
+        .from("client_extra_program_days")
+        .select("id, day_number, day_label")
+        .eq("client_id", me.id)
+        .eq("phase", currentPhase.phase)
+        .order("day_number")
+    : { data: [] as ExtraDay[] };
+  const extraDays = (extraDaysRaw ?? []) as ExtraDay[];
+  const extraDayIds = extraDays.map((d) => d.id);
+  interface ExtraCustomRow {
+    id: string;
+    extra_day_id: string;
+    position: number;
+    exercise_name: string;
+    sets: string | null;
+    reps: string | null;
+  }
+  const { data: extraCustomRows } = extraDayIds.length
+    ? await supabase
+        .from("client_custom_program_days")
+        .select("id, extra_day_id, position, exercise_name, sets, reps")
+        .eq("client_id", me.id)
+        .in("extra_day_id", extraDayIds)
+        .order("position")
+    : { data: [] as ExtraCustomRow[] };
+  const extraCustomByDayId = new Map<string, ExtraCustomRow[]>();
+  for (const row of (extraCustomRows ?? []) as ExtraCustomRow[]) {
+    const list = extraCustomByDayId.get(row.extra_day_id) ?? [];
+    list.push(row);
+    extraCustomByDayId.set(row.extra_day_id, list);
   }
 
   const { data: extraExercises } = extraIds.size
@@ -243,7 +296,7 @@ export default async function ClientProgramPage({
         {t("View past workouts →")}
       </Link>
 
-      {programDays.length === 0 ? (
+      {programDays.length === 0 && extraDays.length === 0 ? (
         <EmptyState
           title={t("No program assigned yet")}
           body={t("Once your coach builds out your care profile's program, it'll show up here.")}
@@ -630,6 +683,134 @@ export default async function ClientProgramPage({
                   dayId={day.id}
                   clientId={me.id}
                   pdeIds={isCustomDay ? customExercises.map((c) => c.id) : sortedExercises.map((pde) => pde.id)}
+                >
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink">
+                      {t("Anything else about how this session felt?")}
+                    </label>
+                    <Textarea name="day_notes" rows={2} />
+                  </div>
+
+                  <div>
+                    <p className="mb-1 text-sm font-medium text-ink">
+                      {t("Rate this workout to complete it")}
+                    </p>
+                    <StarRatingInput name="rating" />
+                  </div>
+
+                  {loggedToday ? (
+                    <ConfirmButton
+                      className="w-full"
+                      confirmText={t("You already logged this day today — save a second entry anyway?")}
+                    >
+                      {t("Log this workout again")}
+                    </ConfirmButton>
+                  ) : (
+                    <Button type="submit" className="w-full">
+                      {t("Log this workout")}
+                    </Button>
+                  )}
+                </WorkoutLogForm>
+                </Collapsible>
+              </Card>
+            );
+          })}
+
+          {extraDays.map((day) => {
+            const customExercises = extraCustomByDayId.get(day.id) ?? [];
+            const logFormId = `log-extra-day-${day.id}`;
+            const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
+            const dayLabelDisplay = t("Day {n}: {label}", {
+              n: day.day_number,
+              label: day.day_label,
+            });
+            const isCompleted = completedDayLabels.has(dayLabel);
+            const loggedToday = loggedTodayDayLabels.has(dayLabel);
+
+            return (
+              <Card key={day.id}>
+                <Collapsible
+                  label={
+                    <>
+                      {dayLabelDisplay}
+                      {isCompleted ? (
+                        <span className="text-teal" aria-label="Completed">
+                          {" "}
+                          ✓
+                        </span>
+                      ) : null}
+                    </>
+                  }
+                >
+                {loggedToday ? (
+                  <p className="mb-3 rounded-lg bg-teal/10 px-3 py-2 text-sm text-teal">
+                    {t("✓ Already logged today — logging again below will add a second entry.")}
+                  </p>
+                ) : null}
+                <div className="space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-ink">
+                      {t("Date")}
+                    </label>
+                    <Input
+                      form={logFormId}
+                      name="date"
+                      type="date"
+                      required
+                      defaultValue={today}
+                    />
+                  </div>
+                  <div>
+                    <p className="mb-2 text-sm font-medium text-ink">
+                      {t("Before you start — how was your day outside the gym?")}
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input form={logFormId} name="sleep" placeholder={t("Sleep — e.g. 7 hrs")} />
+                      <Input form={logFormId} name="water" placeholder={t("Water — e.g. 64 oz")} />
+                      <Input
+                        form={logFormId}
+                        name="food"
+                        placeholder={t("Food — on track / off track")}
+                      />
+                      <Input form={logFormId} name="energy" placeholder={t("Energy — e.g. Good")} />
+                      <Input form={logFormId} name="mood" placeholder={t("Mood — e.g. Steady")} />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-4">
+                  {customExercises.map((c) => (
+                    <div
+                      key={c.id}
+                      className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm font-medium text-ink">{c.exercise_name}</p>
+                        <p className="whitespace-nowrap text-sm text-gray">
+                          {c.sets}×{c.reps}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <WeightInput
+                          form={logFormId}
+                          name={`weight_${c.id}`}
+                          placeholder={t("Weight used")}
+                        />
+                        <Input
+                          form={logFormId}
+                          name={`notes_${c.id}`}
+                          placeholder={t("Notes (optional)")}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <WorkoutLogForm
+                  id={logFormId}
+                  dayId={day.id}
+                  clientId={me.id}
+                  pdeIds={customExercises.map((c) => c.id)}
                 >
                   <div>
                     <label className="mb-1 block text-sm font-medium text-ink">

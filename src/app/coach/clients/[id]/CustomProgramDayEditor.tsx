@@ -19,20 +19,22 @@ function blankRow(): Row {
   return { exercise: "", sets: "", reps: "" };
 }
 
-// A fully custom version of this client's day -- unlike the swap/adjust/
+// A fully custom version of a client's day -- unlike the swap/adjust/
 // remove editor (ProgramDayEditor), rows here aren't tied to an existing
 // program_day_exercise, so any number can be added or removed freely.
-// Only reachable once a day's been switched to custom (promoteDayToCustom);
-// "Reset" below reverts to the shared track template.
+// Works for two kinds of day: an existing template day switched to custom
+// (promoteDayToCustom -- "Reset" below reverts it), or a day that only
+// exists for this client (client_extra_program_days -- no template to
+// reset to, so that control doesn't show).
 export function CustomProgramDayEditor({
   clientId,
-  programDayId,
+  target,
   trackName,
   initialRows,
   exerciseLibrary,
 }: {
   clientId: string;
-  programDayId: string;
+  target: { programDayId: string } | { extraDayId: string };
   trackName: string | null;
   initialRows: Row[];
   exerciseLibrary: ExerciseLibraryEntry[];
@@ -44,6 +46,8 @@ export function CustomProgramDayEditor({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  const isExtraDay = "extraDayId" in target;
 
   function updateRow(i: number, field: keyof Row, value: string) {
     setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, [field]: value } : r)));
@@ -70,7 +74,7 @@ export function CustomProgramDayEditor({
 
     startTransition(async () => {
       try {
-        await setClientCustomProgramDay(clientId, programDayId, formData);
+        await setClientCustomProgramDay(clientId, target, formData);
         setSavedAt(Date.now());
         router.refresh();
       } catch (err) {
@@ -80,10 +84,11 @@ export function CustomProgramDayEditor({
   }
 
   function handleReset() {
+    if (isExtraDay) return;
     setError(null);
     startTransition(async () => {
       try {
-        await clearClientCustomProgramDay(clientId, programDayId);
+        await clearClientCustomProgramDay(clientId, target.programDayId);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -94,10 +99,10 @@ export function CustomProgramDayEditor({
   return (
     <div className="space-y-3 rounded-xl border border-gold/40 bg-gold/5 p-3">
       <p className="text-xs text-gray">
-        Fully customized for this client —{" "}
-        {trackName ? `the shared "${trackName}" template` : "the shared track template"}{" "}
-        and everyone else on it are unaffected. Add or remove exercises
-        freely; sets/reps are plain text.
+        {isExtraDay
+          ? "This day only exists for this client -- nobody else on their track sees it."
+          : `Fully customized for this client — the shared ${trackName ? `"${trackName}" ` : ""}template and everyone else on it are unaffected.`}{" "}
+        Add or remove exercises freely; sets/reps are plain text.
       </p>
 
       <form onSubmit={handleSave} className="space-y-2">
@@ -149,14 +154,16 @@ export function CustomProgramDayEditor({
         {savedAt && !error ? <p className="text-sm text-teal">Saved.</p> : null}
       </form>
 
-      <button
-        type="button"
-        onClick={handleReset}
-        disabled={isPending}
-        className="text-xs text-gray hover:text-ink"
-      >
-        Reset to the shared track default →
-      </button>
+      {!isExtraDay ? (
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={isPending}
+          className="text-xs text-gray hover:text-ink"
+        >
+          Reset to the shared track default →
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1305,24 +1305,51 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
       "day_number, day_label, program_day_exercises(id, position, sets, reps, exercise_id, exercises(name))"
     )
     .eq("id", programDayId)
-    .single();
+    .maybeSingle();
 
-  if (!day) throw new Error("Program day not found.");
+  // Not a template day -- check whether it's a day that exists only for
+  // this client instead (added from the coach's Program tab, see
+  // client_extra_program_days). Its exercises always live in
+  // client_custom_program_days (extra_day_id), there's no template to
+  // fall back to.
+  let extraDay: { day_number: number; day_label: string } | null = null;
+  if (!day) {
+    const { data } = await supabase
+      .from("client_extra_program_days")
+      .select("day_number, day_label")
+      .eq("id", programDayId)
+      .eq("client_id", me.id)
+      .maybeSingle();
+    extraDay = data;
+  }
+
+  if (!day && !extraDay) throw new Error("Program day not found.");
+
+  const effectiveDayNumber = day ? day.day_number : extraDay!.day_number;
+  const effectiveDayLabel = day ? day.day_label : extraDay!.day_label;
 
   // A client whose coach fully replaced this day with a custom list (via
   // "Add to program"/"make permanent") logs against that list instead of
-  // the shared template -- see client_custom_program_days.
-  const { data: customRows } = await supabase
-    .from("client_custom_program_days")
-    .select("id, position, exercise_name, sets, reps")
-    .eq("client_id", me.id)
-    .eq("program_day_id", programDayId)
-    .order("position");
+  // the shared template -- see client_custom_program_days. A client-only
+  // extra day always works this way, there's no template branch for it.
+  const { data: customRows } = day
+    ? await supabase
+        .from("client_custom_program_days")
+        .select("id, position, exercise_name, sets, reps")
+        .eq("client_id", me.id)
+        .eq("program_day_id", programDayId)
+        .order("position")
+    : await supabase
+        .from("client_custom_program_days")
+        .select("id, position, exercise_name, sets, reps")
+        .eq("client_id", me.id)
+        .eq("extra_day_id", programDayId)
+        .order("position");
 
   let entries: SessionEntry[];
 
-  if (customRows && customRows.length > 0) {
-    entries = customRows.map((c) => {
+  if (!day || (customRows && customRows.length > 0)) {
+    entries = (customRows ?? []).map((c) => {
       const weight = String(formData.get(`weight_${c.id}`) ?? "").trim();
       const notes = String(formData.get(`notes_${c.id}`) ?? "").trim();
       const mediaPath =
@@ -1429,7 +1456,7 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
 
   const { error } = await supabase.from("sessions").insert({
     client_id: me.id,
-    day_label: `Day ${day.day_number}: ${day.day_label}`,
+    day_label: `Day ${effectiveDayNumber}: ${effectiveDayLabel}`,
     date,
     entries,
     rating,
@@ -1477,7 +1504,7 @@ export async function logMyWorkout(programDayId: string, formData: FormData) {
   // again" disclosure -- same effect as the redirect() this used to call
   // directly, moved client-side since redirect()'s internal throw can't
   // be used safely from inside a try/catch around a client-invoked action.
-  return day.day_number;
+  return effectiveDayNumber;
 }
 
 // Repeats a freestyle workout the coach named (and so marked repeatable) --
