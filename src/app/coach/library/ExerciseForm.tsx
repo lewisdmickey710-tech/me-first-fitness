@@ -1,5 +1,11 @@
 import { Button, Card, Input, Select, Textarea } from "@/components/ui";
-import { LATERALITIES, MOVEMENT_TYPES, MUSCLE_GROUPS } from "@/lib/constants";
+import {
+  LATERALITIES,
+  MOVEMENT_PATTERNS,
+  MOVEMENT_TYPES,
+  MUSCLE_GROUPS,
+  PLANES_OF_MOTION,
+} from "@/lib/constants";
 import type { Exercise } from "@/lib/types";
 
 export function ExerciseForm({
@@ -106,6 +112,42 @@ export function ExerciseForm({
               {LATERALITIES.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Movement pattern{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Select name="movement_pattern" defaultValue={exercise?.movement_pattern ?? ""}>
+              <option value="">— Choose one —</option>
+              {MOVEMENT_PATTERNS.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ))}
+            </Select>
+            <p className="mt-1 text-xs text-gray">
+              Groups variations of the same movement -- a reverse lunge, a
+              step-up, and a Bulgarian split squat are all &quot;Lunge&quot;
+              -- so they can be found together and offered as swaps.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-ink">
+              Plane of motion{" "}
+              <span className="font-normal text-gray">(optional)</span>
+            </label>
+            <Select name="plane_of_motion" defaultValue={exercise?.plane_of_motion ?? ""}>
+              <option value="">— Choose one —</option>
+              {PLANES_OF_MOTION.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
                 </option>
               ))}
             </Select>

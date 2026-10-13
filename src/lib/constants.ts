@@ -36,6 +36,46 @@ export const LATERALITIES = [
   { id: "per_side", label: "Single-limb — per side (rotational core, etc.)" },
 ] as const;
 
+// Groups exercises that are variations of the same movement (a reverse
+// lunge, a glute-dominant step-up, and a Bulgarian split squat are all
+// "lunge") so they can be searched/filtered together and offered as swap
+// suggestions, independent of the regress_to/progress_to difficulty chain.
+export const MOVEMENT_PATTERNS = [
+  { id: "squat", label: "Squat" },
+  { id: "hinge", label: "Hinge" },
+  { id: "lunge", label: "Lunge" },
+  { id: "push", label: "Push" },
+  { id: "pull", label: "Pull" },
+  { id: "rotation", label: "Rotation" },
+  { id: "gait", label: "Gait / Locomotion" },
+  { id: "carry", label: "Carry" },
+  { id: "core", label: "Core / Isometric" },
+  { id: "mobility", label: "Mobility" },
+  { id: "other", label: "Other" },
+] as const;
+
+export const PLANES_OF_MOTION = [
+  { id: "sagittal", label: "Sagittal (forward/back)" },
+  { id: "frontal", label: "Frontal (side-to-side)" },
+  { id: "transverse", label: "Transverse (rotational)" },
+  { id: "multi_planar", label: "Multi-planar" },
+] as const;
+
+// A short "Lunge · Sagittal · Glutes" label built from an exercise's
+// tags -- used both to show context next to its name (library list,
+// exercise-picker suggestions) and as extra searchable text, so typing a
+// tag finds exercises whose tags match even when the word isn't in the
+// name.
+export function exerciseTagLabel(ex: {
+  movement_pattern?: string | null;
+  plane_of_motion?: string | null;
+  primary_muscle_group?: string | null;
+}): string {
+  const pattern = MOVEMENT_PATTERNS.find((p) => p.id === ex.movement_pattern)?.label;
+  const plane = PLANES_OF_MOTION.find((p) => p.id === ex.plane_of_motion)?.label;
+  return [pattern, plane, ex.primary_muscle_group].filter(Boolean).join(" · ");
+}
+
 const LATERALITY_SUFFIX: Record<string, string> = {
   per_arm: "per arm",
   per_leg: "per leg",

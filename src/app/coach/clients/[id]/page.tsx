@@ -424,10 +424,13 @@ export default async function ClientDetailPage({
     : { data: [] as ClientProgramOverride[] };
 
   const { data: exerciseOptions } = client.care_profile_id
-    ? ((await supabase.from("exercises").select("id, name").order("name")) as unknown as {
-        data: { id: string; name: string }[] | null;
+    ? ((await supabase
+        .from("exercises")
+        .select("id, name, movement_pattern")
+        .order("name")) as unknown as {
+        data: { id: string; name: string; movement_pattern: string | null }[] | null;
       })
-    : { data: [] as { id: string; name: string }[] };
+    : { data: [] as { id: string; name: string; movement_pattern: string | null }[] };
 
   const sevenDaysAgo = toDateString(
     new Date(nowInBusinessTz().getTime() - 6 * 86400000)
@@ -2180,7 +2183,7 @@ function ProgramTab({
   currentPhase: ClientPhaseHistory | null;
   programDays: ProgramDayWithExercisesRow[];
   overrides: ClientProgramOverride[];
-  exerciseOptions: { id: string; name: string }[];
+  exerciseOptions: { id: string; name: string; movement_pattern: string | null }[];
   recentSessions: TrainingSession[];
   sessionMode: Client["session_mode"];
   programLastUpdatedAt: string | null;

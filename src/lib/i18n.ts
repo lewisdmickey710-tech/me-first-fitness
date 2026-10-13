@@ -266,6 +266,7 @@ const ES: Record<string, string> = {
   "Swap this movement": "Cambiar este movimiento",
   "Easier: {name}": "Más fácil: {name}",
   "Harder: {name}": "Más difícil: {name}",
+  "Similar: {name}": "Similar: {name}",
   "Weight used": "Peso usado",
   "Notes (optional)": "Notas (opcional)",
   "Photo or video of your form (optional)": "Foto o video de tu forma (opcional)",

@@ -27,6 +27,8 @@ export async function addExercise(formData: FormData) {
     primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
     movement_type: cleanText(formData.get("movement_type")),
     laterality: cleanText(formData.get("laterality")),
+    movement_pattern: cleanText(formData.get("movement_pattern")),
+    plane_of_motion: cleanText(formData.get("plane_of_motion")),
     video_url: cleanText(formData.get("video_url")),
   });
 
@@ -56,6 +58,8 @@ export async function updateExercise(exerciseId: string, formData: FormData) {
       primary_muscle_group: cleanText(formData.get("primary_muscle_group")),
       movement_type: cleanText(formData.get("movement_type")),
       laterality: cleanText(formData.get("laterality")),
+      movement_pattern: cleanText(formData.get("movement_pattern")),
+      plane_of_motion: cleanText(formData.get("plane_of_motion")),
       video_url: cleanText(formData.get("video_url")),
     })
     .eq("id", exerciseId);
@@ -64,4 +68,35 @@ export async function updateExercise(exerciseId: string, formData: FormData) {
 
   revalidatePath("/coach/library");
   redirect("/coach/library");
+}
+
+// Applies one or more tag fields to many exercises at once -- the main
+// way the ~1,340-exercise library (mostly bulk-imported with no metadata)
+// actually gets categorized, since tagging one at a time in the edit form
+// isn't realistic at that volume. Only fields present in `fields` are
+// touched; filter the list down (search/filters in the Library UI), select
+// the ones that share a tag, and apply it in one call.
+export async function bulkTagExercises(
+  ids: string[],
+  fields: {
+    primary_muscle_group?: string | null;
+    movement_type?: string | null;
+    laterality?: string | null;
+    movement_pattern?: string | null;
+    plane_of_motion?: string | null;
+  }
+) {
+  if (ids.length === 0) return;
+
+  const patch: Record<string, string | null> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) patch[key] = value || null;
+  }
+  if (Object.keys(patch).length === 0) return;
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercises").update(patch).in("id", ids);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/coach/library");
 }

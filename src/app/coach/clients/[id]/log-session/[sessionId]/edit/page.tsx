@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BackLink } from "@/components/back-link";
 import { Card, Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
-import { formatReps } from "@/lib/constants";
+import { exerciseTagLabel, formatReps } from "@/lib/constants";
 import type { Client, TrainingSession } from "@/lib/types";
 import { LogSessionForm, type ExistingSession, type ProgramDayOption } from "../../LogSessionForm";
 
@@ -71,10 +71,27 @@ export default async function EditSessionPage({
         }>)
       : Promise.resolve({ data: null }),
     getCurrentPhase(supabase, id),
-    supabase.from("exercises").select("id, name").order("name") as unknown as Promise<{
-      data: { id: string; name: string }[] | null;
+    supabase
+      .from("exercises")
+      .select("id, name, movement_pattern, plane_of_motion, primary_muscle_group")
+      .order("name") as unknown as Promise<{
+      data:
+        | {
+            id: string;
+            name: string;
+            movement_pattern: string | null;
+            plane_of_motion: string | null;
+            primary_muscle_group: string | null;
+          }[]
+        | null;
     }>,
   ]);
+
+  const exerciseLibraryEntries = (exerciseLibrary ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    tag: exerciseTagLabel(e) || undefined,
+  }));
 
   const allPdeIds = (days ?? []).flatMap((d) =>
     d.program_day_exercises.map((pde) => pde.id)
@@ -176,7 +193,7 @@ export default async function EditSessionPage({
         today={session.date}
         programDayOptions={programDayOptions}
         defaultPhase={currentPhase?.phase ?? "1"}
-        exerciseLibrary={exerciseLibrary ?? []}
+        exerciseLibrary={exerciseLibraryEntries}
         lastEntry={null}
         existingSession={existingSession}
         sessionRate={client.session_rate}

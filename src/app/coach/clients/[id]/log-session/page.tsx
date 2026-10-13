@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { BackLink } from "@/components/back-link";
 import { Card, Heart } from "@/components/ui";
 import { getCurrentPhase } from "@/lib/phase";
-import { formatReps } from "@/lib/constants";
+import { exerciseTagLabel, formatReps } from "@/lib/constants";
 import { mergeLogEntries } from "@/lib/log-entries";
 import type { Activity, Client, CompSessionPackage, TrainingSession } from "@/lib/types";
 import { LogSessionForm, type ProgramDayOption } from "./LogSessionForm";
@@ -79,10 +79,27 @@ export default async function LogSessionPage({
         .eq("client_id", id)
         .order("date", { ascending: false })
         .limit(1) as unknown as Promise<{ data: Activity[] | null }>,
-      supabase.from("exercises").select("id, name").order("name") as unknown as Promise<{
-        data: { id: string; name: string }[] | null;
+      supabase
+        .from("exercises")
+        .select("id, name, movement_pattern, plane_of_motion, primary_muscle_group")
+        .order("name") as unknown as Promise<{
+        data:
+          | {
+              id: string;
+              name: string;
+              movement_pattern: string | null;
+              plane_of_motion: string | null;
+              primary_muscle_group: string | null;
+            }[]
+          | null;
       }>,
     ]);
+
+  const exerciseLibraryEntries = (exerciseLibrary ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    tag: exerciseTagLabel(e) || undefined,
+  }));
 
   const lastEntry = mergeLogEntries(lastSessions ?? [], lastActivities ?? [])[0] ?? null;
 
@@ -201,7 +218,7 @@ export default async function LogSessionPage({
         defaultPhase={currentPhase?.phase ?? "1"}
         lastEntry={lastEntry}
         lastEntryReply={lastEntryReply}
-        exerciseLibrary={exerciseLibrary ?? []}
+        exerciseLibrary={exerciseLibraryEntries}
         activeCompPackage={activeCompPackage}
         sessionRate={client.session_rate}
       />

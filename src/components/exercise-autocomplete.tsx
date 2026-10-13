@@ -6,6 +6,11 @@ import { Input } from "@/components/ui";
 export interface ExerciseLibraryEntry {
   id: string;
   name: string;
+  // A short "Lunge · Quads" style label built from the exercise's tags --
+  // shown under its name in the suggestion list, and matched against too,
+  // so typing a tag ("lunge", "sagittal", "glutes") surfaces exercises
+  // whose tags match even when the word isn't in the name itself.
+  tag?: string;
 }
 
 // A plain text input (still named "exercise" so the surrounding form's
@@ -34,7 +39,9 @@ export function ExerciseAutocomplete({
   const matches = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return [];
-    return exercises.filter((e) => e.name.toLowerCase().includes(q)).slice(0, 8);
+    return exercises
+      .filter((e) => `${e.name} ${e.tag ?? ""}`.toLowerCase().includes(q))
+      .slice(0, 8);
   }, [value, exercises]);
 
   return (
@@ -69,6 +76,7 @@ export function ExerciseAutocomplete({
                 className="block w-full px-3 py-1.5 text-left text-sm text-ink hover:bg-cream"
               >
                 {ex.name}
+                {ex.tag ? <span className="ml-1.5 text-xs text-gray">{ex.tag}</span> : null}
               </button>
             </li>
           ))}

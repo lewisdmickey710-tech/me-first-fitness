@@ -309,6 +309,20 @@ export type MuscleGroup =
 export type MovementType = "compound" | "accessory" | "mobility";
 export type Laterality = "bilateral" | "per_arm" | "per_leg" | "per_side";
 
+export type MovementPattern =
+  | "squat"
+  | "hinge"
+  | "lunge"
+  | "push"
+  | "pull"
+  | "rotation"
+  | "gait"
+  | "carry"
+  | "core"
+  | "mobility"
+  | "other";
+export type PlaneOfMotion = "sagittal" | "frontal" | "transverse" | "multi_planar";
+
 export interface Exercise {
   id: string;
   name: string;
@@ -319,6 +333,8 @@ export interface Exercise {
   primary_muscle_group: MuscleGroup | null;
   movement_type: MovementType | null;
   laterality: Laterality | null;
+  movement_pattern: MovementPattern | null;
+  plane_of_motion: PlaneOfMotion | null;
   video_url: string | null;
   created_at: string;
 }

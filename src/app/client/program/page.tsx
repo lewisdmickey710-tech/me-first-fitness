@@ -44,6 +44,7 @@ interface ProgramDayJoinRow {
       progress_to_id: string | null;
       laterality: string | null;
       video_url: string | null;
+      movement_pattern: string | null;
     } | null;
   }[];
 }
@@ -74,7 +75,7 @@ export default async function ClientProgramPage({
       ? ((await supabase
           .from("program_days")
           .select(
-            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id, laterality, video_url))"
+            "id, day_number, day_label, program_day_exercises(id, position, sets, reps, tempo, superset_group, exercise_id, exercises(id, name, client_description, regress_to_id, progress_to_id, laterality, video_url, movement_pattern))"
           )
           .eq("care_profile_id", me.care_profile_id)
           .eq("phase", currentPhase.phase)
@@ -167,6 +168,30 @@ export default async function ClientProgramPage({
         }[],
       };
   const extraById = new Map((extraExercises ?? []).map((e) => [e.id, e]));
+
+  // Variations of the same movement (a prescribed reverse lunge and a
+  // Bulgarian split squat, say) -- offered as an additional swap option
+  // next to the regress_to/progress_to difficulty chain, for any
+  // prescribed exercise that's been tagged with a movement_pattern.
+  const patterns = new Set<string>();
+  for (const day of programDays) {
+    for (const pde of day.program_day_exercises) {
+      if (pde.exercises?.movement_pattern) patterns.add(pde.exercises.movement_pattern);
+    }
+  }
+  const { data: similarExercises } = patterns.size
+    ? await supabase
+        .from("exercises")
+        .select("id, name, movement_pattern")
+        .in("movement_pattern", [...patterns])
+    : { data: [] as { id: string; name: string; movement_pattern: string | null }[] };
+  const similarByPattern = new Map<string, { id: string; name: string }[]>();
+  for (const ex of similarExercises ?? []) {
+    if (!ex.movement_pattern) continue;
+    const list = similarByPattern.get(ex.movement_pattern) ?? [];
+    list.push({ id: ex.id, name: ex.name });
+    similarByPattern.set(ex.movement_pattern, list);
+  }
 
   const today = toDateString(new Date());
   const sevenDaysAgo = toDateString(
@@ -354,6 +379,13 @@ export default async function ClientProgramPage({
                     const progress = base?.progress_to_id
                       ? extraById.get(base.progress_to_id)
                       : null;
+                    const similar = (
+                      base?.movement_pattern
+                        ? similarByPattern.get(base.movement_pattern) ?? []
+                        : []
+                    ).filter(
+                      (s) => s.id !== base?.id && s.id !== regress?.id && s.id !== progress?.id
+                    );
 
                     return (
                       <div
@@ -410,7 +442,7 @@ export default async function ClientProgramPage({
                               {t("Back to prescribed: {name}", { name: base?.name ?? "" })}
                             </Button>
                           </form>
-                        ) : regress || progress ? (
+                        ) : regress || progress || similar.length > 0 ? (
                           <Collapsible label={t("Swap this movement")}>
                             <div className="flex flex-wrap gap-2">
                               {regress ? (
@@ -443,6 +475,19 @@ export default async function ClientProgramPage({
                                   </Button>
                                 </form>
                               ) : null}
+                              {similar.slice(0, 6).map((s) => (
+                                <form
+                                  key={s.id}
+                                  action={async () => {
+                                    "use server";
+                                    await setProgramExerciseSwap(pde.id, s.id);
+                                  }}
+                                >
+                                  <Button type="submit" variant="secondary">
+                                    {t("Similar: {name}", { name: s.name })}
+                                  </Button>
+                                </form>
+                              ))}
                             </div>
                           </Collapsible>
                         ) : null}
