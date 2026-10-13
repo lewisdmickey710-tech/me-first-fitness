@@ -20,37 +20,12 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { reorderClientProgramDay, setClientProgramOverride } from "@/app/coach/actions";
 import { Button, Input, Select } from "@/components/ui";
-import { MOVEMENT_PATTERNS } from "@/lib/constants";
-
-const MOVEMENT_PATTERN_LABEL = new Map<string, string>(
-  MOVEMENT_PATTERNS.map((p) => [p.id, p.label])
-);
+import { groupExercisesByPattern } from "@/lib/constants";
 
 interface ExerciseOption {
   id: string;
   name: string;
   movement_pattern: string | null;
-}
-
-// Grouped by movement pattern (via <optgroup>) so the ~1,340-exercise
-// library is at least scannable by movement family in a plain dropdown,
-// rather than one flat alphabetical list -- untagged exercises fall into
-// their own group at the end.
-function groupByPattern(options: ExerciseOption[]): [string, ExerciseOption[]][] {
-  const groups = new Map<string, ExerciseOption[]>();
-  for (const ex of options) {
-    const key = ex.movement_pattern
-      ? MOVEMENT_PATTERN_LABEL.get(ex.movement_pattern) ?? ex.movement_pattern
-      : "Untagged";
-    const list = groups.get(key) ?? [];
-    list.push(ex);
-    groups.set(key, list);
-  }
-  const untagged = groups.get("Untagged");
-  groups.delete("Untagged");
-  const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  if (untagged) sorted.push(["Untagged", untagged]);
-  return sorted;
 }
 
 export interface ProgramExerciseRow {
@@ -179,7 +154,7 @@ function SortableExerciseCard({
               defaultValue={exercise.substituteExerciseId ?? ""}
             >
               <option value="">— No swap (use prescribed) —</option>
-              {groupByPattern(exerciseOptions).map(([group, options]) => (
+              {groupExercisesByPattern(exerciseOptions).map(([group, options]) => (
                 <optgroup key={group} label={group}>
                   {options.map((ex) => (
                     <option key={ex.id} value={ex.id}>

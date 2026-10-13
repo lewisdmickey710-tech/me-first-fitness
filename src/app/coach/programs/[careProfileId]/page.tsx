@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { saveProgramDay } from "@/app/coach/programs/actions";
 import { Button, Card, Collapsible, Heart, Input, Select } from "@/components/ui";
 import { PacketUploadSlot } from "./PacketUploadSlot";
-import { PHASES } from "@/lib/constants";
+import { groupExercisesByPattern, PHASES } from "@/lib/constants";
 import type {
   CareProfile,
   CareProfilePacket,
@@ -211,10 +211,14 @@ export default async function CareProfileProgramPage({
                         defaultValue={row?.exercise_id ?? ""}
                       >
                         <option value="">— Exercise —</option>
-                        {exerciseList.map((ex) => (
-                          <option key={ex.id} value={ex.id}>
-                            {ex.name}
-                          </option>
+                        {groupExercisesByPattern(exerciseList).map(([group, options]) => (
+                          <optgroup key={group} label={group}>
+                            {options.map((ex) => (
+                              <option key={ex.id} value={ex.id}>
+                                {ex.name}
+                              </option>
+                            ))}
+                          </optgroup>
                         ))}
                       </Select>
                       <div className="grid grid-cols-12 gap-2">

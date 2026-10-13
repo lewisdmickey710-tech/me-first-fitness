@@ -76,6 +76,34 @@ export function exerciseTagLabel(ex: {
   return [pattern, plane, ex.primary_muscle_group].filter(Boolean).join(" · ");
 }
 
+const MOVEMENT_PATTERN_LABEL = new Map<string, string>(
+  MOVEMENT_PATTERNS.map((p) => [p.id, p.label])
+);
+
+// Groups any list of exercise-shaped options by movement pattern (for
+// rendering as native <optgroup>s) so a plain dropdown over the
+// ~1,340-exercise library is at least scannable by movement family
+// instead of one flat alphabetical list. Untagged exercises fall into
+// their own group at the end; tagged groups sort alphabetically by label.
+export function groupExercisesByPattern<T extends { movement_pattern: string | null }>(
+  options: T[]
+): [string, T[]][] {
+  const groups = new Map<string, T[]>();
+  for (const ex of options) {
+    const key = ex.movement_pattern
+      ? MOVEMENT_PATTERN_LABEL.get(ex.movement_pattern) ?? ex.movement_pattern
+      : "Untagged";
+    const list = groups.get(key) ?? [];
+    list.push(ex);
+    groups.set(key, list);
+  }
+  const untagged = groups.get("Untagged");
+  groups.delete("Untagged");
+  const sorted = [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  if (untagged) sorted.push(["Untagged", untagged]);
+  return sorted;
+}
+
 const LATERALITY_SUFFIX: Record<string, string> = {
   per_arm: "per arm",
   per_leg: "per leg",
