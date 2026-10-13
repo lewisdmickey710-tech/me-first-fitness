@@ -1466,6 +1466,125 @@ export async function reorderClientProgramDay(
   revalidatePath(`/coach/clients/${clientId}/log-session`);
 }
 
+// Switches a client's version of a program day into a fully custom one --
+// seeded from the CURRENT effective exercise list (template + whatever
+// swaps/sets/reps/removals she'd already set via overrides), so turning
+// on free-form add/remove editing doesn't silently discard edits already
+// made the other way. From here, setClientCustomProgramDay below is what
+// actually adds/removes/edits rows; clearClientCustomProgramDay reverts.
+export async function promoteDayToCustom(clientId: string, programDayId: string) {
+  const supabase = await createClient();
+
+  const { data: day } = await supabase
+    .from("program_days")
+    .select(
+      "program_day_exercises(id, position, sets, reps, exercise_id, exercises(name))"
+    )
+    .eq("id", programDayId)
+    .single();
+
+  if (!day) throw new Error("Program day not found.");
+
+  const { data: overrides } = await supabase
+    .from("client_program_overrides")
+    .select(
+      "program_day_exercise_id, substitute_exercise_id, sets_override, reps_override, removed, position_override"
+    )
+    .eq("client_id", clientId)
+    .eq("active", true);
+
+  const overrideByPdeId = new Map(
+    (overrides ?? []).map((o) => [o.program_day_exercise_id, o])
+  );
+
+  const substituteIds = [...overrideByPdeId.values()]
+    .map((o) => o.substitute_exercise_id)
+    .filter((v): v is string => !!v);
+  const { data: subs } = substituteIds.length
+    ? await supabase.from("exercises").select("id, name").in("id", substituteIds)
+    : { data: [] as { id: string; name: string }[] };
+  const subNameById = new Map((subs ?? []).map((s) => [s.id, s.name]));
+
+  type Pde = {
+    id: string;
+    position: number;
+    sets: string | null;
+    reps: string | null;
+    exercises: { name: string } | null;
+  };
+  const pdes = ((day.program_day_exercises ?? []) as unknown as Pde[])
+    .filter((pde) => !overrideByPdeId.get(pde.id)?.removed)
+    .sort(
+      (a, b) =>
+        (overrideByPdeId.get(a.id)?.position_override ?? a.position) -
+        (overrideByPdeId.get(b.id)?.position_override ?? b.position)
+    );
+
+  const entries: SessionEntry[] = pdes.map((pde) => {
+    const override = overrideByPdeId.get(pde.id);
+    const substituteId = override?.substitute_exercise_id ?? null;
+    const name = substituteId
+      ? subNameById.get(substituteId) ?? pde.exercises?.name ?? ""
+      : pde.exercises?.name ?? "";
+    return {
+      exercise: name,
+      sets: override?.sets_override || pde.sets || "",
+      reps: override?.reps_override || pde.reps || "",
+      weight: "",
+    };
+  });
+
+  await syncClientCustomProgramDay(supabase, clientId, programDayId, entries);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Free-form editor for a day already switched to custom (promoteDayToCustom)
+// -- unlike client_program_overrides, this isn't limited to swapping/
+// adjusting exercises that already exist in the shared template; any
+// number of rows, any exercises, fully replacing this client's version of
+// the day each time it's saved.
+export async function setClientCustomProgramDay(
+  clientId: string,
+  programDayId: string,
+  formData: FormData
+) {
+  const supabase = await createClient();
+
+  const exercises = formData.getAll("exercise") as string[];
+  const sets = formData.getAll("sets") as string[];
+  const reps = formData.getAll("reps") as string[];
+
+  const entries: SessionEntry[] = exercises
+    .map((exercise, i) => ({
+      exercise: exercise?.trim() ?? "",
+      sets: sets[i]?.trim() ?? "",
+      reps: reps[i]?.trim() ?? "",
+      weight: "",
+    }))
+    .filter((e) => e.exercise);
+
+  await syncClientCustomProgramDay(supabase, clientId, programDayId, entries);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
+// Reverts a client's day back to the shared track template (plus any
+// client_program_overrides still on record for it) -- for a temporary
+// restructure that's done its job, or one that was started by mistake.
+export async function clearClientCustomProgramDay(clientId: string, programDayId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("client_custom_program_days")
+    .delete()
+    .eq("client_id", clientId)
+    .eq("program_day_id", programDayId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+}
+
 export async function logSessionOccurrence(
   clientId: string,
   formData: FormData

@@ -36,8 +36,11 @@ import {
   touchProgramUpdated,
   unmarkMilestoneAchieved,
   updateClientProfile,
+  promoteDayToCustom,
 } from "@/app/coach/actions";
 import { ProgramDayEditor } from "./ProgramDayEditor";
+import { CustomProgramDayEditor } from "./CustomProgramDayEditor";
+import type { ExerciseLibraryEntry } from "@/components/exercise-autocomplete";
 import { BackLink } from "@/components/back-link";
 import { ConfirmButton } from "@/components/confirm-button";
 import { MarkViewed } from "./MarkViewed";
@@ -60,7 +63,7 @@ import {
 import { BodyMapInput } from "@/components/body-map";
 import { ItemReplyEditor } from "@/components/item-reply-editor";
 import { CalorieGoalField } from "@/components/calorie-goal-field";
-import { ACTIVITY_TYPES, formatReps, phaseInfo, PHASES } from "@/lib/constants";
+import { ACTIVITY_TYPES, exerciseTagLabel, formatReps, phaseInfo, PHASES } from "@/lib/constants";
 import { weekInPhase } from "@/lib/phase";
 import { nextWindowLabel } from "@/lib/measurement-window";
 import {
@@ -423,14 +426,48 @@ export default async function ClientDetailPage({
       })
     : { data: [] as ClientProgramOverride[] };
 
+  interface ExerciseOptionRow {
+    id: string;
+    name: string;
+    movement_pattern: string | null;
+    plane_of_motion: string | null;
+    primary_muscle_group: string | null;
+  }
   const { data: exerciseOptions } = client.care_profile_id
     ? ((await supabase
         .from("exercises")
-        .select("id, name, movement_pattern")
-        .order("name")) as unknown as {
-        data: { id: string; name: string; movement_pattern: string | null }[] | null;
-      })
-    : { data: [] as { id: string; name: string; movement_pattern: string | null }[] };
+        .select("id, name, movement_pattern, plane_of_motion, primary_muscle_group")
+        .order("name")) as unknown as { data: ExerciseOptionRow[] | null })
+    : { data: [] as ExerciseOptionRow[] };
+
+  interface CustomProgramDayRow {
+    id: string;
+    program_day_id: string;
+    position: number;
+    exercise_name: string;
+    sets: string | null;
+    reps: string | null;
+  }
+  const programDayIds = (programDays ?? []).map((d) => d.id);
+  const { data: customProgramDayRows } = programDayIds.length
+    ? ((await supabase
+        .from("client_custom_program_days")
+        .select("id, program_day_id, position, exercise_name, sets, reps")
+        .eq("client_id", id)
+        .in("program_day_id", programDayIds)
+        .order("position")) as unknown as { data: CustomProgramDayRow[] | null })
+    : { data: [] as CustomProgramDayRow[] };
+  const customRowsByDayId = new Map<string, CustomProgramDayRow[]>();
+  for (const row of customProgramDayRows ?? []) {
+    const list = customRowsByDayId.get(row.program_day_id) ?? [];
+    list.push(row);
+    customRowsByDayId.set(row.program_day_id, list);
+  }
+  const exerciseLibraryEntries = (exerciseOptions ?? []).map((e) => ({
+    id: e.id,
+    name: e.name,
+    tag: exerciseTagLabel(e) || undefined,
+  }));
 
   const sevenDaysAgo = toDateString(
     new Date(nowInBusinessTz().getTime() - 6 * 86400000)
@@ -555,10 +592,14 @@ export default async function ClientDetailPage({
       {tab === "program" && (
         <ProgramTab
           clientId={id}
+          clientName={client.name}
+          trackName={client.care_profiles?.name ?? null}
           currentPhase={currentPhase}
           programDays={programDays ?? []}
           overrides={programOverrides ?? []}
           exerciseOptions={exerciseOptions ?? []}
+          exerciseLibrary={exerciseLibraryEntries}
+          customRowsByDayId={customRowsByDayId}
           recentSessions={sessions ?? []}
           sessionMode={client.session_mode}
           programLastUpdatedAt={client.program_last_updated_at}
@@ -2171,19 +2212,30 @@ function ClientIntakeSummary({ intake }: { intake: ClientIntake }) {
 
 function ProgramTab({
   clientId,
+  clientName,
+  trackName,
   currentPhase,
   programDays,
   overrides,
   exerciseOptions,
+  exerciseLibrary,
+  customRowsByDayId,
   recentSessions,
   sessionMode,
   programLastUpdatedAt,
 }: {
   clientId: string;
+  clientName: string;
+  trackName: string | null;
   currentPhase: ClientPhaseHistory | null;
   programDays: ProgramDayWithExercisesRow[];
   overrides: ClientProgramOverride[];
   exerciseOptions: { id: string; name: string; movement_pattern: string | null }[];
+  exerciseLibrary: ExerciseLibraryEntry[];
+  customRowsByDayId: Map<
+    string,
+    { id: string; program_day_id: string; position: number; exercise_name: string; sets: string | null; reps: string | null }[]
+  >;
   recentSessions: TrainingSession[];
   sessionMode: Client["session_mode"];
   programLastUpdatedAt: string | null;
@@ -2272,6 +2324,7 @@ function ProgramTab({
 
         const dayLabel = `Day ${day.day_number}: ${day.day_label}`;
         const isCompleted = completedDayLabels.has(dayLabel);
+        const customRows = customRowsByDayId.get(day.id) ?? [];
         return (
           <Card key={day.id}>
             <p className="font-medium text-ink">
@@ -2284,11 +2337,39 @@ function ProgramTab({
               ) : null}
             </p>
             <div className="mt-3">
-              <ProgramDayEditor
-                clientId={clientId}
-                exercises={ordered}
-                exerciseOptions={exerciseOptions}
-              />
+              {customRows.length > 0 ? (
+                <CustomProgramDayEditor
+                  clientId={clientId}
+                  programDayId={day.id}
+                  trackName={trackName}
+                  initialRows={customRows.map((r) => ({
+                    exercise: r.exercise_name,
+                    sets: r.sets ?? "",
+                    reps: r.reps ?? "",
+                  }))}
+                  exerciseLibrary={exerciseLibrary}
+                />
+              ) : (
+                <>
+                  <ProgramDayEditor
+                    clientId={clientId}
+                    exercises={ordered}
+                    exerciseOptions={exerciseOptions}
+                  />
+                  <form
+                    action={promoteDayToCustom.bind(null, clientId, day.id)}
+                    className="mt-2"
+                  >
+                    <button
+                      type="submit"
+                      className="text-xs text-gray hover:text-ink"
+                    >
+                      Need to add or remove exercises for {clientName}?
+                      Customize this day →
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           </Card>
         );
