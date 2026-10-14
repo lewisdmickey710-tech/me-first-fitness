@@ -11,12 +11,14 @@ import { ExerciseAutocomplete, type ExerciseLibraryEntry } from "@/components/ex
 
 interface Row {
   exercise: string;
+  exerciseId: string;
   sets: string;
   reps: string;
+  notes: string;
 }
 
 function blankRow(): Row {
-  return { exercise: "", sets: "", reps: "" };
+  return { exercise: "", exerciseId: "", sets: "", reps: "", notes: "" };
 }
 
 // A fully custom version of a client's day -- unlike the swap/adjust/
@@ -68,8 +70,10 @@ export function CustomProgramDayEditor({
     for (const row of rows) {
       if (!row.exercise.trim()) continue;
       formData.append("exercise", row.exercise.trim());
+      formData.append("exercise_id", row.exerciseId);
       formData.append("sets", row.sets.trim());
       formData.append("reps", row.reps.trim());
+      formData.append("notes", row.notes.trim());
     }
 
     startTransition(async () => {
@@ -107,34 +111,69 @@ export function CustomProgramDayEditor({
 
       <form onSubmit={handleSave} className="space-y-2">
         {rows.map((row, i) => (
-          <div key={i} className="grid grid-cols-12 gap-2">
-            <ExerciseAutocomplete
-              value={row.exercise}
-              exercises={exerciseLibrary}
-              placeholder="Exercise"
-              className="col-span-6"
-              onChangeText={(text) => updateRow(i, "exercise", text)}
-              onSelect={(ex) => updateRow(i, "exercise", ex.name)}
-            />
+          <div key={i} className="space-y-1 border-b border-gold/20 pb-2 last:border-b-0">
+            <div className="grid grid-cols-12 gap-2">
+              <div className="col-span-6 flex gap-1">
+                <div className="flex-1">
+                  <ExerciseAutocomplete
+                    value={row.exercise}
+                    exercises={exerciseLibrary}
+                    placeholder="Exercise"
+                    onChangeText={(text) => {
+                      updateRow(i, "exercise", text);
+                      updateRow(i, "exerciseId", "");
+                    }}
+                    onSelect={(ex) => {
+                      updateRow(i, "exercise", ex.name);
+                      updateRow(i, "exerciseId", ex.id);
+                    }}
+                  />
+                </div>
+                {row.exercise ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateRow(i, "exercise", "");
+                      updateRow(i, "exerciseId", "");
+                    }}
+                    className="shrink-0 text-xs text-gray hover:text-ink"
+                    title="Clear"
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
+              <Input
+                placeholder="Sets"
+                className="col-span-2"
+                value={row.sets}
+                onChange={(e) => updateRow(i, "sets", e.target.value)}
+              />
+              <Input
+                placeholder="Reps"
+                className="col-span-2"
+                value={row.reps}
+                onChange={(e) => updateRow(i, "reps", e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="col-span-2 text-sm text-gray hover:text-pink"
+              >
+                Remove
+              </button>
+            </div>
+            {row.exercise && !row.exerciseId ? (
+              <p className="text-xs text-gray">
+                Typed freely -- pick a suggestion from the list to link it to
+                the library so the client sees its real name and description.
+              </p>
+            ) : null}
             <Input
-              placeholder="Sets"
-              className="col-span-2"
-              value={row.sets}
-              onChange={(e) => updateRow(i, "sets", e.target.value)}
+              placeholder="Note for the client on this movement (optional) -- e.g. how it went last time"
+              value={row.notes}
+              onChange={(e) => updateRow(i, "notes", e.target.value)}
             />
-            <Input
-              placeholder="Reps"
-              className="col-span-2"
-              value={row.reps}
-              onChange={(e) => updateRow(i, "reps", e.target.value)}
-            />
-            <button
-              type="button"
-              onClick={() => removeRow(i)}
-              className="col-span-2 text-sm text-gray hover:text-pink"
-            >
-              Remove
-            </button>
           </div>
         ))}
 

@@ -840,8 +840,10 @@ async function syncClientCustomProgramDay(
     ...target,
     position: i,
     exercise_name: e.exercise,
+    exercise_id: e.exercise_id ?? null,
     sets: e.sets || null,
     reps: e.reps || null,
+    notes: e.notes || null,
   }));
   const { error: insertError } = await supabase
     .from("client_custom_program_days")
@@ -1547,6 +1549,7 @@ export async function promoteDayToCustom(clientId: string, programDayId: string)
     position: number;
     sets: string | null;
     reps: string | null;
+    exercise_id: string;
     exercises: { name: string } | null;
   };
   const pdes = ((day.program_day_exercises ?? []) as unknown as Pde[])
@@ -1568,6 +1571,7 @@ export async function promoteDayToCustom(clientId: string, programDayId: string)
       sets: override?.sets_override || pde.sets || "",
       reps: override?.reps_override || pde.reps || "",
       weight: "",
+      exercise_id: substituteId ?? pde.exercise_id ?? undefined,
     };
   });
 
@@ -1591,6 +1595,8 @@ export async function setClientCustomProgramDay(
   const exercises = formData.getAll("exercise") as string[];
   const sets = formData.getAll("sets") as string[];
   const reps = formData.getAll("reps") as string[];
+  const exerciseIds = formData.getAll("exercise_id") as string[];
+  const notes = formData.getAll("notes") as string[];
 
   const entries: SessionEntry[] = exercises
     .map((exercise, i) => ({
@@ -1598,6 +1604,8 @@ export async function setClientCustomProgramDay(
       sets: sets[i]?.trim() ?? "",
       reps: reps[i]?.trim() ?? "",
       weight: "",
+      exercise_id: exerciseIds[i] || undefined,
+      notes: notes[i]?.trim() || undefined,
     }))
     .filter((e) => e.exercise);
 

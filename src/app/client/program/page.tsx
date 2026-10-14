@@ -147,14 +147,16 @@ export default async function ClientProgramPage({
     program_day_id: string;
     position: number;
     exercise_name: string;
+    exercise_id: string | null;
     sets: string | null;
     reps: string | null;
+    notes: string | null;
   }
   const allDayIds = programDays.map((d) => d.id);
   const { data: customRows } = allDayIds.length
     ? await supabase
         .from("client_custom_program_days")
-        .select("id, program_day_id, position, exercise_name, sets, reps")
+        .select("id, program_day_id, position, exercise_name, exercise_id, sets, reps, notes")
         .eq("client_id", me.id)
         .in("program_day_id", allDayIds)
         .order("position")
@@ -188,13 +190,15 @@ export default async function ClientProgramPage({
     extra_day_id: string;
     position: number;
     exercise_name: string;
+    exercise_id: string | null;
     sets: string | null;
     reps: string | null;
+    notes: string | null;
   }
   const { data: extraCustomRows } = extraDayIds.length
     ? await supabase
         .from("client_custom_program_days")
-        .select("id, extra_day_id, position, exercise_name, sets, reps")
+        .select("id, extra_day_id, position, exercise_name, exercise_id, sets, reps, notes")
         .eq("client_id", me.id)
         .in("extra_day_id", extraDayIds)
         .order("position")
@@ -204,6 +208,16 @@ export default async function ClientProgramPage({
     const list = extraCustomByDayId.get(row.extra_day_id) ?? [];
     list.push(row);
     extraCustomByDayId.set(row.extra_day_id, list);
+  }
+
+  // A custom/extra day row linked to a library exercise (exercise_id) --
+  // fold those into the same lookup as regress_to/progress_to/substitute
+  // so the client sees the library's real name + description for it too.
+  for (const row of (customRows ?? []) as CustomDayRow[]) {
+    if (row.exercise_id) extraIds.add(row.exercise_id);
+  }
+  for (const row of (extraCustomRows ?? []) as ExtraCustomRow[]) {
+    if (row.exercise_id) extraIds.add(row.exercise_id);
   }
 
   const { data: extraExercises } = extraIds.size
@@ -384,31 +398,58 @@ export default async function ClientProgramPage({
 
                 {isCustomDay ? (
                   <div className="mt-3 space-y-4">
-                    {customExercises.map((c) => (
-                      <div
-                        key={c.id}
-                        className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="text-sm font-medium text-ink">{c.exercise_name}</p>
-                          <p className="whitespace-nowrap text-sm text-gray">
-                            {c.sets}×{c.reps}
-                          </p>
+                    {customExercises.map((c) => {
+                      const linked = c.exercise_id ? extraById.get(c.exercise_id) : null;
+                      return (
+                        <div
+                          key={c.id}
+                          className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-sm font-medium text-ink">
+                              {linked?.name ?? c.exercise_name}
+                            </p>
+                            <p className="whitespace-nowrap text-sm text-gray">
+                              {c.sets}×{c.reps}
+                            </p>
+                          </div>
+                          {c.notes ? (
+                            <p className="text-xs text-rose">
+                              {t("Coach's note: {note}", { note: c.notes })}
+                            </p>
+                          ) : null}
+                          {linked?.client_description ? (
+                            <Collapsible label={t("About this movement")}>
+                              <p className="whitespace-pre-wrap text-sm text-gray">
+                                {linked.client_description}
+                              </p>
+                            </Collapsible>
+                          ) : null}
+                          {linked?.video_url ? (
+                            <a
+                              href={linked.video_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block text-sm font-medium text-rose hover:underline"
+                            >
+                              {t("▶ Watch demo")}
+                            </a>
+                          ) : null}
+                          <div className="grid grid-cols-2 gap-3">
+                            <WeightInput
+                              form={logFormId}
+                              name={`weight_${c.id}`}
+                              placeholder={t("Weight used")}
+                            />
+                            <Input
+                              form={logFormId}
+                              name={`notes_${c.id}`}
+                              placeholder={t("Notes (optional)")}
+                            />
+                          </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                          <WeightInput
-                            form={logFormId}
-                            name={`weight_${c.id}`}
-                            placeholder={t("Weight used")}
-                          />
-                          <Input
-                            form={logFormId}
-                            name={`notes_${c.id}`}
-                            placeholder={t("Notes (optional)")}
-                          />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                 <div className="mt-3 space-y-4">
@@ -779,31 +820,58 @@ export default async function ClientProgramPage({
                 </div>
 
                 <div className="mt-3 space-y-4">
-                  {customExercises.map((c) => (
-                    <div
-                      key={c.id}
-                      className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-ink">{c.exercise_name}</p>
-                        <p className="whitespace-nowrap text-sm text-gray">
-                          {c.sets}×{c.reps}
-                        </p>
+                  {customExercises.map((c) => {
+                    const linked = c.exercise_id ? extraById.get(c.exercise_id) : null;
+                    return (
+                      <div
+                        key={c.id}
+                        className="space-y-2 border-t border-grayLt pt-3 first:border-t-0 first:pt-0"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-sm font-medium text-ink">
+                            {linked?.name ?? c.exercise_name}
+                          </p>
+                          <p className="whitespace-nowrap text-sm text-gray">
+                            {c.sets}×{c.reps}
+                          </p>
+                        </div>
+                        {c.notes ? (
+                          <p className="text-xs text-rose">
+                            {t("Coach's note: {note}", { note: c.notes })}
+                          </p>
+                        ) : null}
+                        {linked?.client_description ? (
+                          <Collapsible label={t("About this movement")}>
+                            <p className="whitespace-pre-wrap text-sm text-gray">
+                              {linked.client_description}
+                            </p>
+                          </Collapsible>
+                        ) : null}
+                        {linked?.video_url ? (
+                          <a
+                            href={linked.video_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-block text-sm font-medium text-rose hover:underline"
+                          >
+                            {t("▶ Watch demo")}
+                          </a>
+                        ) : null}
+                        <div className="grid grid-cols-2 gap-3">
+                          <WeightInput
+                            form={logFormId}
+                            name={`weight_${c.id}`}
+                            placeholder={t("Weight used")}
+                          />
+                          <Input
+                            form={logFormId}
+                            name={`notes_${c.id}`}
+                            placeholder={t("Notes (optional)")}
+                          />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <WeightInput
-                          form={logFormId}
-                          name={`weight_${c.id}`}
-                          placeholder={t("Weight used")}
-                        />
-                        <Input
-                          form={logFormId}
-                          name={`notes_${c.id}`}
-                          placeholder={t("Notes (optional)")}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <WorkoutLogForm

@@ -486,8 +486,10 @@ export default async function ClientDetailPage({
     extra_day_id: string | null;
     position: number;
     exercise_name: string;
+    exercise_id: string | null;
     sets: string | null;
     reps: string | null;
+    notes: string | null;
   }
   const dayFilters = [
     programDayIds.length ? `program_day_id.in.(${programDayIds.join(",")})` : null,
@@ -496,7 +498,7 @@ export default async function ClientDetailPage({
   const { data: customProgramDayRows } = dayFilters.length
     ? ((await supabase
         .from("client_custom_program_days")
-        .select("id, program_day_id, extra_day_id, position, exercise_name, sets, reps")
+        .select("id, program_day_id, extra_day_id, position, exercise_name, exercise_id, sets, reps, notes")
         .eq("client_id", id)
         .or(dayFilters.join(","))
         .order("position")) as unknown as { data: CustomProgramDayRow[] | null })
@@ -2326,8 +2328,10 @@ interface CustomDayRowShape {
   extra_day_id: string | null;
   position: number;
   exercise_name: string;
+  exercise_id: string | null;
   sets: string | null;
   reps: string | null;
+  notes: string | null;
 }
 
 function ProgramTab({
@@ -2513,8 +2517,10 @@ function ProgramTab({
                   trackName={trackName}
                   initialRows={customRows.map((r) => ({
                     exercise: r.exercise_name,
+                    exerciseId: r.exercise_id ?? "",
                     sets: r.sets ?? "",
                     reps: r.reps ?? "",
+                    notes: r.notes ?? "",
                   }))}
                   exerciseLibrary={exerciseLibrary}
                 />
@@ -2587,8 +2593,10 @@ function ProgramTab({
                 trackName={trackName}
                 initialRows={customRows.map((r) => ({
                   exercise: r.exercise_name,
+                  exerciseId: r.exercise_id ?? "",
                   sets: r.sets ?? "",
                   reps: r.reps ?? "",
+                  notes: r.notes ?? "",
                 }))}
                 exerciseLibrary={exerciseLibrary}
               />
