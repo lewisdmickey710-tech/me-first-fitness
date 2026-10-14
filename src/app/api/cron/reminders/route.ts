@@ -831,6 +831,7 @@ export async function GET(request: Request) {
           { data: highRiskOverrides },
           { data: yesterdaySchedules },
           { data: paymentsYesterday },
+          { data: testOrArchivedClients },
         ] = await Promise.all([
           supabase
             .from("client_schedules")
@@ -850,7 +851,7 @@ export async function GET(request: Request) {
             .neq("request_type", "class_interest"),
           supabase
             .from("payments")
-            .select("id")
+            .select("id, client_id")
             .is("paid_on", null)
             .lt("due_date", todayDateStr),
           supabase.from("sliding_scale_applications").select("id").eq("status", "pending"),
@@ -893,7 +894,21 @@ export async function GET(request: Request) {
             .from("payments")
             .select("id, amount")
             .eq("paid_on", yesterdayDateStr),
+          supabase.from("clients").select("id, is_test, archived_at"),
         ]);
+
+        // Same exclusion the dashboard's "Payments overdue" card uses, so
+        // the count in this push always matches what she finds when she
+        // taps through -- test profiles and archived clients never count
+        // as real overdue invoices.
+        const excludedFromOverdueIds = new Set(
+          (testOrArchivedClients ?? [])
+            .filter((c) => c.is_test || c.archived_at)
+            .map((c) => c.id)
+        );
+        const realOverduePayments = (overduePayments ?? []).filter(
+          (p) => !excludedFromOverdueIds.has(p.client_id)
+        );
 
         const todayClientNames = new Set<string>();
         const todayInPersonUserIds = new Set<string>();
@@ -1049,8 +1064,8 @@ export async function GET(request: Request) {
           (pendingRequests ?? []).length > 0
             ? `${(pendingRequests ?? []).length} request${(pendingRequests ?? []).length === 1 ? "" : "s"}`
             : null,
-          (overduePayments ?? []).length > 0
-            ? `${(overduePayments ?? []).length} overdue payment${(overduePayments ?? []).length === 1 ? "" : "s"}`
+          realOverduePayments.length > 0
+            ? `${realOverduePayments.length} overdue payment${realOverduePayments.length === 1 ? "" : "s"}`
             : null,
           (pendingSlidingScale ?? []).length > 0
             ? `${(pendingSlidingScale ?? []).length} sliding-scale app${(pendingSlidingScale ?? []).length === 1 ? "" : "s"}`

@@ -46,11 +46,12 @@ export default async function DashboardPage() {
     { data: recentSessions },
     { data: checkins },
     { data: activities },
+    { data: overduePayments },
   ] = await Promise.all([
     supabase
       .from("clients")
       .select(
-        "id, name, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono"
+        "id, name, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono, is_test"
       )
       .is("archived_at", null) as unknown as Promise<{ data: Client[] | null }>,
     supabase
@@ -89,6 +90,16 @@ export default async function DashboardPage() {
       .gte("date", lookbackStart) as unknown as Promise<{
       data: { client_id: string; date: string }[] | null;
     }>,
+    supabase
+      .from("payments")
+      .select("id, client_id, description, amount, due_date")
+      .is("paid_on", null)
+      .lt("due_date", today)
+      .order("due_date") as unknown as Promise<{
+      data:
+        | { id: string; client_id: string; description: string; amount: number; due_date: string }[]
+        | null;
+    }>,
   ]);
 
   const clientById = new Map((clients ?? []).map((c) => [c.id, c]));
@@ -98,6 +109,22 @@ export default async function DashboardPage() {
   const virtualClientIds = new Set(
     (clients ?? []).filter((c) => c.session_mode === "virtual").map((c) => c.id)
   );
+
+  // ---------------- Payments overdue ----------------
+  // Same definition the morning push notification counts -- test profiles
+  // excluded so QA activity never shows up here, same as everywhere else
+  // overdue/income totals are computed (see finances page).
+  const overduePaymentsByClient = new Map<
+    string,
+    { id: string; description: string; amount: number; due_date: string }[]
+  >();
+  for (const p of overduePayments ?? []) {
+    const client = clientById.get(p.client_id);
+    if (!client || client.is_test) continue;
+    const list = overduePaymentsByClient.get(p.client_id) ?? [];
+    list.push(p);
+    overduePaymentsByClient.set(p.client_id, list);
+  }
 
   // Every occurrence override in the lookback window, keyed by client+date.
   const occByClientDate = new Map(
@@ -290,6 +317,51 @@ export default async function DashboardPage() {
                 )}
               </Card>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="mb-2 text-sm font-medium text-gray">Payments overdue</p>
+        {overduePaymentsByClient.size === 0 ? (
+          <EmptyState title="Nothing overdue" body="No unpaid invoices past their due date." />
+        ) : (
+          <div className="space-y-2">
+            {[...overduePaymentsByClient.entries()].map(([clientId, clientPayments]) => {
+              const client = clientById.get(clientId);
+              if (!client) return null;
+              const total = clientPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+              const oldest = clientPayments.reduce(
+                (earliest, p) => (p.due_date < earliest ? p.due_date : earliest),
+                clientPayments[0].due_date
+              );
+              return (
+                <Card
+                  key={clientId}
+                  className="flex items-center justify-between border-pink/40 bg-pink/5"
+                >
+                  <div>
+                    <Link
+                      href={`/coach/clients/${clientId}?tab=payments`}
+                      className="font-medium text-ink hover:underline"
+                    >
+                      {client.name}
+                    </Link>
+                    <p className="text-sm text-gray">
+                      {clientPayments.length === 1
+                        ? `$${total.toFixed(2)} overdue since ${oldest}`
+                        : `${clientPayments.length} payments, $${total.toFixed(2)} overdue — oldest since ${oldest}`}
+                    </p>
+                  </div>
+                  <Link
+                    href={`/coach/clients/${clientId}?tab=payments`}
+                    className="text-sm font-medium text-rose hover:underline"
+                  >
+                    Review →
+                  </Link>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
