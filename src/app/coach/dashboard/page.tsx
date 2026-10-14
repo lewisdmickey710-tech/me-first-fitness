@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Badge, Card, EmptyState, Heart } from "@/components/ui";
+import { NudgeButton } from "@/components/nudge-button";
 import { formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import type { Client } from "@/lib/types";
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
     supabase
       .from("clients")
       .select(
-        "id, name, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono, is_test"
+        "id, name, user_id, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono, is_test"
       )
       .is("archived_at", null) as unknown as Promise<{ data: Client[] | null }>,
     supabase
@@ -139,6 +140,7 @@ export default async function DashboardPage() {
   type TodaySession = {
     clientId: string;
     clientName: string;
+    userId: string | null;
     timeOfDay: string | null;
     label: string | null;
     isHeld: boolean;
@@ -167,6 +169,7 @@ export default async function DashboardPage() {
     todaysSessions.push({
       clientId: s.client_id,
       clientName: client.name,
+      userId: client.user_id,
       timeOfDay: s.time_of_day,
       label: s.label,
       isHeld: heldClientIds.has(s.client_id),
@@ -184,6 +187,7 @@ export default async function DashboardPage() {
     todaysSessions.push({
       clientId: o.client_id,
       clientName: client.name,
+      userId: client.user_id,
       timeOfDay: timeMatch?.[1] ?? null,
       label: o.is_video_session ? "Video session" : null,
       isHeld: heldClientIds.has(o.client_id),
@@ -302,20 +306,23 @@ export default async function DashboardPage() {
                     {s.label ? ` · ${s.label}` : ""}
                   </p>
                 </div>
-                {s.isHeld ? (
-                  <Badge tone="gray">On hold</Badge>
-                ) : s.isDone ? (
-                  <Badge tone="green">Logged</Badge>
-                ) : s.isOneOff ? (
-                  <Badge tone="teal">One-off</Badge>
-                ) : (
-                  <Link
-                    href={`/coach/clients/${s.clientId}/log-session?date=${today}`}
-                    className="text-sm font-medium text-rose hover:underline"
-                  >
-                    Log it →
-                  </Link>
-                )}
+                <div className="flex items-center gap-2">
+                  {s.isHeld ? (
+                    <Badge tone="gray">On hold</Badge>
+                  ) : s.isDone ? (
+                    <Badge tone="green">Logged</Badge>
+                  ) : s.isOneOff ? (
+                    <Badge tone="teal">One-off</Badge>
+                  ) : (
+                    <Link
+                      href={`/coach/clients/${s.clientId}/log-session?date=${today}`}
+                      className="text-sm font-medium text-rose hover:underline"
+                    >
+                      Log it →
+                    </Link>
+                  )}
+                  {s.isHeld ? null : <NudgeButton clientId={s.clientId} userId={s.userId} />}
+                </div>
               </Card>
             ))}
           </div>
@@ -354,12 +361,15 @@ export default async function DashboardPage() {
                         : `${clientPayments.length} payments, $${total.toFixed(2)} overdue — oldest since ${oldest}`}
                     </p>
                   </div>
-                  <Link
-                    href={`/coach/clients/${clientId}?tab=payments`}
-                    className="text-sm font-medium text-rose hover:underline"
-                  >
-                    Review →
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/coach/clients/${clientId}?tab=payments`}
+                      className="text-sm font-medium text-rose hover:underline"
+                    >
+                      Review →
+                    </Link>
+                    <NudgeButton clientId={clientId} userId={client.user_id} />
+                  </div>
                 </Card>
               );
             })}
@@ -393,12 +403,15 @@ export default async function DashboardPage() {
                         : `${dates.length} sessions not logged`}
                     </p>
                   </div>
-                  <Link
-                    href={`/coach/clients/${clientId}/log-session?date=${dates[0]}`}
-                    className="text-sm font-medium text-rose hover:underline"
-                  >
-                    Log it →
-                  </Link>
+                  <div className="flex items-center gap-2">
+                    <Link
+                      href={`/coach/clients/${clientId}/log-session?date=${dates[0]}`}
+                      className="text-sm font-medium text-rose hover:underline"
+                    >
+                      Log it →
+                    </Link>
+                    <NudgeButton clientId={clientId} userId={client.user_id} />
+                  </div>
                 </Card>
               );
             })}
@@ -425,6 +438,7 @@ export default async function DashboardPage() {
                     {label} — {daysSince}+ days
                   </p>
                 </div>
+                <NudgeButton clientId={client.id} userId={client.user_id} />
               </Card>
             ))}
           </div>

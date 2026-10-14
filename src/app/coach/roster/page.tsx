@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { unarchiveClient, coachCancelSession, coachCancelSessionAsClient } from "@/app/coach/actions";
 import { isLateCancellation, lateCancellationFeeAmount } from "@/lib/cancellation";
 import { ConfirmButton } from "@/components/confirm-button";
+import { NudgeButton } from "@/components/nudge-button";
 import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
@@ -751,8 +752,8 @@ export default async function RosterPage({
     const flags = computeFlags(client);
 
     return (
-      <Link key={client.id} href={`/coach/clients/${client.id}`}>
-        <Card className="transition hover:border-rose/40">
+      <Card key={client.id} className="transition hover:border-rose/40">
+        <Link href={`/coach/clients/${client.id}`}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span
@@ -800,8 +801,13 @@ export default async function RosterPage({
               ))}
             </div>
           ) : null}
-        </Card>
-      </Link>
+        </Link>
+        {client.user_id ? (
+          <div className="mt-2 flex justify-end">
+            <NudgeButton clientId={client.id} userId={client.user_id} />
+          </div>
+        ) : null}
+      </Card>
     );
   }
 
