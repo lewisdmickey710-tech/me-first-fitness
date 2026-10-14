@@ -113,7 +113,7 @@ export default async function RosterPage({
     clientIds.length > 0
       ? supabase
           .from("payments")
-          .select("client_id, due_date, paid_on, kind")
+          .select("client_id, due_date, paid_on, waived_on, kind")
           .in("client_id", clientIds)
       : Promise.resolve({ data: [] }),
     clientIds.length > 0
@@ -294,18 +294,18 @@ export default async function RosterPage({
 
   const overdueByClient = new Set(
     (paymentRows ?? [])
-      .filter((p) => !p.paid_on && p.due_date < today)
+      .filter((p) => !p.paid_on && !p.waived_on && p.due_date < today)
       .map((p) => p.client_id)
   );
 
   const paymentsByClient = new Map<
     string,
-    { due_date: string; paid_on: string | null }[]
+    { due_date: string; paid_on: string | null; waived_on: string | null }[]
   >();
   for (const p of paymentRows ?? []) {
     paymentsByClient.set(p.client_id, [
       ...(paymentsByClient.get(p.client_id) ?? []),
-      { due_date: p.due_date, paid_on: p.paid_on },
+      { due_date: p.due_date, paid_on: p.paid_on, waived_on: p.waived_on },
     ]);
   }
 
@@ -363,7 +363,7 @@ export default async function RosterPage({
 
   const lateCancelFeeDueByClient = new Set(
     (paymentRows ?? [])
-      .filter((p) => p.kind === "late_cancellation_fee" && !p.paid_on)
+      .filter((p) => p.kind === "late_cancellation_fee" && !p.paid_on && !p.waived_on)
       .map((p) => p.client_id)
   );
 

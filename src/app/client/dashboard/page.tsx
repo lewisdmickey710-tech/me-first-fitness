@@ -106,6 +106,7 @@ export default async function ClientDashboard() {
       .select("*")
       .eq("client_id", me.id)
       .is("paid_on", null)
+      .is("waived_on", null)
       .order("due_date", { ascending: true }) as unknown as Promise<{
       data: Payment[] | null;
     }>,

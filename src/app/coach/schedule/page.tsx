@@ -202,6 +202,7 @@ export default async function CoachSchedulePage({
       .from("payments")
       .select("client_id")
       .is("paid_on", null)
+      .is("waived_on", null)
       .neq("kind", "late_cancellation_fee")
       .lt("due_date", todayStr) as unknown as Promise<{
       data: { client_id: string }[] | null;

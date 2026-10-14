@@ -94,6 +94,7 @@ export default async function DashboardPage() {
       .from("payments")
       .select("id, client_id, description, amount, due_date")
       .is("paid_on", null)
+      .is("waived_on", null)
       .lt("due_date", today)
       .order("due_date") as unknown as Promise<{
       data:

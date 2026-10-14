@@ -94,7 +94,8 @@ export async function GET(request: Request) {
     .from("payments")
     .select("client_id")
     .eq("kind", "late_cancellation_fee")
-    .is("paid_on", null);
+    .is("paid_on", null)
+    .is("waived_on", null);
   const { data: heldClientRows } = await supabase
     .from("clients")
     .select("id")
@@ -303,6 +304,7 @@ export async function GET(request: Request) {
       "id, description, amount, due_date, reminder_sent_at, clients(name, user_id, pro_bono, language)"
     )
     .is("paid_on", null)
+    .is("waived_on", null)
     .lte("due_date", paymentLookaheadStr);
 
   for (const payment of payments ?? []) {
@@ -853,6 +855,7 @@ export async function GET(request: Request) {
             .from("payments")
             .select("id, client_id")
             .is("paid_on", null)
+            .is("waived_on", null)
             .lt("due_date", todayDateStr),
           supabase.from("sliding_scale_applications").select("id").eq("status", "pending"),
           supabase
@@ -879,7 +882,7 @@ export async function GET(request: Request) {
             .from("sessions")
             .select("client_id, date, coached")
             .gte("date", riskLookback),
-          supabase.from("payments").select("client_id").is("paid_on", null),
+          supabase.from("payments").select("client_id").is("paid_on", null).is("waived_on", null),
           supabase
             .from("service_checkins")
             .select("client_id, satisfaction, date")

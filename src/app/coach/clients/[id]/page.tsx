@@ -24,6 +24,7 @@ import {
   markCompPackageConverted,
   markMilestoneAchieved,
   markPaymentPaid,
+  waivePayment,
   recordExternalDocumentSignature,
   setClientDocumentAssignment,
   setClientPartner,
@@ -798,7 +799,7 @@ function Overview({
   const allotted = client.sessions_allotted;
   const nextSession = nextSessionForClient(schedules, occurrences);
   const today = toDateString(new Date());
-  const unpaid = payments.filter((p) => !p.paid_on);
+  const unpaid = payments.filter((p) => !p.paid_on && !p.waived_on);
   const nextDue = unpaid.sort((a, b) => a.due_date.localeCompare(b.due_date))[0] ?? null;
   const payAsYouGo =
     client.payment_schedule === "pay_as_you_go"
@@ -4010,7 +4011,7 @@ function PaymentsTab({
       ) : (
         <div className="space-y-3">
           {payments.map((p) => {
-            const overdue = !p.paid_on && p.due_date < today;
+            const overdue = !p.paid_on && !p.waived_on && p.due_date < today;
             return (
               <Card
                 key={p.id}
@@ -4027,6 +4028,8 @@ function PaymentsTab({
                   </div>
                   {p.paid_on ? (
                     <Badge tone="green">paid {p.paid_on}</Badge>
+                  ) : p.waived_on ? (
+                    <Badge tone="gray">waived</Badge>
                   ) : overdue ? (
                     <Badge tone="pink">overdue</Badge>
                   ) : (
@@ -4036,18 +4039,29 @@ function PaymentsTab({
                 <p className="mt-1 text-lg font-semibold text-ink">
                   ${Number(p.amount).toFixed(2)}
                 </p>
-                {!p.paid_on ? (
-                  <form
-                    action={async () => {
-                      "use server";
-                      await markPaymentPaid(p.id, clientId);
-                    }}
-                    className="mt-3"
-                  >
-                    <Button type="submit" variant="secondary">
-                      Mark paid
-                    </Button>
-                  </form>
+                {!p.paid_on && !p.waived_on ? (
+                  <div className="mt-3 flex gap-2">
+                    <form
+                      action={async () => {
+                        "use server";
+                        await markPaymentPaid(p.id, clientId);
+                      }}
+                    >
+                      <Button type="submit" variant="secondary">
+                        Mark paid
+                      </Button>
+                    </form>
+                    <form
+                      action={async () => {
+                        "use server";
+                        await waivePayment(p.id, clientId);
+                      }}
+                    >
+                      <Button type="submit" variant="secondary">
+                        Waive
+                      </Button>
+                    </form>
+                  </div>
                 ) : null}
               </Card>
             );

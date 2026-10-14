@@ -100,6 +100,8 @@ export default async function ClientPaymentHistoryPage() {
                   <p className="font-medium text-ink">{entry.payment.description}</p>
                   {entry.payment.paid_on ? (
                     <Badge tone="green">{t("paid {date}", { date: entry.payment.paid_on })}</Badge>
+                  ) : entry.payment.waived_on ? (
+                    <Badge tone="gray">{t("waived")}</Badge>
                   ) : (
                     <Badge tone="gold">{t("due {date}", { date: entry.payment.due_date })}</Badge>
                   )}

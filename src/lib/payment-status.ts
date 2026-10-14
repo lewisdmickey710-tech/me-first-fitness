@@ -40,6 +40,7 @@ export async function clientHasOverdueBalance(
     .select("id")
     .eq("client_id", clientId)
     .is("paid_on", null)
+    .is("waived_on", null)
     .neq("kind", "late_cancellation_fee")
     .lt("due_date", today)
     .limit(1);
@@ -62,11 +63,11 @@ export function payAsYouGoStatus(
 // payment rows at all means nothing's been invoiced yet -- distinct from
 // "paid up" (rows exist, all have paid_on set).
 export function monthlyPaymentStatus(
-  payments: { due_date: string; paid_on: string | null }[],
+  payments: { due_date: string; paid_on: string | null; waived_on?: string | null }[],
   today: string
 ): PaymentStatusBadge {
   if (payments.length === 0) return null;
-  const unpaid = payments.filter((p) => !p.paid_on);
+  const unpaid = payments.filter((p) => !p.paid_on && !p.waived_on);
   if (unpaid.length === 0) return { label: "Paid up", tone: "teal" };
   const overdue = unpaid.some((p) => p.due_date < today);
   if (overdue) return { label: "Payment overdue", tone: "pink" };

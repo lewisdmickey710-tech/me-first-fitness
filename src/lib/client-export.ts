@@ -322,7 +322,7 @@ export async function buildClientExportText(
       (payments ?? [])
         .map(
           (p) =>
-            `${p.due_date}: ${p.description} — $${p.amount} — ${p.paid_on ? `paid ${p.paid_on}` : "unpaid"}`
+            `${p.due_date}: ${p.description} — $${p.amount} — ${p.paid_on ? `paid ${p.paid_on}` : p.waived_on ? "waived" : "unpaid"}`
         )
         .join("\n")
     )

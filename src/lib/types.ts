@@ -513,6 +513,7 @@ export interface Payment {
   amount: number;
   due_date: string;
   paid_on: string | null;
+  waived_on: string | null;
   reminder_sent_at: string | null;
   kind: PaymentKind;
   session_occurrence_id: string | null;

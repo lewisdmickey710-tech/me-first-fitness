@@ -2320,6 +2320,25 @@ export async function markPaymentPaid(paymentId: string, clientId: string) {
   revalidatePath("/coach/finances");
 }
 
+// Forgives any payment row outright -- a session fee, a late cancellation
+// fee, a hold/retainer fee, anything in `payments` -- without counting it
+// as real income the way markPaymentPaid would. Leaves paid_on untouched;
+// every overdue/due/unpaid check across the app treats waived_on is not
+// null the same as paid for "nothing outstanding" purposes.
+export async function waivePayment(paymentId: string, clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("payments")
+    .update({ waived_on: new Date().toISOString() })
+    .eq("id", paymentId);
+
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/finances");
+}
+
 // Starts a comp session package for a client (a silent-auction donation, a
 // giveaway, a referral perk, etc.) -- see 0105_comp_session_packages for the
 // full lifecycle. session_value drives clients.session_rate for as long as

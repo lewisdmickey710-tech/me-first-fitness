@@ -8,6 +8,7 @@ import {
   deleteCredential,
   addPaymentFromLedger,
   markPaymentPaid,
+  waivePayment,
 } from "@/app/coach/actions";
 import { BackOfficeTabs } from "@/components/back-office-tabs";
 import { Badge, Button, Card, EmptyState, Heart, Input, Select } from "@/components/ui";
@@ -231,7 +232,7 @@ export default async function FinancesPage({
 
   const filteredLedgerPayments = (ledgerPayments ?? []).filter((p) => {
     if (paymentStatus === "paid") return !!p.paid_on;
-    if (paymentStatus === "unpaid") return !p.paid_on;
+    if (paymentStatus === "unpaid") return !p.paid_on && !p.waived_on;
     return true;
   });
 
@@ -558,7 +559,7 @@ export default async function FinancesPage({
           ) : (
             <div className="space-y-2">
               {filteredLedgerPayments.map((p) => {
-                const overdue = !p.paid_on && p.due_date < todayStr;
+                const overdue = !p.paid_on && !p.waived_on && p.due_date < todayStr;
                 return (
                   <div
                     key={p.id}
@@ -573,9 +574,11 @@ export default async function FinancesPage({
                       <p className="text-xs text-gray">
                         {p.paid_on
                           ? `Paid ${p.paid_on}`
-                          : overdue
-                            ? `Overdue since ${p.due_date}`
-                            : `Due ${p.due_date}`}
+                          : p.waived_on
+                            ? "Waived"
+                            : overdue
+                              ? `Overdue since ${p.due_date}`
+                              : `Due ${p.due_date}`}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -587,17 +590,29 @@ export default async function FinancesPage({
                         >
                           Receipt
                         </Link>
-                      ) : (
-                        <form
-                          action={async () => {
-                            "use server";
-                            await markPaymentPaid(p.id, p.client_id);
-                          }}
-                        >
-                          <Button type="submit" variant="secondary">
-                            Mark paid
-                          </Button>
-                        </form>
+                      ) : p.waived_on ? null : (
+                        <>
+                          <form
+                            action={async () => {
+                              "use server";
+                              await markPaymentPaid(p.id, p.client_id);
+                            }}
+                          >
+                            <Button type="submit" variant="secondary">
+                              Mark paid
+                            </Button>
+                          </form>
+                          <form
+                            action={async () => {
+                              "use server";
+                              await waivePayment(p.id, p.client_id);
+                            }}
+                          >
+                            <Button type="submit" variant="secondary">
+                              Waive
+                            </Button>
+                          </form>
+                        </>
                       )}
                     </div>
                   </div>

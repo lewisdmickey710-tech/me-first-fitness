@@ -612,6 +612,7 @@ const ES: Record<string, string> = {
     "Los pagos y sesiones cubiertas aparecerán aquí a medida que ocurran.",
   "paid {date}": "pagado {date}",
   "due {date}": "vence {date}",
+  waived: "condonado",
   value: "valor",
 
   // Progress

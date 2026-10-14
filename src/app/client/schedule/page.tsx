@@ -81,7 +81,8 @@ export default async function ClientSchedulePage({
       .select("*")
       .eq("client_id", me.id)
       .eq("kind", "late_cancellation_fee")
-      .is("paid_on", null) as unknown as Promise<{ data: Payment[] | null }>,
+      .is("paid_on", null)
+      .is("waived_on", null) as unknown as Promise<{ data: Payment[] | null }>,
   ]);
 
   if (me.hold_started_at) {
