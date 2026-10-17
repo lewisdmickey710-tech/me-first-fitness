@@ -102,7 +102,7 @@ export async function sendPreviewAccessEmail(
 // Same reasoning as sendLeadInviteEmail -- delivered through Resend
 // instead of Supabase Auth's own (rate-limited, silently unreliable)
 // email sender.
-export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
+export async function sendClientLoginLinkEmail(to: string, actionLink: string, code: string) {
   if (!resend) {
     console.warn("RESEND_API_KEY not set — skipping client login link email");
     return;
@@ -115,7 +115,9 @@ export async function sendClientLoginLinkEmail(to: string, actionLink: string) {
       <p>Here&apos;s your one-time login link:</p>
       <p><a href="${actionLink}" style="color: ${BRAND.accentColor}; font-weight: 600;">Log in →</a></p>
       <p style="font-size: 13px; color: #8A8078;">This link works once and expires after a while — if it's stopped working, just request a new one.</p>
-      <p style="font-size: 13px; color: #8A8078;">Tip: if you've already added ${BRAND.name} to your phone's Home Screen, this link still opens in your browser first — just close that tab afterward and open the app from your Home Screen icon instead.</p>
+      <p>Already added ${BRAND.name} to your phone's Home Screen? A tapped link always opens in your browser first, not the Home Screen app, and the two don't always share your login. Skip that entirely by opening the app from your Home Screen icon and entering this code there instead:</p>
+      <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px; color: ${BRAND.accentColor};">${code}</p>
+      <p style="font-size: 13px; color: #8A8078;">This code works once and expires after a while, same as the link above.</p>
     `),
   });
 }

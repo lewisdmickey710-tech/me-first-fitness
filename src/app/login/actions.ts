@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import { sendClientLoginLinkEmail } from "@/lib/email";
 
 export async function sendClientLoginLink(email: string) {
@@ -27,5 +28,26 @@ export async function sendClientLoginLink(email: string) {
   // type it was generated with ('magiclink' here), so that has to be
   // echoed back verbatim rather than substituted for anything else.
   const actionLink = `${process.env.NEXT_PUBLIC_SITE_URL}/auth/confirm?token_hash=${data.properties.hashed_token}&type=${data.properties.verification_type}&next=/`;
-  await sendClientLoginLinkEmail(trimmed, actionLink);
+  // generateLink hands back a plain 6-digit code alongside the link
+  // (data.properties.email_otp) -- same underlying OTP record, just a
+  // second way to redeem it. Verifying by typed code (verifyClientLoginCode
+  // below) never leaves whatever app/browser it's typed into, unlike the
+  // link, which always opens in Safari first even with the Home Screen
+  // icon installed -- so it's the one path that works entirely from
+  // inside an already-installed PWA.
+  await sendClientLoginLinkEmail(trimmed, actionLink, data.properties.email_otp);
+}
+
+export async function verifyClientLoginCode(email: string, code: string) {
+  const trimmed = email.trim().toLowerCase();
+  const trimmedCode = code.trim();
+  if (!trimmed || !trimmedCode) throw new Error("Enter your email and the code.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.auth.verifyOtp({
+    email: trimmed,
+    token: trimmedCode,
+    type: "email",
+  });
+  if (error) throw new Error(error.message);
 }

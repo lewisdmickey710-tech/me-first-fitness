@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { sendClientLoginLink } from "@/app/login/actions";
+import { sendClientLoginLink, verifyClientLoginCode } from "@/app/login/actions";
 import { Button, Card, Collapsible, Heart, Input } from "@/components/ui";
 import { BRAND } from "@/lib/brand";
 
@@ -160,6 +160,9 @@ function ClientLogin() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [code, setCode] = useState("");
+  const [codeError, setCodeError] = useState<string | null>(null);
+  const [verifying, setVerifying] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -179,15 +182,61 @@ function ClientLogin() {
     setLoading(false);
   }
 
+  async function handleVerifyCode(e: React.FormEvent) {
+    e.preventDefault();
+    setCodeError(null);
+    const trimmedCode = code.trim();
+    if (!trimmedCode) {
+      setCodeError("Enter the code from the email.");
+      return;
+    }
+    setVerifying(true);
+    try {
+      await verifyClientLoginCode(email.trim(), trimmedCode);
+      window.location.href = "/";
+    } catch (err) {
+      setCodeError(err instanceof Error ? err.message : "Something went wrong.");
+      setVerifying(false);
+    }
+  }
+
   if (sent) {
     return (
-      <div className="py-4 text-center">
-        <Heart className="mb-2 inline-block text-lg" />
-        <p className="font-medium text-ink">Check your email</p>
-        <p className="mt-1 text-sm text-gray">
-          We sent a login link to {email.trim()}. Tap it on this device to
-          get in.
-        </p>
+      <div className="space-y-4 py-4">
+        <div className="text-center">
+          <Heart className="mb-2 inline-block text-lg" />
+          <p className="font-medium text-ink">Check your email</p>
+          <p className="mt-1 text-sm text-gray">
+            We sent a login link to {email.trim()}. Tap it on this device to
+            get in.
+          </p>
+        </div>
+        <div className="border-t border-grayLt pt-4">
+          <p className="text-center text-sm font-medium text-ink">
+            Already have the app on your Home Screen?
+          </p>
+          <p className="mt-1 text-center text-xs text-gray">
+            Tapping the link opens your browser first, not the Home Screen
+            icon, and the two don&apos;t always share your login. Open the
+            app from your Home Screen instead and type the 6-digit code from
+            that same email here:
+          </p>
+          <form onSubmit={handleVerifyCode} className="mt-3 space-y-2">
+            <Input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              className="text-center text-lg tracking-widest"
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+            />
+            {codeError ? <p className="text-center text-sm text-pink">{codeError}</p> : null}
+            <Button type="submit" className="w-full" disabled={verifying}>
+              {verifying ? "Checking…" : "Enter code"}
+            </Button>
+          </form>
+        </div>
       </div>
     );
   }
