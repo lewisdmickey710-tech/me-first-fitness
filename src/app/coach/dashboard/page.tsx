@@ -311,15 +311,16 @@ export default async function DashboardPage() {
                     <Badge tone="gray">On hold</Badge>
                   ) : s.isDone ? (
                     <Badge tone="green">Logged</Badge>
-                  ) : s.isOneOff ? (
-                    <Badge tone="teal">One-off</Badge>
                   ) : (
-                    <Link
-                      href={`/coach/clients/${s.clientId}/log-session?date=${today}`}
-                      className="text-sm font-medium text-rose hover:underline"
-                    >
-                      Log it →
-                    </Link>
+                    <>
+                      {s.isOneOff ? <Badge tone="teal">One-off</Badge> : null}
+                      <Link
+                        href={`/coach/clients/${s.clientId}/log-session?date=${today}`}
+                        className="text-sm font-medium text-rose hover:underline"
+                      >
+                        Log it →
+                      </Link>
+                    </>
                   )}
                   {s.isHeld ? null : <NudgeButton clientId={s.clientId} userId={s.userId} />}
                 </div>
