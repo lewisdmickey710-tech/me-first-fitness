@@ -913,10 +913,31 @@ export async function GET(request: Request) {
           (p) => !excludedFromOverdueIds.has(p.client_id)
         );
 
+        // todaySchedules is the recurring weekly schedule alone -- it has
+        // no idea a client's slot was cancelled/late-cancelled/rescheduled
+        // for today specifically (that's recorded as a session_occurrences
+        // override, same as the Motherboard's own Today section already
+        // checks). todayOneOffs doesn't need this -- it's already filtered
+        // to status=scheduled at the query level -- but a recurring slot
+        // with an override here would otherwise still show up as if it
+        // were happening today.
+        const cancelledOrRescheduledTodayClientIds = new Set(
+          (recentOccurrences ?? [])
+            .filter(
+              (o) =>
+                o.occurrence_date === todayDateStr &&
+                (o.status === "cancelled" ||
+                  o.status === "late_cancelled" ||
+                  o.status === "rescheduled")
+            )
+            .map((o) => o.client_id)
+        );
+
         const todayClientNames = new Set<string>();
         const todayInPersonUserIds = new Set<string>();
         for (const row of [...(todaySchedules ?? []), ...(todayOneOffs ?? [])]) {
           if (frozenClientIds.has(row.client_id)) continue;
+          if (cancelledOrRescheduledTodayClientIds.has(row.client_id)) continue;
           const c = (row as unknown as {
             clients: { name: string; user_id: string | null; session_mode: string | null } | null;
           }).clients;
