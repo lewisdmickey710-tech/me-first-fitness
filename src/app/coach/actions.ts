@@ -2859,6 +2859,60 @@ export async function endClientHold(clientId: string) {
   revalidatePath("/coach/dashboard");
 }
 
+// Moves a client onto a once-a-month, pay-per-visit arrangement -- in
+// person, pay-as-you-go (no recurring access fee), and no standing
+// weekly schedule since there isn't one anymore (deactivated rather than
+// deleted, so the history stays if she ever switches back). monthly_checkin
+// itself is what tells the dashboard/roster/risk-score/inactivity-nudge
+// checks to use a longer, once-a-month-appropriate window instead of
+// flagging her as gone quiet between visits, and to stop expecting
+// days_per_week-worth of weekly sessions out of her for the consistency-%
+// math (days_per_week itself is left alone -- the DB requires it be
+// between 1 and 6, so it can't just go to 0 to mean "not weekly").
+export async function switchClientToMonthlyCheckIn(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({
+      monthly_checkin: true,
+      session_mode: "in_person",
+      payment_schedule: "pay_as_you_go",
+    })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  const { error: scheduleError } = await supabase
+    .from("client_schedules")
+    .update({ active: false })
+    .eq("client_id", clientId)
+    .eq("active", true);
+  if (scheduleError) throw new Error(scheduleError.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
+  revalidatePath("/coach/schedule");
+}
+
+// Just clears the flag -- session_mode/payment_schedule/days_per_week and
+// her weekly schedule are left for the coach to set back up deliberately
+// (via the normal edit form + re-adding schedule slots), since "back to
+// what" isn't something to guess at automatically.
+export async function switchClientToFullCoaching(clientId: string) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ monthly_checkin: false })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
+}
+
 const OVERRIDABLE_FLAGS = ["inactive", "high_risk", "session_not_logged"] as const;
 
 // Dismisses a roster "attention" flag she already knows the story behind

@@ -14,6 +14,10 @@ export interface RiskInput {
   hasOverduePayment: boolean;
   consistencyPct: number | null; // trailing-28-day sessions vs. expected, 0-100
   latestServiceCheckinSatisfaction: number | null; // 1-5
+  // Overrides INACTIVITY_DAYS_THRESHOLD below for a client whose expected
+  // cadence genuinely isn't weekly (a monthly check-in client, say) --
+  // leave unset for the normal threshold.
+  inactivityThresholdDays?: number;
 }
 
 export type RiskLevel = "low" | "medium" | "high";
@@ -30,6 +34,10 @@ const MEDIUM_RISK_THRESHOLD = 1;
 // Also the threshold the inactivity-nudge cron uses to decide a client
 // has "gone quiet" -- kept here as the one source of truth for that number.
 export const INACTIVITY_DAYS_THRESHOLD = 14;
+// Same idea, for a client on the monthly_checkin arrangement -- covers a
+// once-a-month visit landing a few days later than last time without
+// flagging/nudging her in between.
+export const MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD = 35;
 const LOW_CONSISTENCY_THRESHOLD = 50;
 const LOW_SATISFACTION_THRESHOLD = 2;
 
@@ -62,9 +70,10 @@ export function computeCancellationRisk(input: RiskInput): RiskResult {
     );
   }
 
+  const inactivityThreshold = input.inactivityThresholdDays ?? INACTIVITY_DAYS_THRESHOLD;
   if (
     input.daysSinceLastCheckinOrActivity === null ||
-    input.daysSinceLastCheckinOrActivity >= INACTIVITY_DAYS_THRESHOLD
+    input.daysSinceLastCheckinOrActivity >= inactivityThreshold
   ) {
     score += 1;
     reasons.push(

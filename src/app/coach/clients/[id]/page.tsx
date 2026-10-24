@@ -33,6 +33,8 @@ import {
   setRequestStatus,
   sendTrackingNudge,
   startClientHold,
+  switchClientToMonthlyCheckIn,
+  switchClientToFullCoaching,
   touchProgramUpdated,
   unmarkMilestoneAchieved,
   updateClientProfile,
@@ -814,7 +816,7 @@ function Overview({
   const recentCount = allSessions.filter(
     (s) => s.coached && new Date(s.date) >= fourWeeksAgo
   ).length;
-  const expectedCount = (client.days_per_week ?? 3) * 4;
+  const expectedCount = client.monthly_checkin ? 0 : (client.days_per_week ?? 3) * 4;
   const consistencyPct =
     expectedCount > 0
       ? Math.min(100, Math.round((recentCount / expectedCount) * 100))
@@ -1764,6 +1766,45 @@ function ProfileTab({
             {client.hold_started_at ? "End hold" : "Start hold"}
           </Button>
         </form>
+      </Card>
+
+      <Card className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="font-medium text-ink">Monthly check-in</p>
+          {client.monthly_checkin ? <Badge tone="teal">active</Badge> : null}
+        </div>
+        <p className="text-sm text-gray">
+          {client.monthly_checkin
+            ? "In person, pay-as-you-go, no standing weekly schedule or recurring access fee -- book and bill each visit like any one-off session. The dashboard, roster, and tracking nudges give her a longer runway before flagging her as quiet, since once a month is the plan."
+            : "For a client dropping to roughly once a month in person for measurements/updates, paying per visit -- no ongoing access fee. Switches her to in-person/pay-as-you-go, deactivates her standing weekly schedule, and stops the usual weekly-cadence flags/nudges from firing on her between visits."}
+        </p>
+        {client.monthly_checkin ? (
+          <form
+            action={async () => {
+              "use server";
+              await switchClientToFullCoaching(client.id);
+            }}
+          >
+            <Button type="submit" variant="secondary">
+              Switch back to regular coaching
+            </Button>
+          </form>
+        ) : (
+          <form
+            action={async () => {
+              "use server";
+              await switchClientToMonthlyCheckIn(client.id);
+            }}
+          >
+            <ConfirmButton
+              type="submit"
+              variant="secondary"
+              confirmText={`Switch ${client.name} to in-person, pay-as-you-go, once-a-month check-ins? This deactivates her standing weekly schedule -- you'll book each visit as a one-off.`}
+            >
+              Switch to monthly check-in
+            </ConfirmButton>
+          </form>
+        )}
       </Card>
 
       <Card className="space-y-3">

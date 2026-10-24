@@ -14,7 +14,11 @@ import { getCoachEmail, getCoachUserId } from "@/lib/coach";
 import { sendPushToUser } from "@/lib/push";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
 import { formatTimeOfDay, formatTimeOfDayForClient } from "@/lib/schedule";
-import { computeCancellationRisk, INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
+import {
+  computeCancellationRisk,
+  INACTIVITY_DAYS_THRESHOLD,
+  MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD,
+} from "@/lib/risk";
 import { FREE_HOLD_DAYS, RETAINER_FEE_PER_WEEK } from "@/lib/retainer";
 import { computeStreak, nextStreakCelebration } from "@/lib/streaks";
 import { getTodaysNotableWeather } from "@/lib/weather";
@@ -62,9 +66,6 @@ export async function GET(request: Request) {
     resendCooldownCutoff.getUTCDate() - PAYMENT_RESEND_COOLDOWN_DAYS
   );
 
-  const inactivityCutoff = new Date(now);
-  inactivityCutoff.setUTCDate(inactivityCutoff.getUTCDate() - INACTIVITY_DAYS_THRESHOLD);
-  const inactivityCutoffStr = toDateString(inactivityCutoff);
   const nudgeCooldownCutoff = new Date(now);
   nudgeCooldownCutoff.setUTCDate(
     nudgeCooldownCutoff.getUTCDate() - INACTIVITY_NUDGE_COOLDOWN_DAYS
@@ -350,7 +351,9 @@ export async function GET(request: Request) {
   // ---- Inactivity nudges: no self-logged check-in/activity in a while ----
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, user_id, last_inactivity_nudge_sent_at, language, notify_tracking_reminders")
+    .select(
+      "id, name, user_id, last_inactivity_nudge_sent_at, language, notify_tracking_reminders, monthly_checkin"
+    )
     .not("user_id", "is", null);
 
   const activeClients = (clients ?? []).filter(
@@ -361,26 +364,43 @@ export async function GET(request: Request) {
 
   if (activeClients.length > 0) {
     const activeClientIds = activeClients.map((c) => c.id);
+    // Widest window covers both thresholds below -- a monthly_checkin
+    // client's "last tracked" date needs to survive this far back even
+    // though most clients only ever need the shorter one.
+    const widestCutoff = new Date(now);
+    widestCutoff.setUTCDate(
+      widestCutoff.getUTCDate() - MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+    );
+    const widestCutoffStr = toDateString(widestCutoff);
     const [{ data: recentCheckins }, { data: recentActivities }] = await Promise.all([
       supabase
         .from("checkins")
         .select("client_id, date")
         .in("client_id", activeClientIds)
-        .gte("date", inactivityCutoffStr),
+        .gte("date", widestCutoffStr),
       supabase
         .from("activities")
         .select("client_id, date")
         .in("client_id", activeClientIds)
-        .gte("date", inactivityCutoffStr),
+        .gte("date", widestCutoffStr),
     ]);
-    const trackedRecentlyIds = new Set(
-      [...(recentCheckins ?? []), ...(recentActivities ?? [])].map(
-        (r) => r.client_id
-      )
-    );
+    const lastTrackedByClientId = new Map<string, string>();
+    for (const r of [...(recentCheckins ?? []), ...(recentActivities ?? [])]) {
+      const existing = lastTrackedByClientId.get(r.client_id);
+      if (!existing || r.date > existing) lastTrackedByClientId.set(r.client_id, r.date);
+    }
 
     for (const client of activeClients) {
-      if (trackedRecentlyIds.has(client.id)) continue;
+      const lastTracked = lastTrackedByClientId.get(client.id);
+      const threshold = client.monthly_checkin
+        ? MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+        : INACTIVITY_DAYS_THRESHOLD;
+      if (lastTracked) {
+        const daysSince = Math.floor(
+          (now.getTime() - new Date(`${lastTracked}T00:00:00Z`).getTime()) / 86400000
+        );
+        if (daysSince < threshold) continue;
+      }
       if (!client.user_id) continue;
 
       const { data: userResult } = await supabase.auth.admin.getUserById(client.user_id);
@@ -866,7 +886,7 @@ export async function GET(request: Request) {
             .neq("status", "archived"),
           supabase
             .from("clients")
-            .select("id, name, days_per_week")
+            .select("id, name, days_per_week, monthly_checkin")
             .eq("is_test", false)
             .is("archived_at", null)
             .is("hold_started_at", null),
@@ -991,7 +1011,7 @@ export async function GET(request: Request) {
           const daysSince = lastTracked
             ? Math.floor((new Date(todayDateStr).getTime() - new Date(lastTracked).getTime()) / 86400000)
             : null;
-          const expectedCount = (c.days_per_week ?? 3) * 4;
+          const expectedCount = c.monthly_checkin ? 0 : (c.days_per_week ?? 3) * 4;
           const consistencyPct =
             expectedCount > 0
               ? Math.min(100, Math.round(((coachedCountByClient.get(c.id) ?? 0) / expectedCount) * 100))
@@ -1002,6 +1022,9 @@ export async function GET(request: Request) {
             hasOverduePayment: overdueClientIds.has(c.id),
             consistencyPct,
             latestServiceCheckinSatisfaction: satisfactionByClient.get(c.id) ?? null,
+            inactivityThresholdDays: c.monthly_checkin
+              ? MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+              : undefined,
           });
           if (level === "high") atRiskNames.push(c.name);
         }

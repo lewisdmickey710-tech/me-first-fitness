@@ -7,7 +7,12 @@ import { NudgeButton } from "@/components/nudge-button";
 import { Button, Card, Collapsible, EmptyState, Heart } from "@/components/ui";
 import { phaseInfo } from "@/lib/constants";
 import { isFirstWeekOfMonth, loggedThisMonth } from "@/lib/measurement-window";
-import { computeCancellationRisk, RISK_LEVEL_COLOR, RISK_LEVEL_LABEL } from "@/lib/risk";
+import {
+  computeCancellationRisk,
+  MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD,
+  RISK_LEVEL_COLOR,
+  RISK_LEVEL_LABEL,
+} from "@/lib/risk";
 import type { RiskLevel } from "@/lib/risk";
 import { toDateString, nowInBusinessTz } from "@/lib/timezone";
 import { formatTimeOfDay } from "@/lib/schedule";
@@ -544,7 +549,7 @@ export default async function RosterPage({
             (1000 * 60 * 60 * 24)
         )
       : null;
-    const expectedCount = (c.days_per_week ?? 3) * 4;
+    const expectedCount = c.monthly_checkin ? 0 : (c.days_per_week ?? 3) * 4;
     const consistencyPct =
       expectedCount > 0
         ? Math.min(
@@ -558,6 +563,9 @@ export default async function RosterPage({
       hasOverduePayment: overdueByClient.has(c.id),
       consistencyPct,
       latestServiceCheckinSatisfaction: latestSatisfactionByClient.get(c.id) ?? null,
+      inactivityThresholdDays: c.monthly_checkin
+        ? MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+        : undefined,
     });
     riskByClient.set(c.id, { score, level });
   }
@@ -703,7 +711,10 @@ export default async function RosterPage({
     const clientEstablished =
       new Date(today).getTime() - new Date(client.created_at).getTime() >
       3 * 24 * 60 * 60 * 1000;
-    if (clientEstablished && daysSinceActivity > 3) {
+    const inactiveAfterDays = client.monthly_checkin
+      ? MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+      : 3;
+    if (clientEstablished && daysSinceActivity > inactiveAfterDays) {
       pushOverridableFlag("inactive", `Inactive ${daysSinceActivity}+ days`);
     }
 

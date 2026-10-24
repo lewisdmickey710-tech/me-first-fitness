@@ -4,6 +4,7 @@ import { Badge, Card, EmptyState, Heart } from "@/components/ui";
 import { NudgeButton } from "@/components/nudge-button";
 import { formatTimeOfDay } from "@/lib/schedule";
 import { nowInBusinessTz, toDateString } from "@/lib/timezone";
+import { MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD } from "@/lib/risk";
 import type { Client } from "@/lib/types";
 
 const INACTIVE_AFTER_DAYS = 3;
@@ -52,7 +53,7 @@ export default async function DashboardPage() {
     supabase
       .from("clients")
       .select(
-        "id, name, user_id, session_mode, hold_started_at, self_led, self_led_last_checkin, created_at, pro_bono, is_test"
+        "id, name, user_id, session_mode, hold_started_at, self_led, self_led_last_checkin, monthly_checkin, created_at, pro_bono, is_test"
       )
       .is("archived_at", null) as unknown as Promise<{ data: Client[] | null }>,
     supabase
@@ -263,7 +264,10 @@ export default async function DashboardPage() {
     const daysSince = lastTracked
       ? daysBetween(today, lastTracked)
       : daysBetween(today, c.created_at.slice(0, 10));
-    if (daysSince > INACTIVE_AFTER_DAYS) {
+    const inactiveAfter = c.monthly_checkin
+      ? MONTHLY_CHECKIN_INACTIVITY_DAYS_THRESHOLD
+      : INACTIVE_AFTER_DAYS;
+    if (daysSince > inactiveAfter) {
       notLoggingClients.push({ client: c, daysSince, label: "No activity logged" });
     }
   }

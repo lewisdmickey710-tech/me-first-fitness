@@ -55,6 +55,7 @@ export interface Client {
   session_rate: number | null;
   self_led: boolean;
   self_led_last_checkin: string | null;
+  monthly_checkin: boolean;
   digest_reviewed_at: string | null;
   theme: string;
   notify_announcements: boolean;
