@@ -553,22 +553,31 @@ async function coachBookSessionCore(
   }
 
   const dayOfWeek = new Date(`${date}T00:00:00Z`).getUTCDay();
-  const [{ data: recurringSchedules }, { data: dateOccurrences }] = await Promise.all([
-    supabase
-      .from("client_schedules")
-      .select("client_id, time_of_day, duration_minutes")
-      .eq("day_of_week", dayOfWeek)
-      .eq("active", true),
-    supabase
-      .from("session_occurrences")
-      .select("client_id, status, notes, duration_minutes")
-      .eq("occurrence_date", date),
-  ]);
+  const [{ data: recurringSchedules }, { data: dateOccurrences }, { data: heldClientRows }] =
+    await Promise.all([
+      supabase
+        .from("client_schedules")
+        .select("client_id, time_of_day, duration_minutes")
+        .eq("day_of_week", dayOfWeek)
+        .eq("active", true),
+      supabase
+        .from("session_occurrences")
+        .select("client_id, status, notes, duration_minutes")
+        .eq("occurrence_date", date),
+      supabase.from("clients").select("id").not("hold_started_at", "is", null),
+    ]);
+
+  // A held client's usual slot is just a placeholder, not a real session --
+  // she can be overridden and booked over freely. Clients themselves still
+  // can't request that same slot (submitRequest, client/actions.ts, has no
+  // equivalent exclusion -- deliberately, so self-service stays blocked).
+  const heldClientIds = new Set((heldClientRows ?? []).map((c) => c.id));
 
   const overrideStatusByClient = new Map(
     (dateOccurrences ?? []).map((o) => [o.client_id, o.status])
   );
   const recurringConflict = (recurringSchedules ?? []).some((s) => {
+    if (heldClientIds.has(s.client_id)) return false;
     // Any override for this client on this date (including a same-day
     // reschedule's new "scheduled" time) supersedes their recurring
     // default -- only "completed" leaves the default's own time in play.
@@ -577,6 +586,7 @@ async function coachBookSessionCore(
     return !overridden && timesOverlap(time, durationMinutes, s.time_of_day, s.duration_minutes);
   });
   const oneOffConflict = (dateOccurrences ?? []).some((o) => {
+    if (heldClientIds.has(o.client_id)) return false;
     if (o.status !== "scheduled") return false;
     const match = o.notes?.match(/Confirmed request — (\d{2}:\d{2})/);
     if (!match) return false;

@@ -263,11 +263,14 @@ export function ScheduleGrid({
     );
   }
 
+  // Excludes held placeholders -- a held client's usual slot is just a
+  // dimmed reminder of whose time it normally is, not a real booking, so
+  // it shouldn't block tapping that slot to put someone else there.
   function bookingAt(date: string, slot: number): DayBooking | null {
     const t = toMinutes(BOUNDARIES[slot]);
     return (
       bookings.find((b) => {
-        if (b.date !== date) return false;
+        if (b.date !== date || b.isHeld) return false;
         const start = toMinutes(b.timeOfDay);
         return t >= start && t < start + b.durationMinutes;
       }) ?? null
@@ -735,8 +738,8 @@ export function ScheduleGrid({
                   return (
                     <div
                       key={`${b.clientId}-${b.timeOfDay}`}
-                      title={`${b.clientName} — on hold. This is a placeholder for their usual time, not a real session.`}
-                      className="absolute inset-x-0 z-10 flex items-center justify-center rounded-md border border-grayLt bg-grayLt/50 text-[10px] font-medium leading-none text-gray opacity-60"
+                      title={`${b.clientName} — on hold. This is a placeholder for their usual time, not a real session. Tap through to book someone else here.`}
+                      className="pointer-events-none absolute inset-x-0 z-10 flex items-center justify-center rounded-md border border-grayLt bg-grayLt/50 text-[10px] font-medium leading-none text-gray opacity-60"
                       style={{ top: geometry.top, height: geometry.height }}
                     >
                       {initials(b.clientName)}
