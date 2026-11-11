@@ -43,6 +43,7 @@ export interface ExistingSession {
 }
 
 interface Row {
+  id: string;
   exercise: string;
   sets: string;
   reps: string;
@@ -54,8 +55,15 @@ interface Row {
 
 const BLANK_ROWS = 6;
 
+function newRowId(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random()}`;
+}
+
 function rowsFromEntries(entries: SessionEntry[]): Row[] {
   const filled = entries.map((e) => ({
+    id: newRowId(),
     exercise: e.exercise,
     sets: e.sets,
     reps: e.reps,
@@ -87,6 +95,7 @@ const NOTES_LABEL: Record<SessionType, string> = {
 
 function blankRows(count: number): Row[] {
   return Array.from({ length: count }, () => ({
+    id: newRowId(),
     exercise: "",
     sets: "",
     reps: "",
@@ -209,6 +218,7 @@ export function LogSessionForm({
     setDayLabel(day.label);
     setDayLabelTouched(true);
     const filled = day.exercises.map((e) => ({
+      id: newRowId(),
       exercise: e.exercise,
       sets: e.sets,
       reps: e.reps,
@@ -227,6 +237,7 @@ export function LogSessionForm({
     setDayLabel(lastEntry.session.day_label);
     setDayLabelTouched(true);
     const filled = lastEntry.session.entries.map((e) => ({
+      id: newRowId(),
       exercise: e.exercise,
       sets: e.sets,
       reps: e.reps,
@@ -264,6 +275,16 @@ export function LogSessionForm({
         idx === i ? { ...r, exercise: exercise.name, exerciseId: exercise.id } : r
       )
     );
+  }
+
+  function moveRow(i: number, direction: -1 | 1) {
+    setRows((prev) => {
+      const j = i + direction;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   }
 
   function defaultDayLabelFor(type: SessionType): string {
@@ -565,63 +586,85 @@ export function LogSessionForm({
               </label>
               <div className="space-y-3">
                 {rows.map((row, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="grid grid-cols-12 gap-2">
-                      <ExerciseAutocomplete
-                        value={row.exercise}
-                        exercises={exerciseLibrary}
-                        placeholder="Exercise"
-                        className="col-span-5"
-                        onChangeText={(text) => updateRow(i, "exercise", text)}
-                        onSelect={(ex) => selectExerciseForRow(i, ex)}
-                      />
-                      <input type="hidden" name="exercise_id" value={row.exerciseId ?? ""} />
-                      <Input
-                        name="sets"
-                        placeholder="Sets"
-                        className="col-span-2"
-                        value={row.sets}
-                        onChange={(e) => updateRow(i, "sets", e.target.value)}
-                      />
-                      <Input
-                        name="reps"
-                        placeholder="Reps"
-                        className="col-span-2"
-                        value={row.reps}
-                        onChange={(e) => updateRow(i, "reps", e.target.value)}
-                      />
-                      <div className="col-span-3">
-                        <WeightInput
-                          key={`${activeDayKey ?? "free"}-${i}`}
-                          name="weight"
-                          placeholder="Weight"
-                          defaultValue={row.weight}
-                        />
-                      </div>
+                  <div key={row.id} className="flex gap-2">
+                    <div className="flex shrink-0 flex-col gap-0.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => moveRow(i, -1)}
+                        disabled={i === 0}
+                        aria-label="Move exercise up"
+                        className="rounded border border-grayLt bg-white px-1.5 text-xs leading-tight text-gray hover:text-ink disabled:opacity-30"
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveRow(i, 1)}
+                        disabled={i === rows.length - 1}
+                        aria-label="Move exercise down"
+                        className="rounded border border-grayLt bg-white px-1.5 text-xs leading-tight text-gray hover:text-ink disabled:opacity-30"
+                      >
+                        ▼
+                      </button>
                     </div>
-                    <Input
-                      name="exercise_notes"
-                      placeholder="Notes on this movement -- form cue, how it felt, a swap..."
-                      value={row.notes}
-                      onChange={(e) => updateRow(i, "notes", e.target.value)}
-                    />
-                    <input
-                      type="hidden"
-                      name="existing_media_path"
-                      value={row.existingMediaPath ?? ""}
-                    />
-                    <input
-                      type="file"
-                      name="file"
-                      accept="image/*,video/*"
-                      className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
-                    />
-                    {row.existingMediaPath ? (
-                      <p className="text-xs text-gray">
-                        Has a photo/video attached — choose a file above only
-                        if you want to replace it.
-                      </p>
-                    ) : null}
+                    <div className="flex-1 space-y-1">
+                      <div className="grid grid-cols-12 gap-2">
+                        <ExerciseAutocomplete
+                          value={row.exercise}
+                          exercises={exerciseLibrary}
+                          placeholder="Exercise"
+                          className="col-span-5"
+                          onChangeText={(text) => updateRow(i, "exercise", text)}
+                          onSelect={(ex) => selectExerciseForRow(i, ex)}
+                        />
+                        <input type="hidden" name="exercise_id" value={row.exerciseId ?? ""} />
+                        <Input
+                          name="sets"
+                          placeholder="Sets"
+                          className="col-span-2"
+                          value={row.sets}
+                          onChange={(e) => updateRow(i, "sets", e.target.value)}
+                        />
+                        <Input
+                          name="reps"
+                          placeholder="Reps"
+                          className="col-span-2"
+                          value={row.reps}
+                          onChange={(e) => updateRow(i, "reps", e.target.value)}
+                        />
+                        <div className="col-span-3">
+                          <WeightInput
+                            key={row.id}
+                            name="weight"
+                            placeholder="Weight"
+                            defaultValue={row.weight}
+                          />
+                        </div>
+                      </div>
+                      <Input
+                        name="exercise_notes"
+                        placeholder="Notes on this movement -- form cue, how it felt, a swap..."
+                        value={row.notes}
+                        onChange={(e) => updateRow(i, "notes", e.target.value)}
+                      />
+                      <input
+                        type="hidden"
+                        name="existing_media_path"
+                        value={row.existingMediaPath ?? ""}
+                      />
+                      <input
+                        type="file"
+                        name="file"
+                        accept="image/*,video/*"
+                        className="block w-full text-xs text-gray file:mr-3 file:rounded-lg file:border-0 file:bg-rose/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-rose"
+                      />
+                      {row.existingMediaPath ? (
+                        <p className="text-xs text-gray">
+                          Has a photo/video attached — choose a file above only
+                          if you want to replace it.
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
