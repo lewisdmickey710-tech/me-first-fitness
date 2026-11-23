@@ -724,14 +724,17 @@ export async function GET(request: Request) {
   // free (no payment created in startClientHold), so the first retainer
   // payment is only due once a hold has run longer than that -- every
   // week after, it rolls a new payment forward one week after the last
-  // one's due date, same as before. ----
+  // one's due date, same as before. A client the coach has marked as a
+  // permanent/free hold (hold_retainer_waived) never gets a retainer
+  // payment created at all, for as long as that stays set. ----
   let retainerPayments = 0;
   const { data: onHoldClients } = await supabase
     .from("clients")
-    .select("id, hold_started_at")
+    .select("id, hold_started_at, hold_retainer_waived")
     .not("hold_started_at", "is", null);
 
   for (const client of onHoldClients ?? []) {
+    if (client.hold_retainer_waived) continue;
     const { data: lastRetainer } = await supabase
       .from("payments")
       .select("due_date")

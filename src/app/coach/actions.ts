@@ -2858,9 +2858,30 @@ export async function startClientHold(clientId: string) {
 export async function endClientHold(clientId: string) {
   const supabase = await createClient();
 
+  // Resets the waiver too -- a later, unrelated hold shouldn't silently
+  // inherit "this one's free" from whatever was true the last time.
   const { error } = await supabase
     .from("clients")
-    .update({ hold_started_at: null })
+    .update({ hold_started_at: null, hold_retainer_waived: false })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/coach/clients/${clientId}`);
+  revalidatePath("/coach/roster");
+  revalidatePath("/coach/dashboard");
+}
+
+// Marks an active hold as permanent and free -- the weekly retainer-billing
+// cron (see api/cron/reminders) skips creating payments for this client
+// while it's true, for as long as the hold itself stays active. Doesn't
+// touch any retainer payments already on the books (paid or not); only
+// stops new ones from being created going forward.
+export async function setHoldRetainerWaived(clientId: string, waived: boolean) {
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("clients")
+    .update({ hold_retainer_waived: waived })
     .eq("id", clientId);
   if (error) throw new Error(error.message);
 

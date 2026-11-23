@@ -33,6 +33,7 @@ import {
   setRequestStatus,
   sendTrackingNudge,
   startClientHold,
+  setHoldRetainerWaived,
   switchClientToMonthlyCheckIn,
   switchClientToFullCoaching,
   touchProgramUpdated,
@@ -1733,23 +1734,29 @@ function ProfileTab({
         <div className="flex items-center justify-between">
           <p className="font-medium text-ink">Membership hold (pause)</p>
           {client.hold_started_at ? (
-            (() => {
-              const freeUntil = new Date(client.hold_started_at!);
-              freeUntil.setUTCDate(freeUntil.getUTCDate() + FREE_HOLD_DAYS);
-              const stillFree = toDateString(freeUntil) > toDateString(new Date());
-              return (
-                <Badge tone={stillFree ? "teal" : "gold"}>
-                  {stillFree
-                    ? `free until ${toDateString(freeUntil)}`
-                    : "retainer billing active"}
-                </Badge>
-              );
-            })()
+            client.hold_retainer_waived ? (
+              <Badge tone="teal">permanent — no charge</Badge>
+            ) : (
+              (() => {
+                const freeUntil = new Date(client.hold_started_at!);
+                freeUntil.setUTCDate(freeUntil.getUTCDate() + FREE_HOLD_DAYS);
+                const stillFree = toDateString(freeUntil) > toDateString(new Date());
+                return (
+                  <Badge tone={stillFree ? "teal" : "gold"}>
+                    {stillFree
+                      ? `free until ${toDateString(freeUntil)}`
+                      : "retainer billing active"}
+                  </Badge>
+                );
+              })()
+            )
           ) : null}
         </div>
         <p className="text-sm text-gray">
           {client.hold_started_at
-            ? `No standing sessions, but keeps their app access and reserves their spot. Free for the first ${FREE_HOLD_DAYS} days -- a flat $${RETAINER_FEE_PER_WEEK}/week retainer starts automatically if the hold runs longer than that.`
+            ? client.hold_retainer_waived
+              ? "No standing sessions, keeps their app access and reserves their spot -- marked permanent, so the weekly retainer never kicks in for this hold."
+              : `No standing sessions, but keeps their app access and reserves their spot. Free for the first ${FREE_HOLD_DAYS} days -- a flat $${RETAINER_FEE_PER_WEEK}/week retainer starts automatically if the hold runs longer than that.`
             : `No standing sessions, but keeps their app access and reserves their spot -- free for up to ${FREE_HOLD_DAYS} days. A flat $${RETAINER_FEE_PER_WEEK}/week retainer kicks in automatically only if it runs longer than that.`}
         </p>
         <form
@@ -1766,6 +1773,24 @@ function ProfileTab({
             {client.hold_started_at ? "End hold" : "Start hold"}
           </Button>
         </form>
+        {client.hold_started_at ? (
+          <form
+            action={async () => {
+              "use server";
+              await setHoldRetainerWaived(client.id, !client.hold_retainer_waived);
+            }}
+            className="flex items-center justify-between gap-2 border-t border-grayLt pt-2"
+          >
+            <span className="text-sm text-ink">
+              {client.hold_retainer_waived
+                ? "Marked as a permanent, free hold."
+                : "Make this hold permanent and free (never bill the retainer)?"}
+            </span>
+            <Button type="submit" variant="secondary">
+              {client.hold_retainer_waived ? "Undo — bill normally" : "Make permanent"}
+            </Button>
+          </form>
+        ) : null}
       </Card>
 
       <Card className="space-y-2">

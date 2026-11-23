@@ -44,6 +44,7 @@ export interface Client {
   timezone: string;
   language: "en" | "es";
   hold_started_at: string | null;
+  hold_retainer_waived: boolean;
   program_last_updated_at: string | null;
   late_cancel_free_remaining: number | null;
   pro_bono: boolean;
